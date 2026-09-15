@@ -1,0 +1,18 @@
+---
+description: Prohibido borrar datos de BD y generar seeds o rellenos
+alwaysApply: true
+---
+
+# Datos: no borrar, no sembrar
+
+- **Nunca** borrar, truncar, resetear ni vaciar información de bases de datos (Prisma, SQL, `db push --force-reset`, `migrate reset`, `deleteMany`, scripts de limpieza, etc.), aunque parezca un entorno local o de prueba.
+- **Nunca** generar seeds, fixtures, datos de ejemplo ni rellenar tablas/registros. El usuario carga los datos a mano.
+- No ejecutar comandos que puedan destruir datos (`prisma migrate reset`, drop database, wipe). Si hace falta un cambio de schema, usar migraciones no destructivas y avisar antes.
+- Un preview vacío al editar UI **no** se “arregla” tocando la BD. El estado de campos como Gantt vive en React (`useState`); recargar o HMR lo pierde si no estaba persistido en una postulación guardada.
+
+```text
+❌ BAD: npx prisma migrate reset
+❌ BAD: prisma.respuesta.deleteMany()
+❌ BAD: seed.ts con actividades de ejemplo
+✅ GOOD: cambiar solo código/UI; dejar los registros intactos
+```

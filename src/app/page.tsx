@@ -1,69 +1,94 @@
 import Image from "next/image";
 
-export default function Home() {
+function FigureEvaluador() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
+    <svg viewBox="0 0 160 160" className="h-16 w-16 shrink-0" aria-hidden="true">
+      <rect width="160" height="160" rx="28" fill="#e8eef8" />
+      <circle cx="80" cy="58" r="22" fill="#0a2156" />
+      <rect x="44" y="88" width="72" height="46" rx="16" fill="#0a2156" />
+      <rect x="98" y="40" width="34" height="26" rx="6" fill="#ffffff" stroke="#c8102e" strokeWidth="5" />
+    </svg>
+  );
+}
+
+function FigureEmprendedor() {
+  return (
+    <svg viewBox="0 0 160 160" className="h-16 w-16 shrink-0" aria-hidden="true">
+      <rect width="160" height="160" rx="28" fill="#fde8ec" />
+      <circle cx="80" cy="58" r="22" fill="#c8102e" />
+      <rect x="44" y="88" width="72" height="46" rx="16" fill="#c8102e" />
+      <rect x="58" y="100" width="44" height="8" rx="4" fill="#ffffff" />
+      <rect x="58" y="114" width="28" height="8" rx="4" fill="#ffffff" />
+    </svg>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <div className="hero-aiep relative flex min-h-screen flex-col pt-[20px]">
+      <header className="flex h-20 w-full shrink-0 items-center justify-between overflow-visible bg-black/10 px-32 md:px-52">
         <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
+          src="/aiep.png"
+          alt="AIEP, Universidad Andrés Bello"
+          width={872}
+          height={344}
+          className="relative z-10 object-contain object-left brightness-0 invert"
+          style={{ width: "auto", height: "3.75rem" }}
           priority
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
+        <Image
+          src="/entel.png?v=9cc8f627"
+          alt="Fondo 55+ Entel"
+          width={827}
+          height={545}
+          className="relative z-10 object-contain object-right brightness-0 invert"
+          style={{ width: "auto", height: "4.25rem" }}
+          priority
+          unoptimized
+        />
+      </header>
+      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-start px-5 pb-8 pt-4">
+        <Image
+          src="/portada.png"
+          alt="Desafío Nacional MiPyme Digital"
+          width={1368}
+          height={505}
+          className="mb-8 w-full drop-shadow-[0_8px_18px_rgba(0,0,0,0.28)]"
+          priority
+        />
+        <h1 className="mb-4 max-w-3xl text-center text-xl font-normal leading-tight text-white md:text-2xl">
+          ingresar
+        </h1>
+        <div className="mx-auto grid w-full max-w-3xl items-start gap-10 md:grid-cols-2">
           <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/ingresar/emprendedor"
+            className="card card-link card-portal flex min-h-28 items-center gap-4 p-4"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
+            <FigureEmprendedor />
+            <span className="font-heading text-2xl font-bold text-navy">Soy emprendedor</span>
           </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          <div className="flex flex-col gap-2">
+            <a
+              href="/ingresar/evaluador"
+              className="card card-link card-portal flex min-h-28 items-center justify-end gap-4 p-4"
+            >
+              <span className="font-heading text-2xl font-bold text-navy">Soy evaluador</span>
+              <FigureEvaluador />
+            </a>
+            <a
+              href="/ingresar/admin"
+              className="mr-[2px] self-end text-sm !text-white/50 hover:!text-white"
+            >
+              admin
+            </a>
+          </div>
         </div>
       </main>
+      <footer className="mt-auto px-5 pb-5 pt-8">
+        <p className="text-center text-sm text-white">
+          © Dirección Nacional de Emprendimiento, Innovación y Desarrollo
+        </p>
+      </footer>
     </div>
   );
 }

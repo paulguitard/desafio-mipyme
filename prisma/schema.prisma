@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String   @id @default(cuid())
+  name             String
+  email            String   @unique
+  passwordHash     String
+  passwordAssigned String
+  role             String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  formulariosCreados Formulario[]
+  postulaciones      Postulacion[]
+  asignaciones       AsignacionEvaluador[]
+  convocatoriasPool  ConvocatoriaEvaluador[]
+}
+
+model Formulario {
+  id          String   @id @default(cuid())
+  titulo      String
+  descripcion String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  creadoPorId String
+  creadoPor   User     @relation(fields: [creadoPorId], references: [id])
+
+  preguntas     Pregunta[]
+  convocatorias Convocatoria[]
+}
+
+model Pregunta {
+  id             String  @id @default(cuid())
+  formularioId   String
+  formulario     Formulario @relation(fields: [formularioId], references: [id], onDelete: Cascade)
+  orden          Int
+  enunciado      String
+  ayuda          String  @default("")
+  obligatoria    Boolean @default(true)
+  tipo           String
+  opciones       String  @default("[]")
+  permiteArchivo   Boolean @default(false)
+  permiteImagen    Boolean @default(false)
+  permiteVideoLink Boolean @default(false)
+  conNotas         Boolean @default(false)
+  escalaNotas    String  @default("[]")
+
+  respuestas Respuesta[]
+  revisiones RevisionPregunta[]
+}
+
+model Convocatoria {
+  id                         String    @id @default(cuid())
+  titulo                     String
+  descripcion                String    @default("")
+  formularioId               String
+  formulario                 Formulario @relation(fields: [formularioId], references: [id])
+  estado                     String    @default("ABIERTA")
+  imagen                     String    @default("")
+  fechaInicio                DateTime?
+  fechaCierre                DateTime?
+  evaluacionesPorPostulacion Int       @default(1)
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  postulaciones Postulacion[]
+  evaluadores   ConvocatoriaEvaluador[]
+}
+
+model ConvocatoriaEvaluador {
+  id               String       @id @default(cuid())
+  convocatoriaId   String
+  convocatoria     Convocatoria @relation(fields: [convocatoriaId], references: [id], onDelete: Cascade)
+  evaluadorId      String
+  evaluador        User         @relation(fields: [evaluadorId], references: [id])
+  maxEvaluaciones  Int          @default(0)
+  createdAt        DateTime     @default(now())
+
+  @@unique([convocatoriaId, evaluadorId])
+}
+
+model Postulacion {
+  id             String    @id @default(cuid())
+  convocatoriaId String
+  convocatoria   Convocatoria @relation(fields: [convocatoriaId], references: [id])
+  postulanteId   String
+  postulante     User      @relation(fields: [postulanteId], references: [id])
+  estado         String    @default("BORRADOR")
+  enviadaAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  respuestas   Respuesta[]
+  asignaciones AsignacionEvaluador[]
+
+  @@unique([convocatoriaId, postulanteId])
+}
+
+model Respuesta {
+  id            String   @id @default(cuid())
+  postulacionId String
+  postulacion   Postulacion @relation(fields: [postulacionId], references: [id], onDelete: Cascade)
+  preguntaId    String
+  pregunta      Pregunta    @relation(fields: [preguntaId], references: [id])
+  valor         String   @default("")
+  archivos      String   @default("[]")
+  updatedAt     DateTime @updatedAt
+
+  versiones RespuestaVersion[]
+
+  @@unique([postulacionId, preguntaId])
+}
+
+model RespuestaVersion {
+  id          String   @id @default(cuid())
+  respuestaId String
+  respuesta   Respuesta @relation(fields: [respuestaId], references: [id], onDelete: Cascade)
+  valor       String
+  archivos    String   @default("[]")
+  createdAt   DateTime @default(now())
+}
+
+model AsignacionEvaluador {
+  id            String   @id @default(cuid())
+  postulacionId String
+  postulacion   Postulacion @relation(fields: [postulacionId], references: [id], onDelete: Cascade)
+  evaluadorId   String
+  evaluador     User     @relation(fields: [evaluadorId], references: [id])
+  orden         Int
+  estado        String   @default("PENDIENTE")
+  rondaActual   Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  revisiones RevisionPregunta[]
+
+  @@unique([postulacionId, evaluadorId])
+}
+
+model RevisionPregunta {
+  id           String   @id @default(cuid())
+  asignacionId String
+  asignacion   AsignacionEvaluador @relation(fields: [asignacionId], references: [id], onDelete: Cascade)
+  preguntaId   String
+  pregunta     Pregunta @relation(fields: [preguntaId], references: [id])
+  ronda        Int
+  veredicto    String
+  comentario   String   @default("")
+  nota         Int?
+  createdAt    DateTime @default(now())
+
+  @@unique([asignacionId, preguntaId, ronda])
+}
