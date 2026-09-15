@@ -3,10 +3,12 @@ import Credentials from "next-auth/providers/credentials";
 import { authConfig } from "@/auth.config";
 import { prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
-import { isRole, normalizeRole, type Role } from "@/lib/roles";
+import { isRole, normalizeRole } from "@/lib/roles";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  trustHost: true,
   providers: [
     Credentials({
       credentials: {
