@@ -21,6 +21,12 @@ export async function loginAction(formData: FormData) {
     });
   } catch (error) {
     if (error instanceof AuthError) {
+      if (error.type === "Configuration") {
+        return {
+          error:
+            "Falta configurar AUTH_SECRET (o AUTH_URL) en Vercel. Agrégalo en Environment Variables y vuelve a desplegar.",
+        };
+      }
       return {
         error:
           "No pudimos ingresar. Revisa el correo, la contraseña y que tu usuario tenga el rol correcto.",
