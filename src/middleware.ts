@@ -1,7 +1,6 @@
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig, deniedUrl } from "@/auth.config";
-import type { Role } from "@/lib/roles";
 import { loginPathForRole, normalizeRole, type Role } from "@/lib/roles";
 
 const { auth } = NextAuth(authConfig);

@@ -578,9 +578,14 @@ export function ConvocatoriaEvaluacion({
               setError(null);
               setMensaje(null);
               const result = await asignarEvaluadoresAutomatico(formData);
-              if (result?.error) setError(result.error);
-              else {
-                setMensaje(result?.mensaje ?? "Asignación automática lista.");
+              if (result && "error" in result && result.error) {
+                setError(result.error);
+              } else {
+                setMensaje(
+                  result && "mensaje" in result && result.mensaje
+                    ? result.mensaje
+                    : "Asignación automática lista.",
+                );
                 await onMutated?.();
               }
             }}

@@ -61,10 +61,10 @@ export async function crearConvocatoria(formData: FormData) {
   }
 
   const formOk = await validarFormulario(formularioId);
-  if ("error" in formOk) return formOk;
+  if ("error" in formOk && formOk.error) return { error: formOk.error };
 
   const fechas = leerFechas(formData);
-  if ("error" in fechas) return fechas;
+  if ("error" in fechas && fechas.error) return { error: fechas.error };
 
   const imagen = await leerImagen(formData, "");
   if (typeof imagen !== "string") return imagen;
@@ -104,11 +104,11 @@ export async function actualizarConvocatoria(formData: FormData) {
     convocatoria._count.postulaciones > 0 ? convocatoria.formularioId : formularioId;
   if (formIdFinal !== convocatoria.formularioId) {
     const formOk = await validarFormulario(formIdFinal);
-    if ("error" in formOk) return formOk;
+    if ("error" in formOk && formOk.error) return { error: formOk.error };
   }
 
   const fechas = leerFechas(formData);
-  if ("error" in fechas) return fechas;
+  if ("error" in fechas && fechas.error) return { error: fechas.error };
 
   const imagen = await leerImagen(formData, convocatoria.imagen);
   if (typeof imagen !== "string") return imagen;

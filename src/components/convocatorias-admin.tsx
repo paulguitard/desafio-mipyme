@@ -221,7 +221,7 @@ export function ConvocatoriasAdmin({
               ? await actualizarConvocatoria(formData)
               : await crearConvocatoria(formData);
             setSaving(false);
-            if (result?.error) {
+            if (result && "error" in result && result.error) {
               setError(result.error);
               return;
             }
