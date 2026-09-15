@@ -21,7 +21,8 @@ export async function loginAction(formData: FormData) {
     });
   } catch (error) {
     if (error instanceof AuthError) {
-      if (error.type === "Configuration") {
+      const kind = String((error as { type?: string }).type ?? "");
+      if (kind === "Configuration") {
         return {
           error:
             "Falta configurar AUTH_SECRET (o AUTH_URL) en Vercel. Agrégalo en Environment Variables y vuelve a desplegar.",
