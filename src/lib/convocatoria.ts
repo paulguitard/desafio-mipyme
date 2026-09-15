@@ -6,7 +6,7 @@ export function parseImagenConvocatoria(raw: string): StoredFile | null {
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object") return null;
     const file = parsed as StoredFile;
-    if (!file.relativePath) return null;
+    if (!file.relativePath && !file.url) return null;
     return file;
   } catch {
     return null;

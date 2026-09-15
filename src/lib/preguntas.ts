@@ -224,6 +224,7 @@ export type StoredFile = {
   mimeType: string;
   kind: "file" | "image";
   relativePath: string;
+  url?: string;
 };
 
 export type StoredVideoLink = {
@@ -361,6 +362,8 @@ export function serializeValor(value: unknown): string {
 }
 
 export function publicUploadUrl(file: StoredFile) {
+  if (file.url) return file.url;
+  if (/^https?:\/\//i.test(file.relativePath)) return file.relativePath;
   return `/api/archivos/${encodeURIComponent(file.relativePath)}`;
 }
 

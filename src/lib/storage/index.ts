@@ -1,6 +1,6 @@
+export { saveUpload, deleteUpload } from "./cloudinary";
 export {
-  saveUpload,
-  deleteUpload,
+  deleteLocalUpload,
   publicUploadUrl,
   uploadAbsolutePath,
   mimeFromFilename,
