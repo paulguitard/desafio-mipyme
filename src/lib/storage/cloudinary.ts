@@ -1,3 +1,4 @@
+import "@/lib/env";
 import { randomUUID } from "node:crypto";
 import { v2 as cloudinary } from "cloudinary";
 import type { StoredFile } from "@/lib/preguntas";

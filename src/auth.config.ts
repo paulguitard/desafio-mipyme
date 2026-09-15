@@ -1,3 +1,4 @@
+import "@/lib/env";
 import type { NextAuthConfig } from "next-auth";
 import { loginPathForRole, normalizeRole, type Role } from "@/lib/roles";
 
