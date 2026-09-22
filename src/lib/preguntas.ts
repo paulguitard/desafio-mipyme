@@ -1024,6 +1024,34 @@ export function parseEscalaNotas(raw: string): PeldanoEscala[] {
   }
 }
 
+export type NotaPreguntaGeneral = {
+  preguntaId: string;
+  enunciado: string;
+  escala: PeldanoEscala[];
+  notaInicial: number | null;
+};
+
+export function notasParaEvaluacionGeneral(
+  preguntas: { id: string; enunciado: string; conNotas: boolean; escalaNotas: string }[],
+  revisiones: { preguntaId: string; ronda: number; nota: number | null }[],
+  ronda: number,
+): NotaPreguntaGeneral[] {
+  return preguntas.flatMap((pregunta) => {
+    if (!pregunta.conNotas) return [];
+    const escala = parseEscalaNotas(pregunta.escalaNotas);
+    if (escala.length === 0) return [];
+    const actual = revisiones.find((item) => item.preguntaId === pregunta.id && item.ronda === ronda);
+    return [
+      {
+        preguntaId: pregunta.id,
+        enunciado: pregunta.enunciado,
+        escala,
+        notaInicial: actual?.nota ?? null,
+      },
+    ];
+  });
+}
+
 export function serializeEscalaNotas(escala: PeldanoEscala[]): string {
   return JSON.stringify(escala);
 }

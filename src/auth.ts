@@ -1,3 +1,4 @@
+import "@/lib/env";
 import { randomBytes } from "crypto";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
@@ -48,8 +49,8 @@ export const {
     ...(process.env.AUTH_GOOGLE_ID?.trim() && process.env.AUTH_GOOGLE_SECRET?.trim()
       ? [
           Google({
-            clientId: process.env.AUTH_GOOGLE_ID,
-            clientSecret: process.env.AUTH_GOOGLE_SECRET,
+            clientId: process.env.AUTH_GOOGLE_ID.trim(),
+            clientSecret: process.env.AUTH_GOOGLE_SECRET.trim(),
           }),
         ]
       : []),

@@ -1,3 +1,4 @@
+import "@/lib/env";
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig, deniedUrl } from "@/auth.config";

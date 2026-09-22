@@ -3,12 +3,12 @@
 import { useMemo, useState } from "react";
 import { HistorialVersionesRespuesta } from "@/components/historial-versiones-respuesta";
 import { PanelEvaluacionPregunta } from "@/components/panel-evaluacion-pregunta";
-import { PanelObservacionGeneral } from "@/components/panel-observacion-general";
+import { PanelObservacionGeneral, PanelSupervisionPendiente } from "@/components/panel-observacion-general";
 import { PreguntaCampo } from "@/components/pregunta-campo";
 import type { DetalleFichaAdmin } from "@/lib/convocatoria-admin-data";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
-import { parseEscalaNotas } from "@/lib/preguntas";
+import { notasParaEvaluacionGeneral, parseEscalaNotas } from "@/lib/preguntas";
 import { historialSupervision } from "@/lib/supervision-ui";
 
 export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
@@ -64,7 +64,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
       </div>
 
       <section className="eval-detalle-shell" aria-label="Caso, evaluación y supervisión">
-        <div className="page-scroll eval-detalle-body">
+        <div className={`page-scroll eval-detalle-body${esGeneral ? " is-general" : ""}`}>
           <div className="eval-detalle-headers">
             <div className="eval-detalle-head is-caso">
               <h2>Caso</h2>
@@ -75,7 +75,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
               <p>
                 {asignacion
                   ? esGeneral
-                    ? `Notas y observación general de ${asignacion.evaluadorNombre}`
+                    ? `Observación general de ${asignacion.evaluadorNombre}`
                     : `Revisión de ${asignacion.evaluadorNombre}`
                   : "Sin evaluadores asignados"}
               </p>
@@ -90,6 +90,66 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
             </div>
           </div>
 
+          {esGeneral ? (
+            <>
+              <div className="eval-detalle-cell is-eval is-general-panel">
+                {asignacion ? (
+                  <PanelObservacionGeneral
+                    canEdit={false}
+                    ronda={ronda}
+                    namePrefix="eval-"
+                    notasPreguntas={notasParaEvaluacionGeneral(
+                      data.preguntas,
+                      asignacion.revisiones,
+                      ronda,
+                    )}
+                    veredictoInicial={
+                      asignacion.revisionesGenerales.find((item) => item.ronda === ronda)?.veredicto
+                    }
+                    comentarioInicial={
+                      asignacion.revisionesGenerales.find((item) => item.ronda === ronda)?.comentario
+                    }
+                    historial={asignacion.revisionesGenerales.map((item) => ({
+                      id: item.id,
+                      ronda: item.ronda,
+                      veredicto: item.veredicto,
+                      comentario: item.comentario,
+                      createdAt: item.createdAt,
+                    }))}
+                  />
+                ) : (
+                  <div className="card space-y-2 p-4">
+                    <p className="text-muted">Aún no hay evaluadores asignados a esta ficha.</p>
+                  </div>
+                )}
+              </div>
+              <div className="eval-detalle-cell is-sup is-general-panel">
+                {asignacion && asignacion.supervisionesGenerales.length > 0 ? (
+                  <PanelObservacionGeneral
+                    canEdit={false}
+                    ronda={ciclo}
+                    tipo="supervision"
+                    namePrefix="sup-"
+                    veredictoInicial={
+                      asignacion.supervisionesGenerales.find(
+                        (item) => item.ronda === ronda && item.ciclo === ciclo,
+                      )?.veredicto
+                    }
+                    comentarioInicial={
+                      asignacion.supervisionesGenerales.find(
+                        (item) => item.ronda === ronda && item.ciclo === ciclo,
+                      )?.comentario
+                    }
+                    historial={historialSupervision(asignacion.supervisionesGenerales)}
+                  />
+                ) : (
+                  <PanelSupervisionPendiente />
+                )}
+              </div>
+            </>
+          ) : null}
+
+          <div className={esGeneral ? "eval-detalle-caso-stack" : "contents"}>
           {data.preguntas.map((pregunta) => {
             const respuesta = data.respuestas.find((item) => item.preguntaId === pregunta.id);
             const actual = asignacion?.revisiones.find(
@@ -127,7 +187,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
                   />
                 </div>
                 <div className="eval-detalle-cell is-eval">
-                  {asignacion ? (
+                  {esGeneral ? null : asignacion ? (
                     <PanelEvaluacionPregunta
                       preguntaId={pregunta.id}
                       canEdit={false}
@@ -136,7 +196,6 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
                       comentarioInicial={actual?.comentario}
                       notaInicial={actual?.nota}
                       escala={escala}
-                      soloNotas={esGeneral}
                       namePrefix="eval-"
                       historial={historial.map((item) => ({
                         id: item.id,
@@ -154,7 +213,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
                   )}
                 </div>
                 <div className="eval-detalle-cell is-sup">
-                  {asignacion && !esGeneral ? (
+                  {esGeneral ? null : asignacion ? (
                     <PanelEvaluacionPregunta
                       preguntaId={pregunta.id}
                       canEdit={false}
@@ -166,10 +225,6 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
                       namePrefix="sup-"
                       historial={historialSupervision(supervisiones)}
                     />
-                  ) : asignacion && esGeneral ? (
-                    <div className="card space-y-2 p-4">
-                      <p className="text-muted">La supervisión de este formulario es general.</p>
-                    </div>
                   ) : (
                     <div className="card space-y-2 p-4">
                       <p className="text-muted">Sin supervisión.</p>
@@ -179,51 +234,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
               </article>
             );
           })}
-
-          {esGeneral && asignacion ? (
-            <article className="eval-detalle-row">
-              <div className="eval-detalle-cell is-caso" />
-              <div className="eval-detalle-cell is-eval">
-                <PanelObservacionGeneral
-                  canEdit={false}
-                  ronda={ronda}
-                  namePrefix="eval-"
-                  veredictoInicial={
-                    asignacion.revisionesGenerales.find((item) => item.ronda === ronda)?.veredicto
-                  }
-                  comentarioInicial={
-                    asignacion.revisionesGenerales.find((item) => item.ronda === ronda)?.comentario
-                  }
-                  historial={asignacion.revisionesGenerales.map((item) => ({
-                    id: item.id,
-                    ronda: item.ronda,
-                    veredicto: item.veredicto,
-                    comentario: item.comentario,
-                    createdAt: item.createdAt,
-                  }))}
-                />
-              </div>
-              <div className="eval-detalle-cell is-sup">
-                <PanelObservacionGeneral
-                  canEdit={false}
-                  ronda={ciclo}
-                  tipo="supervision"
-                  namePrefix="sup-"
-                  veredictoInicial={
-                    asignacion.supervisionesGenerales.find(
-                      (item) => item.ronda === ronda && item.ciclo === ciclo,
-                    )?.veredicto
-                  }
-                  comentarioInicial={
-                    asignacion.supervisionesGenerales.find(
-                      (item) => item.ronda === ronda && item.ciclo === ciclo,
-                    )?.comentario
-                  }
-                  historial={historialSupervision(asignacion.supervisionesGenerales)}
-                />
-              </div>
-            </article>
-          ) : null}
+          </div>
         </div>
       </section>
     </div>

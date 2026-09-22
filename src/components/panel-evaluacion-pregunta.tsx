@@ -22,21 +22,11 @@ function etiquetaNota(nota: number | null, escala: PeldanoEscala[]) {
 function ContenidoRevisionLectura({
   item,
   escala,
-  soloNotas,
 }: {
   item: ItemHistorial;
   escala: PeldanoEscala[];
-  soloNotas: boolean;
 }) {
   const notaTexto = etiquetaNota(item.nota, escala);
-
-  if (soloNotas) {
-    return (
-      <div className="historial-feed-valor space-y-1">
-        {notaTexto ? <p>{notaTexto}</p> : <p className="text-muted">Sin nota</p>}
-      </div>
-    );
-  }
 
   if (item.veredicto === "OBSERVACION") {
     return (
@@ -64,7 +54,6 @@ export function PanelEvaluacionPregunta({
   notaInicial,
   escala,
   historial,
-  soloNotas = false,
   namePrefix = "",
   tipo = "evaluacion",
 }: {
@@ -76,13 +65,12 @@ export function PanelEvaluacionPregunta({
   notaInicial?: number | null;
   escala: PeldanoEscala[];
   historial: ItemHistorial[];
-  soloNotas?: boolean;
   namePrefix?: string;
   tipo?: "evaluacion" | "supervision";
 }) {
-  const [veredicto, setVeredicto] = useState(soloNotas ? "OK" : (veredictoInicial ?? ""));
+  const [veredicto, setVeredicto] = useState(veredictoInicial ?? "");
   const [nota, setNota] = useState<number | null>(notaInicial ?? null);
-  const [comentario, setComentario] = useState(soloNotas ? "" : (comentarioInicial ?? ""));
+  const [comentario, setComentario] = useState(comentarioInicial ?? "");
 
   const campoVeredicto = `${namePrefix}veredicto-${preguntaId}`;
   const campoNota = `${namePrefix}nota-${preguntaId}`;
@@ -94,29 +82,21 @@ export function PanelEvaluacionPregunta({
     items.unshift({
       id: `pendiente-${preguntaId}-${ronda}`,
       ronda,
-      veredicto: soloNotas ? "OK" : (veredictoInicial ?? ""),
-      comentario: soloNotas ? "" : (comentarioInicial ?? ""),
+      veredicto: veredictoInicial ?? "",
+      comentario: comentarioInicial ?? "",
       nota: notaInicial ?? null,
       createdAt: null,
     });
   }
 
-  if (soloNotas && escala.length === 0) {
-    return (
-      <div className="card space-y-2 p-4">
-        <p className="text-muted">Esta pregunta no se califica con nota.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="card space-y-3 p-4">
-      <input type="hidden" name={campoVeredicto} value={soloNotas ? "OK" : veredicto} />
+      <input type="hidden" name={campoVeredicto} value={veredicto} />
       {escala.length > 0 && !esSupervision ? (
         <input type="hidden" name={campoNota} value={nota ?? ""} />
       ) : null}
-      {!canEdit || soloNotas || veredicto !== "OBSERVACION" ? (
-        <input type="hidden" name={campoComentario} value={soloNotas ? "" : comentario} />
+      {!canEdit || veredicto !== "OBSERVACION" ? (
+        <input type="hidden" name={campoComentario} value={comentario} />
       ) : null}
 
       <ol className="historial-feed">
@@ -136,16 +116,12 @@ export function PanelEvaluacionPregunta({
                     {item.etiqueta
                       ? item.etiqueta
                       : editable
-                        ? soloNotas
-                          ? `Tu nota (ronda ${item.ronda})`
-                          : esSupervision
-                            ? `Tu supervisión (ciclo ${item.ronda})`
-                            : `Tu evaluación (ronda ${item.ronda})`
-                        : soloNotas
-                          ? `Nota (ronda ${item.ronda})`
-                          : esSupervision
-                            ? `Supervisión (ciclo ${item.ronda})`
-                            : `Evaluación (ronda ${item.ronda})`}
+                        ? esSupervision
+                          ? `Tu supervisión (ciclo ${item.ronda})`
+                          : `Tu evaluación (ronda ${item.ronda})`
+                        : esSupervision
+                          ? `Supervisión (ciclo ${item.ronda})`
+                          : `Evaluación (ronda ${item.ronda})`}
                   </strong>
                   {index === 0 ? <span className="historial-feed-badge">Más reciente</span> : null}
                 </div>
@@ -157,24 +133,22 @@ export function PanelEvaluacionPregunta({
 
                 {editable ? (
                   <div className="mt-3 space-y-3">
-                    {soloNotas ? null : (
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          className={`btn btn-sm ${veredicto === "OBSERVACION" ? "btn-primary" : "btn-secondary"}`}
-                          type="button"
-                          onClick={() => setVeredicto("OBSERVACION")}
-                        >
-                          Comentar observaciones
-                        </button>
-                        <button
-                          className={`btn btn-sm ${veredicto === "OK" ? "btn-primary" : "btn-secondary"}`}
-                          type="button"
-                          onClick={() => setVeredicto("OK")}
-                        >
-                          Sin observaciones
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        className={`btn btn-sm ${veredicto === "OBSERVACION" ? "btn-primary" : "btn-secondary"}`}
+                        type="button"
+                        onClick={() => setVeredicto("OBSERVACION")}
+                      >
+                        Comentar observaciones
+                      </button>
+                      <button
+                        className={`btn btn-sm ${veredicto === "OK" ? "btn-primary" : "btn-secondary"}`}
+                        type="button"
+                        onClick={() => setVeredicto("OK")}
+                      >
+                        Sin observaciones
+                      </button>
+                    </div>
                     {escala.length > 0 && !esSupervision ? (
                       <div className="space-y-2">
                         <p className="text-sm font-semibold">Nota</p>
@@ -196,7 +170,7 @@ export function PanelEvaluacionPregunta({
                         </div>
                       </div>
                     ) : null}
-                    {!soloNotas && veredicto === "OBSERVACION" ? (
+                    {veredicto === "OBSERVACION" ? (
                       <div className="field">
                         <label htmlFor={campoComentario}>Comentario (obligatorio)</label>
                         <textarea
@@ -210,7 +184,7 @@ export function PanelEvaluacionPregunta({
                     ) : null}
                   </div>
                 ) : (
-                  <ContenidoRevisionLectura item={item} escala={escala} soloNotas={soloNotas} />
+                  <ContenidoRevisionLectura item={item} escala={escala} />
                 )}
               </div>
             </li>

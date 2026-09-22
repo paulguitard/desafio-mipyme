@@ -141,7 +141,7 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-gold"
                     type="submit"
                     formAction={async (formData) => {
-                      if (!window.confirm("¿Enviar observaciones al supervisor?")) return;
+                      if (!window.confirm("¿Enviar al supervisor?")) return;
                       const result = await enviarObservaciones(formData);
                       if (result?.error) {
                         setError(result.error);
@@ -152,7 +152,7 @@ export function FormularioEvaluacion({
                       }
                     }}
                   >
-                    Enviar observaciones
+                    Enviar a supervisor
                   </button>
                   <button
                     className="btn btn-sm btn-primary"
@@ -190,7 +190,7 @@ export function FormularioEvaluacion({
       </div>
 
       <section className="eval-detalle-shell" aria-label="Caso, evaluación y supervisión">
-        <div className="page-scroll eval-detalle-body is-tres">
+        <div className={`page-scroll eval-detalle-body is-tres${esGeneral ? " is-general" : ""}`}>
           <input type="hidden" name="asignacionId" value={asignacionId} />
           <div className="eval-detalle-headers">
             <div className="eval-detalle-head is-caso">
@@ -201,7 +201,7 @@ export function FormularioEvaluacion({
               <h2>Evaluación</h2>
               <p>
                 {headerEvaluacion ??
-                  (esGeneral ? "Notas por pregunta y observación general" : "Revisión por pregunta")}
+                  (esGeneral ? "Observación general" : "Revisión por pregunta")}
               </p>
             </div>
             <div className="eval-detalle-head is-sup">
@@ -212,14 +212,17 @@ export function FormularioEvaluacion({
               </p>
             </div>
           </div>
-          {children}
-          {observacionGeneral || observacionGeneralSupervision ? (
-            <article className="eval-detalle-row">
-              <div className="eval-detalle-cell is-caso" />
-              <div className="eval-detalle-cell is-eval">{observacionGeneral}</div>
-              <div className="eval-detalle-cell is-sup">{observacionGeneralSupervision}</div>
-            </article>
-          ) : null}
+          {esGeneral ? (
+            <>
+              <div className="eval-detalle-cell is-eval is-general-panel">{observacionGeneral}</div>
+              <div className="eval-detalle-cell is-sup is-general-panel">
+                {observacionGeneralSupervision}
+              </div>
+              <div className="eval-detalle-caso-stack">{children}</div>
+            </>
+          ) : (
+            children
+          )}
         </div>
       </section>
     </form>

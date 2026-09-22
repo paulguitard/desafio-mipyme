@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { NotaPreguntaGeneral, PeldanoEscala } from "@/lib/preguntas";
 
 type ItemHistorial = {
   id: string;
@@ -10,6 +11,12 @@ type ItemHistorial = {
   createdAt?: string | null;
   etiqueta?: string;
 };
+
+function etiquetaNota(nota: number | null, escala: PeldanoEscala[]) {
+  if (nota == null || escala.length === 0) return "Sin nota";
+  const peldano = escala.find((item) => item.valor === nota);
+  return peldano?.etiqueta ? `Nota: ${nota} · ${peldano.etiqueta}` : `Nota: ${nota}`;
+}
 
 function ContenidoRevisionGeneralLectura({ item }: { item: ItemHistorial }) {
   if (item.veredicto === "OBSERVACION") {
@@ -27,6 +34,77 @@ function ContenidoRevisionGeneralLectura({ item }: { item: ItemHistorial }) {
   );
 }
 
+function SelectoresNotasGenerales({
+  notas,
+  canEdit,
+  namePrefix,
+}: {
+  notas: NotaPreguntaGeneral[];
+  canEdit: boolean;
+  namePrefix: string;
+}) {
+  const [valores, setValores] = useState<Record<string, number | null>>(() =>
+    Object.fromEntries(notas.map((item) => [item.preguntaId, item.notaInicial])),
+  );
+
+  if (notas.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <h4 className="font-semibold text-navy">Notas</h4>
+        <p className="text-sm text-muted">Calificación de las preguntas que se evalúan con nota.</p>
+      </div>
+      {notas.map((item) => {
+        const nota = valores[item.preguntaId] ?? null;
+        const campoNota = `${namePrefix}nota-${item.preguntaId}`;
+        const campoVeredicto = `${namePrefix}veredicto-${item.preguntaId}`;
+
+        return (
+          <div key={item.preguntaId} className="space-y-2">
+            <p className="text-sm font-semibold">{item.enunciado}</p>
+            {canEdit ? (
+              <>
+                <input type="hidden" name={campoVeredicto} value="OK" />
+                <input type="hidden" name={campoNota} value={nota ?? ""} />
+                <div className="flex flex-wrap gap-2">
+                  {item.escala.map((peldano) => {
+                    const activo = nota === peldano.valor;
+                    return (
+                      <button
+                        key={peldano.valor}
+                        className={`btn btn-sm ${activo ? "btn-navy" : "btn-ghost"}`}
+                        type="button"
+                        onClick={() =>
+                          setValores((actual) => ({ ...actual, [item.preguntaId]: peldano.valor }))
+                        }
+                      >
+                        {peldano.valor}
+                        {peldano.etiqueta ? ` · ${peldano.etiqueta}` : ""}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm">{etiquetaNota(item.notaInicial, item.escala)}</p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function PanelSupervisionPendiente() {
+  return (
+    <div className="card space-y-2 p-4">
+      <h3 className="text-lg font-semibold text-navy">Supervisión general</h3>
+      <p className="text-muted">Sin supervisión por el momento → a la espera de la evaluación</p>
+    </div>
+  );
+}
+
 export function PanelObservacionGeneral({
   canEdit,
   ronda,
@@ -35,6 +113,7 @@ export function PanelObservacionGeneral({
   historial,
   namePrefix = "",
   tipo = "evaluacion",
+  notasPreguntas = [],
 }: {
   canEdit: boolean;
   ronda: number;
@@ -43,6 +122,7 @@ export function PanelObservacionGeneral({
   historial: ItemHistorial[];
   namePrefix?: string;
   tipo?: "evaluacion" | "supervision";
+  notasPreguntas?: NotaPreguntaGeneral[];
 }) {
   const [veredicto, setVeredicto] = useState(veredictoInicial ?? "");
   const [comentario, setComentario] = useState(comentarioInicial ?? "");
@@ -78,6 +158,10 @@ export function PanelObservacionGeneral({
             : "Comentario sobre la respuesta completa del formulario."}
         </p>
       </div>
+
+      {!esSupervision ? (
+        <SelectoresNotasGenerales notas={notasPreguntas} canEdit={canEdit} namePrefix={namePrefix} />
+      ) : null}
 
       <ol className="historial-feed">
         {items.map((item, index) => {

@@ -440,6 +440,12 @@ html:has(.app-shell) body {
   border-radius: 0 0 1rem 1rem;
 }
 
+.eval-detalle-body.is-general > .is-general-panel > * {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+}
+
 @media (min-width: 768px) {
   .eval-detalle-body {
     grid-template-columns: minmax(0, 1fr) 0.75rem minmax(0, 1fr) 0.75rem minmax(0, 1fr);
@@ -466,6 +472,47 @@ html:has(.app-shell) body {
   .eval-detalle-head.is-sup,
   .eval-detalle-cell.is-sup {
     grid-column: 5;
+  }
+
+  .eval-detalle-body.is-general .eval-detalle-headers {
+    grid-row: 1;
+  }
+
+  .eval-detalle-body.is-general .eval-detalle-caso-stack {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    background: #f3f5f9;
+    border-left: 1px solid var(--eval-detalle-panel-border, rgba(10, 33, 86, 0.12));
+    border-right: 1px solid var(--eval-detalle-panel-border, rgba(10, 33, 86, 0.12));
+    border-bottom: 1px solid var(--eval-detalle-panel-border, rgba(10, 33, 86, 0.12));
+    border-radius: 0 0 1rem 1rem;
+  }
+
+  .eval-detalle-body.is-general .eval-detalle-row {
+    grid-column: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .eval-detalle-body.is-general .eval-detalle-row .is-eval,
+  .eval-detalle-body.is-general .eval-detalle-row .is-sup {
+    display: none;
+  }
+
+  .eval-detalle-body.is-general .eval-detalle-row:last-child .eval-detalle-cell {
+    border-bottom: 0;
+    border-radius: 0 0 1rem 1rem;
+  }
+
+  .eval-detalle-body.is-general > .is-general-panel.is-eval,
+  .eval-detalle-body.is-general > .is-general-panel.is-sup {
+    grid-row: 2;
+    align-self: stretch;
+    border-bottom: 1px solid var(--eval-detalle-panel-border, rgba(10, 33, 86, 0.12));
+    border-radius: 0 0 1rem 1rem;
   }
 }
 

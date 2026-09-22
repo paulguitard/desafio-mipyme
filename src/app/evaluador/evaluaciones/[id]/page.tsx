@@ -2,13 +2,13 @@ import { BotonAtras } from "@/components/boton-atras";
 import { FormularioEvaluacion } from "@/components/formulario-evaluacion";
 import { HistorialVersionesRespuesta } from "@/components/historial-versiones-respuesta";
 import { PanelEvaluacionPregunta } from "@/components/panel-evaluacion-pregunta";
-import { PanelObservacionGeneral } from "@/components/panel-observacion-general";
+import { PanelObservacionGeneral, PanelSupervisionPendiente } from "@/components/panel-observacion-general";
 import { PreguntaCampo } from "@/components/pregunta-campo";
 import { prisma } from "@/lib/db";
 import { evaluadorPuedeEditar } from "@/lib/estado";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { etiquetaNombreCaso, extraerNombreCaso } from "@/lib/nombre-caso";
-import { parseEscalaNotas } from "@/lib/preguntas";
+import { notasParaEvaluacionGeneral, parseEscalaNotas } from "@/lib/preguntas";
 import { requireUser } from "@/lib/session";
 import { historialSupervision } from "@/lib/supervision-ui";
 import { notFound } from "next/navigation";
@@ -74,7 +74,7 @@ export default async function EvaluacionDetallePage({
           {nombreCaso} · {asignacion.postulacion.convocatoria.titulo}
         </h1>
       }
-      headerEvaluacion={esGeneral ? "Tus notas y observación general" : "Tu revisión por pregunta"}
+      headerEvaluacion={esGeneral ? "Tu observación general" : "Tu revisión por pregunta"}
       headerSupervision={
         asignacion.postulacion.supervision
           ? `Revisión de ${asignacion.postulacion.supervision.supervisor.name}`
@@ -107,6 +107,11 @@ export default async function EvaluacionDetallePage({
             ronda={ronda}
             veredictoInicial={revisionGeneralActual?.veredicto}
             comentarioInicial={revisionGeneralActual?.comentario}
+            notasPreguntas={notasParaEvaluacionGeneral(
+              asignacion.postulacion.convocatoria.formulario.preguntas,
+              asignacion.revisiones,
+              ronda,
+            )}
             historial={asignacion.revisionesGenerales.map((item) => ({
               id: item.id,
               ronda: item.ronda,
@@ -119,20 +124,24 @@ export default async function EvaluacionDetallePage({
       }
       observacionGeneralSupervision={
         esGeneral ? (
-          <PanelObservacionGeneral
-            canEdit={false}
-            ronda={ciclo}
-            tipo="supervision"
-            namePrefix="sup-"
-            veredictoInicial={supervisionGeneralActual?.veredicto}
-            comentarioInicial={supervisionGeneralActual?.comentario}
-            historial={historialSupervision(
-              asignacion.supervisionesGenerales.map((item) => ({
-                ...item,
-                createdAt: item.createdAt.toISOString(),
-              })),
-            )}
-          />
+          asignacion.supervisionesGenerales.length === 0 ? (
+            <PanelSupervisionPendiente />
+          ) : (
+            <PanelObservacionGeneral
+              canEdit={false}
+              ronda={ciclo}
+              tipo="supervision"
+              namePrefix="sup-"
+              veredictoInicial={supervisionGeneralActual?.veredicto}
+              comentarioInicial={supervisionGeneralActual?.comentario}
+              historial={historialSupervision(
+                asignacion.supervisionesGenerales.map((item) => ({
+                  ...item,
+                  createdAt: item.createdAt.toISOString(),
+                })),
+              )}
+            />
+          )
         ) : null
       }
     >
@@ -173,31 +182,28 @@ export default async function EvaluacionDetallePage({
               />
             </div>
             <div className="eval-detalle-cell is-eval">
-              <PanelEvaluacionPregunta
-                preguntaId={pregunta.id}
-                canEdit={canEdit}
-                ronda={ronda}
-                veredictoInicial={actual?.veredicto}
-                comentarioInicial={actual?.comentario}
-                notaInicial={actual?.nota}
-                escala={escala}
-                soloNotas={esGeneral}
-                historial={historialRevisiones.map((item) => ({
-                  id: item.id,
-                  ronda: item.ronda,
-                  veredicto: item.veredicto,
-                  comentario: item.comentario,
-                  nota: item.nota,
-                  createdAt: item.createdAt.toISOString(),
-                }))}
-              />
+              {esGeneral ? null : (
+                <PanelEvaluacionPregunta
+                  preguntaId={pregunta.id}
+                  canEdit={canEdit}
+                  ronda={ronda}
+                  veredictoInicial={actual?.veredicto}
+                  comentarioInicial={actual?.comentario}
+                  notaInicial={actual?.nota}
+                  escala={escala}
+                  historial={historialRevisiones.map((item) => ({
+                    id: item.id,
+                    ronda: item.ronda,
+                    veredicto: item.veredicto,
+                    comentario: item.comentario,
+                    nota: item.nota,
+                    createdAt: item.createdAt.toISOString(),
+                  }))}
+                />
+              )}
             </div>
             <div className="eval-detalle-cell is-sup">
-              {esGeneral ? (
-                <div className="card space-y-2 p-4">
-                  <p className="text-muted">La supervisión de este formulario es general.</p>
-                </div>
-              ) : (
+              {esGeneral ? null : (
                 <PanelEvaluacionPregunta
                   preguntaId={pregunta.id}
                   canEdit={false}
