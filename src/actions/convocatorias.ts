@@ -8,7 +8,12 @@ import { deleteUpload, saveUpload } from "@/lib/storage";
 import { parseFechaForm, parseImagenConvocatoria } from "@/lib/convocatoria";
 import { isStoredFile, parseArchivos } from "@/lib/preguntas";
 import { asignarEvaluadoresAutomaticoEnConvocatoria } from "@/lib/asignacion-automatica";
-import { getPanelEvaluacion, getRespuestasConvocatoria } from "@/lib/convocatoria-admin-data";
+import { asignarSupervisoresAutomaticoEnConvocatoria } from "@/lib/asignacion-supervisor";
+import {
+  getDetalleFichaAdmin,
+  getPanelEvaluacion,
+  getRespuestasConvocatoria,
+} from "@/lib/convocatoria-admin-data";
 
 async function validarFormulario(formularioId: string) {
   const form = await prisma.formulario.findUnique({
@@ -65,6 +70,25 @@ export async function crearConvocatoria(formData: FormData) {
 
   const fechas = leerFechas(formData);
   if ("error" in fechas && fechas.error) return { error: fechas.error };
+
+  // Evita duplicados por doble envío (mismo título, formulario y fechas recientes).
+  const ventanaDuplicadoMs = 2 * 60 * 1000;
+  const duplicadoReciente = await prisma.convocatoria.findFirst({
+    where: {
+      titulo,
+      formularioId,
+      fechaInicio: fechas.fechaInicio,
+      fechaCierre: fechas.fechaCierre,
+      createdAt: { gte: new Date(Date.now() - ventanaDuplicadoMs) },
+    },
+    select: { id: true },
+  });
+  if (duplicadoReciente) {
+    return {
+      error:
+        "Ya se creó una convocatoria igual hace un momento. Revisa la lista antes de volver a intentar.",
+    };
+  }
 
   const imagen = await leerImagen(formData, "");
   if (typeof imagen !== "string") return imagen;
@@ -154,7 +178,7 @@ export async function guardarConfigEvaluacion(formData: FormData) {
 
   const convocatoria = await prisma.convocatoria.findUnique({
     where: { id: convocatoriaId },
-    include: { evaluadores: true },
+    include: { evaluadores: true, supervisores: true },
   });
   if (!convocatoria) return { error: "Convocatoria no encontrada." };
 
@@ -170,6 +194,16 @@ export async function guardarConfigEvaluacion(formData: FormData) {
     await prisma.convocatoriaEvaluador.update({
       where: { id: item.id },
       data: { maxEvaluaciones: Number.isFinite(max) && max >= 0 ? max : 0 },
+    });
+  }
+
+  for (const item of convocatoria.supervisores) {
+    const raw = formData.get(`max-sup-${item.supervisorId}`);
+    if (raw == null) continue;
+    const max = Number.parseInt(String(raw), 10);
+    await prisma.convocatoriaSupervisor.update({
+      where: { id: item.id },
+      data: { maxSupervisiones: Number.isFinite(max) && max >= 0 ? max : 0 },
     });
   }
 
@@ -391,11 +425,183 @@ export async function eliminarPostulacion(formData: FormData) {
   return { ok: true, mensaje: "Postulación eliminada." };
 }
 
+export async function eliminarConvocatoria(formData: FormData) {
+  await requireUser("ADMIN");
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Datos incompletos." };
+
+  const convocatoria = await prisma.convocatoria.findUnique({
+    where: { id },
+    include: {
+      postulaciones: {
+        include: {
+          respuestas: { include: { versiones: true } },
+        },
+      },
+    },
+  });
+  if (!convocatoria) return { error: "Convocatoria no encontrada." };
+
+  const adjuntos = new Set<string>();
+  const imagen = parseImagenConvocatoria(convocatoria.imagen);
+  if (imagen?.relativePath) adjuntos.add(imagen.relativePath);
+
+  for (const postulacion of convocatoria.postulaciones) {
+    for (const respuesta of postulacion.respuestas) {
+      for (const archivo of parseArchivos(respuesta.archivos).filter(isStoredFile)) {
+        adjuntos.add(archivo.relativePath);
+      }
+      for (const version of respuesta.versiones) {
+        for (const archivo of parseArchivos(version.archivos).filter(isStoredFile)) {
+          adjuntos.add(archivo.relativePath);
+        }
+      }
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (convocatoria.postulaciones.length > 0) {
+      await tx.postulacion.deleteMany({ where: { convocatoriaId: id } });
+    }
+    await tx.convocatoria.delete({ where: { id } });
+  });
+
+  for (const relativePath of adjuntos) {
+    try {
+      await deleteUpload(relativePath);
+    } catch {
+      /* el registro ya se eliminó; no bloquear por un archivo huérfano */
+    }
+  }
+
+  revalidateConvocatorias();
+  revalidatePath("/evaluador");
+  return { ok: true };
+}
+
 export async function asignarEvaluadoresAutomatico(formData: FormData) {
   await requireUser("ADMIN");
   const convocatoriaId = String(formData.get("convocatoriaId") ?? "");
   if (!convocatoriaId) return { error: "Convocatoria no encontrada." };
   const result = await asignarEvaluadoresAutomaticoEnConvocatoria(convocatoriaId);
+  revalidateConvocatorias(convocatoriaId);
+  revalidatePath("/evaluador");
+  return result;
+}
+
+export async function agregarSupervisorAlPool(formData: FormData) {
+  await requireUser("ADMIN");
+  const convocatoriaId = String(formData.get("convocatoriaId") ?? "");
+  const supervisorId = String(formData.get("supervisorId") ?? formData.get("evaluadorId") ?? "");
+  if (!convocatoriaId || !supervisorId) return { error: "Datos incompletos." };
+
+  const user = await prisma.user.findUnique({ where: { id: supervisorId } });
+  if (!user || user.role !== "SUPERVISOR") return { error: "Supervisor no válido." };
+
+  await prisma.convocatoriaSupervisor.upsert({
+    where: { convocatoriaId_supervisorId: { convocatoriaId, supervisorId } },
+    update: {},
+    create: { convocatoriaId, supervisorId, maxSupervisiones: 0 },
+  });
+  revalidateConvocatorias(convocatoriaId);
+  return { ok: true };
+}
+
+export async function agregarSupervisoresAlPool(formData: FormData) {
+  await requireUser("ADMIN");
+  const convocatoriaId = String(formData.get("convocatoriaId") ?? "");
+  const supervisorIds = [
+    ...new Set(
+      [...formData.getAll("supervisorId"), ...formData.getAll("evaluadorId")]
+        .map(String)
+        .filter(Boolean),
+    ),
+  ];
+  if (!convocatoriaId) return { error: "Datos incompletos." };
+  if (supervisorIds.length === 0) return { error: "Selecciona al menos un supervisor." };
+
+  const usuarios = await prisma.user.findMany({
+    where: { id: { in: supervisorIds }, role: "SUPERVISOR" },
+    select: { id: true },
+  });
+  if (usuarios.length === 0) return { error: "No hay supervisores válidos para agregar." };
+
+  await prisma.$transaction(
+    usuarios.map((user) =>
+      prisma.convocatoriaSupervisor.upsert({
+        where: { convocatoriaId_supervisorId: { convocatoriaId, supervisorId: user.id } },
+        update: {},
+        create: { convocatoriaId, supervisorId: user.id, maxSupervisiones: 0 },
+      }),
+    ),
+  );
+
+  revalidateConvocatorias(convocatoriaId);
+  const n = usuarios.length;
+  return {
+    ok: true,
+    mensaje: n === 1 ? "Supervisor agregado." : `Se agregaron ${n} supervisores.`,
+  };
+}
+
+export async function quitarSupervisorDelPool(formData: FormData) {
+  await requireUser("ADMIN");
+  const convocatoriaId = String(formData.get("convocatoriaId") ?? "");
+  const supervisorId = String(formData.get("supervisorId") ?? formData.get("evaluadorId") ?? "");
+  if (!convocatoriaId || !supervisorId) return { error: "Datos incompletos." };
+
+  await prisma.convocatoriaSupervisor.deleteMany({
+    where: { convocatoriaId, supervisorId },
+  });
+  revalidateConvocatorias(convocatoriaId);
+  return { ok: true };
+}
+
+export async function asignarSupervisorAPostulacion(formData: FormData) {
+  await requireUser("ADMIN");
+  const postulacionId = String(formData.get("postulacionId") ?? "");
+  const supervisorId = String(formData.get("supervisorId") ?? formData.get("evaluadorId") ?? "");
+  if (!postulacionId || !supervisorId) return { error: "Datos incompletos." };
+
+  const postulacion = await prisma.postulacion.findUnique({
+    where: { id: postulacionId },
+    include: {
+      convocatoria: { include: { supervisores: true } },
+      supervision: true,
+    },
+  });
+  if (!postulacion) return { error: "Caso no encontrado." };
+  if (postulacion.convocatoria.estado !== "ABIERTA") {
+    return { error: "La convocatoria está cerrada. No se puede asignar." };
+  }
+  if (postulacion.estado === "FINALIZADA" || !postulacion.enviadaAt) {
+    return { error: "Solo se asignan respuestas enviadas y no finalizadas." };
+  }
+
+  const enPool = postulacion.convocatoria.supervisores.some((e) => e.supervisorId === supervisorId);
+  if (!enPool) return { error: "El supervisor no está en el pool de esta convocatoria." };
+
+  if (postulacion.supervision) {
+    return { error: "Esta respuesta ya tiene un supervisor asignado." };
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: supervisorId } });
+  if (!user || user.role !== "SUPERVISOR") return { error: "Supervisor no válido." };
+
+  await prisma.asignacionSupervisor.create({
+    data: { postulacionId, supervisorId },
+  });
+
+  revalidatePath(`/admin/convocatorias/${postulacion.convocatoriaId}`);
+  revalidatePath("/evaluador");
+  return { ok: true, mensaje: "Supervisor asignado." };
+}
+
+export async function asignarSupervisoresAutomatico(formData: FormData) {
+  await requireUser("ADMIN");
+  const convocatoriaId = String(formData.get("convocatoriaId") ?? "");
+  if (!convocatoriaId) return { error: "Convocatoria no encontrada." };
+  const result = await asignarSupervisoresAutomaticoEnConvocatoria(convocatoriaId);
   revalidateConvocatorias(convocatoriaId);
   revalidatePath("/evaluador");
   return result;
@@ -415,6 +621,14 @@ export async function cargarPanelEvaluacion(convocatoriaId: string) {
   return { data };
 }
 
+export async function cargarDetalleFichaAdmin(postulacionId: string) {
+  await requireUser("ADMIN");
+  if (!postulacionId) return { error: "Postulación no encontrada." };
+  const data = await getDetalleFichaAdmin(postulacionId);
+  if (!data) return { error: "Postulación no encontrada." };
+  return { data };
+}
+
 export async function crearConvocatoriaForm(formData: FormData): Promise<void> {
   await crearConvocatoria(formData);
 }
@@ -425,6 +639,10 @@ export async function actualizarConvocatoriaForm(formData: FormData): Promise<vo
 
 export async function toggleConvocatoriaForm(formData: FormData): Promise<void> {
   await toggleConvocatoria(formData);
+}
+
+export async function eliminarConvocatoriaForm(formData: FormData): Promise<void> {
+  await eliminarConvocatoria(formData);
 }
 
 export async function asignarEvaluadoresForm(formData: FormData): Promise<void> {

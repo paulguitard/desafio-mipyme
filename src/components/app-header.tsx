@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { logoutAction } from "@/actions/auth";
 import { BrandMark } from "@/components/brand-mark";
 
@@ -6,11 +7,13 @@ export function AppHeader({
   name,
   links,
   maxWidthClass = "max-w-6xl",
+  trailing,
 }: {
   title: string;
   name: string;
   links: { href: string; label: string }[];
   maxWidthClass?: string;
+  trailing?: ReactNode;
 }) {
   return (
     <header className="site-header shrink-0">
@@ -32,6 +35,7 @@ export function AppHeader({
               {link.label}
             </a>
           ))}
+          {trailing}
           <form action={logoutAction}>
             <button className="btn btn-primary min-h-11 px-4 text-sm" type="submit">
               Cerrar sesión

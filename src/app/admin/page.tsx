@@ -22,7 +22,7 @@ export default async function AdminHomePage() {
   ) as Record<string, number>;
 
   const administradores = countByRole.ADMIN ?? 0;
-  const evaluadores = countByRole.EVALUADOR ?? 0;
+  const evaluadores = (countByRole.EVALUADOR ?? 0) + (countByRole.SUPERVISOR ?? 0);
   const emprendedores = countByRole.EMPRENDEDOR ?? 0;
   const abiertas = countByEstado.ABIERTA ?? 0;
   const cerradas = countByEstado.CERRADA ?? 0;

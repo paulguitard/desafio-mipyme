@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   actualizarConvocatoria,
   cargarPanelEvaluacion,
   crearConvocatoria,
+  eliminarConvocatoriaForm,
   toggleConvocatoriaForm,
 } from "@/actions/convocatorias";
 import { ConfirmForm } from "@/components/confirm-form";
@@ -39,6 +40,7 @@ export function ConvocatoriasAdmin({
   const [editing, setEditing] = useState<ConvocatoriaListaItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [imagenPreview, setImagenPreview] = useState<string | null>(null);
   const [evaluacionOpen, setEvaluacionOpen] = useState(false);
   const [evaluacionTitulo, setEvaluacionTitulo] = useState("");
@@ -62,10 +64,16 @@ export function ConvocatoriasAdmin({
     [editing],
   );
 
+  function resetGuardado() {
+    savingRef.current = false;
+    setSaving(false);
+  }
+
   function abrirCrear() {
     setEditing(null);
     setError(null);
     setImagenPreview(null);
+    resetGuardado();
     setOpen(true);
   }
 
@@ -73,13 +81,16 @@ export function ConvocatoriasAdmin({
     setEditing(item);
     setError(null);
     setImagenPreview(null);
+    resetGuardado();
     setOpen(true);
   }
 
   function cerrarModal() {
+    if (savingRef.current) return;
     setOpen(false);
     setError(null);
     setImagenPreview(null);
+    resetGuardado();
   }
 
   async function abrirEvaluacion(item: ConvocatoriaListaItem) {
@@ -159,6 +170,19 @@ export function ConvocatoriasAdmin({
                     {item.estado === "ABIERTA" ? "Cerrar" : "Abrir"}
                   </button>
                 </ConfirmForm>
+                <ConfirmForm
+                  action={eliminarConvocatoriaForm}
+                  message={
+                    item.postulaciones > 0
+                      ? `¿Eliminar "${item.titulo}"?\n\nSe borrarán ${item.postulaciones} caso(s), respuestas, evaluaciones y archivos. Esta acción no se puede deshacer.`
+                      : `¿Eliminar "${item.titulo}"?\n\nEsta acción no se puede deshacer.`
+                  }
+                >
+                  <input type="hidden" name="id" value={item.id} />
+                  <button className="btn btn-sm btn-danger" type="submit">
+                    Eliminar
+                  </button>
+                </ConfirmForm>
               </div>
             </article>
           );
@@ -204,6 +228,8 @@ export function ConvocatoriasAdmin({
             preguntas={evaluacion.preguntas}
             pool={evaluacion.pool}
             evaluadoresDisponibles={evaluacion.evaluadoresDisponibles}
+            poolSupervisores={evaluacion.poolSupervisores}
+            supervisoresDisponibles={evaluacion.supervisoresDisponibles}
             postulaciones={evaluacion.postulaciones}
             onMutated={refrescarEvaluacion}
           />
@@ -214,18 +240,30 @@ export function ConvocatoriasAdmin({
         <form
           key={editing?.id ?? "nuevo"}
           className="grid gap-4"
+          aria-busy={saving}
           action={async (formData) => {
+            // Ref síncrono: setState no alcanza a bloquear un segundo clic/Enter.
+            if (savingRef.current) return;
+            savingRef.current = true;
             setSaving(true);
             setError(null);
-            const result = editing
-              ? await actualizarConvocatoria(formData)
-              : await crearConvocatoria(formData);
-            setSaving(false);
-            if (result && "error" in result && result.error) {
-              setError(result.error);
-              return;
+            try {
+              const result = editing
+                ? await actualizarConvocatoria(formData)
+                : await crearConvocatoria(formData);
+              if (result && "error" in result && result.error) {
+                setError(result.error);
+                return;
+              }
+              savingRef.current = false;
+              setSaving(false);
+              cerrarModal();
+            } finally {
+              if (savingRef.current) {
+                savingRef.current = false;
+                setSaving(false);
+              }
             }
-            cerrarModal();
           }}
         >
           {editing ? <input type="hidden" name="id" value={editing.id} /> : null}

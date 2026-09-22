@@ -38,6 +38,8 @@ const ROLE_ALIASES: Record<string, Role> = {
   administracion: "ADMIN",
   evaluador: "EVALUADOR",
   evaluadora: "EVALUADOR",
+  supervisor: "SUPERVISOR",
+  supervisora: "SUPERVISOR",
   emprendedor: "EMPRENDEDOR",
   emprendedora: "EMPRENDEDOR",
   postulante: "EMPRENDEDOR",
@@ -168,7 +170,7 @@ export function parseUsuariosCsv(text: string): ParseUsuariosCsvResult {
     if (!name || !email || !password || !role) {
       errores.push({
         linea,
-        mensaje: "Completa nombre, correo, contraseña y un rol válido (Administración, Evaluador o Emprendedor).",
+        mensaje: "Completa nombre, correo, contraseña y un rol válido (Administración, Evaluador, Supervisor o Emprendedor).",
       });
       continue;
     }

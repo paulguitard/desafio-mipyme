@@ -5,6 +5,8 @@ export const CLAVE_NOMBRE_CASO = "nombre_caso";
 export const ENUNCIADO_NOMBRE_CASO = "Nombre del caso";
 export const MAX_CARACTERES_NOMBRE_CASO = 60;
 export const NOMBRE_CASO_VACIO = "Sin nombre";
+/** Id estable en el builder "nuevo" (antes de persistir) para evitar mismatch de hidratación. */
+export const ID_BORRADOR_NOMBRE_CASO = "borrador-nombre-caso";
 
 export function opcionesNombreCaso(): string {
   return JSON.stringify({

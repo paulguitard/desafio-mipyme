@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig, deniedUrl } from "@/auth.config";
-import { loginPathForRole, normalizeRole, type Role } from "@/lib/roles";
+import { esRolCatalogoEvaluador, loginPathForRole, normalizeRole, type Role } from "@/lib/roles";
 
 const { auth } = NextAuth(authConfig);
 
@@ -22,7 +22,11 @@ export default auth((req) => {
       login.searchParams.set("callbackUrl", pathname);
       return NextResponse.redirect(login);
     }
-    if (role !== guard.expected) {
+    const coincide =
+      guard.expected === "EVALUADOR"
+        ? esRolCatalogoEvaluador(role)
+        : role === guard.expected;
+    if (!coincide) {
       return NextResponse.redirect(new URL(deniedUrl(guard.expected), req.nextUrl.origin));
     }
   }

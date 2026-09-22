@@ -1,12 +1,14 @@
-import { BadgeAsignacion } from "@/components/badges";
+import { BadgeAsignacion, BadgePostulacion } from "@/components/badges";
 import { prisma } from "@/lib/db";
 import { ESTADO_ASIGNACION_LABEL, type EstadoAsignacion } from "@/lib/estado";
 import { asegurarPreguntaNombreCaso, etiquetaNombreCaso, extraerNombreCaso } from "@/lib/nombre-caso";
-import { requireUser } from "@/lib/session";
+import { requireCatalogoEvaluador } from "@/lib/session";
+import { SupervisorHome } from "@/components/supervisor-home";
 
 const FILTROS: { id: string; label: string; estados?: EstadoAsignacion[] }[] = [
   { id: "todas", label: "Todas" },
-  { id: "pendientes", label: "Pendientes", estados: ["PENDIENTE", "EN_REVISION"] },
+  { id: "pendientes", label: "Pendientes", estados: ["PENDIENTE", "EN_REVISION", "DEVUELTA_SUPERVISOR"] },
+  { id: "supervision", label: "En supervisión", estados: ["EN_SUPERVISION"] },
   { id: "observaciones", label: "Con observaciones", estados: ["CON_OBSERVACIONES"] },
   { id: "reparadas", label: "Reparadas por el emprendedor", estados: ["REPARADA"] },
   { id: "finalizadas", label: "Finalizadas", estados: ["FINALIZADA"] },
@@ -17,7 +19,11 @@ export default async function EvaluadorHomePage({
 }: {
   searchParams: Promise<{ filtro?: string }>;
 }) {
-  const user = await requireUser("EVALUADOR");
+  const user = await requireCatalogoEvaluador();
+  if (user.role === "SUPERVISOR") {
+    return <SupervisorHome supervisorId={user.id} searchParams={searchParams} />;
+  }
+
   const { filtro = "todas" } = await searchParams;
   const activo = FILTROS.find((f) => f.id === filtro) ?? FILTROS[0];
 

@@ -21,8 +21,15 @@ import {
 } from "@/components/pregunta-composer";
 import {
   esPreguntaNombreCaso,
+  ID_BORRADOR_NOMBRE_CASO,
   preguntaNombreCasoVista,
 } from "@/lib/nombre-caso";
+import {
+  MODO_EVALUACION_BOTON,
+  MODOS_EVALUACION,
+  parseModoEvaluacion,
+  type ModoEvaluacion,
+} from "@/lib/modo-evaluacion";
 import {
   campoLimiteCuenta,
   CUENTAS_PRESUPUESTO,
@@ -226,12 +233,17 @@ export function FormularioBuilder({
     id: string;
     titulo: string;
     descripcion: string;
+    modoEvaluacion?: string;
+    puedeCambiarModo?: boolean;
     preguntas: PreguntaVista[];
   };
 }) {
   const router = useRouter();
   const [titulo, setTitulo] = useState(formulario?.titulo ?? "");
   const [descripcion, setDescripcion] = useState(formulario?.descripcion ?? "");
+  const [modoEvaluacion, setModoEvaluacion] = useState<ModoEvaluacion>(
+    parseModoEvaluacion(formulario?.modoEvaluacion),
+  );
   const [tituloDraft, setTituloDraft] = useState(formulario?.titulo ?? "");
   const [descripcionDraft, setDescripcionDraft] = useState(formulario?.descripcion ?? "");
   const [editandoTitulo, setEditandoTitulo] = useState(modo === "nuevo" || !formulario?.titulo);
@@ -239,16 +251,17 @@ export function FormularioBuilder({
   const [preguntas, setPreguntas] = useState<PreguntaVista[]>(() => {
     const actuales = formulario?.preguntas ?? [];
     if (actuales.some(esPreguntaNombreCaso)) return actuales;
-    return [preguntaNombreCasoVista(crypto.randomUUID()), ...actuales];
+    return [preguntaNombreCasoVista(ID_BORRADOR_NOMBRE_CASO), ...actuales];
   });
   const [agregando, setAgregando] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [obligatoria, setObligatoria] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
-  const [guardandoCampo, setGuardandoCampo] = useState<"titulo" | "descripcion" | null>(null);
+  const [guardandoCampo, setGuardandoCampo] = useState<"titulo" | "descripcion" | "modo" | null>(null);
 
   const esNuevo = modo === "nuevo";
+  const puedeCambiarModo = esNuevo || Boolean(formulario?.puedeCambiarModo);
   const preguntaEditando = editandoId ? preguntas.find((item) => item.id === editandoId) : undefined;
   const modalPreguntaAbierto = agregando || Boolean(preguntaEditando);
 
@@ -259,7 +272,11 @@ export function FormularioBuilder({
     setError(null);
   }
 
-  async function persistirTituloDescripcion(siguienteTitulo: string, siguienteDescripcion: string) {
+  async function persistirTituloDescripcion(
+    siguienteTitulo: string,
+    siguienteDescripcion: string,
+    siguienteModo: ModoEvaluacion = modoEvaluacion,
+  ) {
     if (esNuevo || !formulario) return true;
     const tituloFinal = siguienteTitulo.trim();
     if (!tituloFinal) {
@@ -270,6 +287,7 @@ export function FormularioBuilder({
     formData.set("id", formulario.id);
     formData.set("titulo", tituloFinal);
     formData.set("descripcion", siguienteDescripcion);
+    formData.set("modoEvaluacion", siguienteModo);
     const result = await actualizarFormulario(formData);
     if (result?.error) {
       setError(result.error);
@@ -301,6 +319,20 @@ export function FormularioBuilder({
     if (!ok) return;
     setDescripcion(descripcionDraft);
     setEditandoDescripcion(false);
+  }
+
+  async function onCambiarModo(siguiente: ModoEvaluacion) {
+    if (!puedeCambiarModo || siguiente === modoEvaluacion) return;
+    if (esNuevo) {
+      setModoEvaluacion(siguiente);
+      return;
+    }
+    setGuardandoCampo("modo");
+    const ok = await persistirTituloDescripcion(titulo, descripcion, siguiente);
+    setGuardandoCampo(null);
+    if (!ok) return;
+    setModoEvaluacion(siguiente);
+    router.refresh();
   }
 
   async function onAgregar(borrador: PreguntaBorrador) {
@@ -402,6 +434,7 @@ export function FormularioBuilder({
     const result = await crearFormularioCompleto({
       titulo: titulo.trim(),
       descripcion: descripcion.trim(),
+      modoEvaluacion,
       preguntas: preguntas.map((pregunta) => ({
         enunciado: pregunta.enunciado,
         ayuda: pregunta.ayuda,
@@ -465,6 +498,30 @@ export function FormularioBuilder({
           ) : null}
         </div>
         {error ? <p className="text-danger">{error}</p> : null}
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <p className="text-sm font-semibold text-navy">Tipo de evaluación</p>
+            {MODOS_EVALUACION.map((modoItem) => {
+              const activo = modoEvaluacion === modoItem;
+              return (
+                <button
+                  key={modoItem}
+                  className={`btn btn-sm ${activo ? "btn-primary" : "btn-secondary"}`}
+                  type="button"
+                  disabled={!puedeCambiarModo || guardandoCampo === "modo"}
+                  onClick={() => onCambiarModo(modoItem)}
+                >
+                  {MODO_EVALUACION_BOTON[modoItem]}
+                </button>
+              );
+            })}
+          </div>
+          {!puedeCambiarModo ? (
+            <p className="text-right text-sm text-muted">
+              El tipo queda fijo porque este formulario ya tiene convocatorias asociadas.
+            </p>
+          ) : null}
+        </div>
         <CampoEditable
           editing={editandoDescripcion}
           guardando={guardandoCampo === "descripcion"}

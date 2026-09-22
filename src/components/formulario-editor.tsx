@@ -9,6 +9,8 @@ export function FormularioEditor({
     id: string;
     titulo: string;
     descripcion: string;
+    modoEvaluacion: string;
+    puedeCambiarModo: boolean;
     preguntas: {
       id: string;
       enunciado: string;

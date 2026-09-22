@@ -15,6 +15,8 @@ model User {
   passwordHash     String
   passwordAssigned String
   role             String
+  /// ADMIN = creado por administración / CSV; REGISTRO = auto-registro o Google
+  origen           String   @default("ADMIN")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -22,16 +24,49 @@ model User {
   postulaciones      Postulacion[]
   asignaciones       AsignacionEvaluador[]
   convocatoriasPool  ConvocatoriaEvaluador[]
+  convocatoriasPoolSupervisor ConvocatoriaSupervisor[]
+  asignacionesSupervisor      AsignacionSupervisor[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+/// Singleton de plantilla del correo de recuperación de contraseña (id fijo "default").
+model ConfigCorreoRecuperacion {
+  id              String   @id @default("default")
+  asunto          String
+  titulo          String
+  cuerpo          String
+  textoBoton      String
+  pie             String
+  colorFondo      String   @default("#f4f6fa")
+  colorEncabezado String   @default("#0a2156")
+  colorBoton      String   @default("#c8102e")
+  colorTexto      String   @default("#12203a")
+  /// JSON StoredFile o vacío
+  imagen          String   @default("")
+  updatedAt       DateTime @updatedAt
 }
 
 model Formulario {
-  id          String   @id @default(cuid())
-  titulo      String
-  descripcion String   @default("")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  creadoPorId String
-  creadoPor   User     @relation(fields: [creadoPorId], references: [id])
+  id             String   @id @default(cuid())
+  titulo         String
+  descripcion    String   @default("")
+  modoEvaluacion String   @default("POR_PREGUNTA") // POR_PREGUNTA | GENERAL
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  creadoPorId    String
+  creadoPor      User     @relation(fields: [creadoPorId], references: [id])
 
   preguntas     Pregunta[]
   convocatorias Convocatoria[]
@@ -55,6 +90,7 @@ model Pregunta {
 
   respuestas Respuesta[]
   revisiones RevisionPregunta[]
+  supervisiones SupervisionPregunta[]
 }
 
 model Convocatoria {
@@ -73,6 +109,7 @@ model Convocatoria {
 
   postulaciones Postulacion[]
   evaluadores   ConvocatoriaEvaluador[]
+  supervisores  ConvocatoriaSupervisor[]
 }
 
 model ConvocatoriaEvaluador {
@@ -85,6 +122,18 @@ model ConvocatoriaEvaluador {
   createdAt        DateTime     @default(now())
 
   @@unique([convocatoriaId, evaluadorId])
+}
+
+model ConvocatoriaSupervisor {
+  id               String       @id @default(cuid())
+  convocatoriaId   String
+  convocatoria     Convocatoria @relation(fields: [convocatoriaId], references: [id], onDelete: Cascade)
+  supervisorId     String
+  supervisor       User         @relation(fields: [supervisorId], references: [id])
+  maxSupervisiones Int          @default(0)
+  createdAt        DateTime     @default(now())
+
+  @@unique([convocatoriaId, supervisorId])
 }
 
 model Postulacion {
@@ -100,6 +149,7 @@ model Postulacion {
 
   respuestas   Respuesta[]
   asignaciones AsignacionEvaluador[]
+  supervision  AsignacionSupervisor?
 
   @@unique([convocatoriaId, postulanteId])
 }
@@ -137,12 +187,28 @@ model AsignacionEvaluador {
   orden         Int
   estado        String   @default("PENDIENTE")
   rondaActual   Int      @default(1)
+  /// OBSERVACIONES | FINALIZAR | vacío: lo que el evaluador envió al supervisor
+  intencionPendiente String?
+  cicloSupervision   Int     @default(1)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  revisiones RevisionPregunta[]
+  revisiones              RevisionPregunta[]
+  revisionesGenerales     RevisionGeneral[]
+  supervisionesPregunta   SupervisionPregunta[]
+  supervisionesGenerales  SupervisionGeneral[]
 
   @@unique([postulacionId, evaluadorId])
+}
+
+model AsignacionSupervisor {
+  id            String      @id @default(cuid())
+  postulacionId String      @unique
+  postulacion   Postulacion @relation(fields: [postulacionId], references: [id], onDelete: Cascade)
+  supervisorId  String
+  supervisor    User        @relation(fields: [supervisorId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
 
 model RevisionPregunta {
@@ -158,4 +224,44 @@ model RevisionPregunta {
   createdAt    DateTime @default(now())
 
   @@unique([asignacionId, preguntaId, ronda])
+}
+
+model RevisionGeneral {
+  id           String   @id @default(cuid())
+  asignacionId String
+  asignacion   AsignacionEvaluador @relation(fields: [asignacionId], references: [id], onDelete: Cascade)
+  ronda        Int
+  veredicto    String
+  comentario   String   @default("")
+  createdAt    DateTime @default(now())
+
+  @@unique([asignacionId, ronda])
+}
+
+model SupervisionPregunta {
+  id           String   @id @default(cuid())
+  asignacionId String
+  asignacion   AsignacionEvaluador @relation(fields: [asignacionId], references: [id], onDelete: Cascade)
+  preguntaId   String
+  pregunta     Pregunta @relation(fields: [preguntaId], references: [id])
+  ronda        Int
+  ciclo        Int
+  veredicto    String
+  comentario   String   @default("")
+  createdAt    DateTime @default(now())
+
+  @@unique([asignacionId, preguntaId, ronda, ciclo])
+}
+
+model SupervisionGeneral {
+  id           String   @id @default(cuid())
+  asignacionId String
+  asignacion   AsignacionEvaluador @relation(fields: [asignacionId], references: [id], onDelete: Cascade)
+  ronda        Int
+  ciclo        Int
+  veredicto    String
+  comentario   String   @default("")
+  createdAt    DateTime @default(now())
+
+  @@unique([asignacionId, ronda, ciclo])
 }

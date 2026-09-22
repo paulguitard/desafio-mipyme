@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { MODO_EVALUACION_LABEL, parseModoEvaluacion } from "@/lib/modo-evaluacion";
 
 export default async function FormulariosPage() {
   const formularios = await prisma.formulario.findMany({
@@ -17,14 +18,18 @@ export default async function FormulariosPage() {
 
       <div className="space-y-3">
         {formularios.length === 0 ? <p className="text-muted">Aún no hay formularios.</p> : null}
-        {formularios.map((form) => (
-          <a key={form.id} href={`/admin/formularios/${form.id}`} className="card block p-5">
-            <h2 className="text-xl font-semibold">{form.titulo}</h2>
-            <p className="text-muted">
-              {form._count.preguntas} preguntas · {form._count.convocatorias} convocatorias
-            </p>
-          </a>
-        ))}
+        {formularios.map((form) => {
+          const modo = parseModoEvaluacion(form.modoEvaluacion);
+          return (
+            <a key={form.id} href={`/admin/formularios/${form.id}`} className="card block p-5">
+              <h2 className="text-xl font-semibold">{form.titulo}</h2>
+              <p className="text-muted">
+                {MODO_EVALUACION_LABEL[modo]} · {form._count.preguntas} preguntas ·{" "}
+                {form._count.convocatorias} convocatorias
+              </p>
+            </a>
+          );
+        })}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { enviarPostulacion, guardarBorrador } from "@/actions/postulaciones";
 import {
   MAX_FILE_BYTES,
@@ -18,6 +18,13 @@ function validarAdjuntosCliente(formData: FormData): string | null {
     }
   }
   return null;
+}
+
+function limpiarInputsArchivo(form: HTMLFormElement | null) {
+  if (!form) return;
+  for (const input of form.querySelectorAll<HTMLInputElement>('input[type="file"]')) {
+    input.value = "";
+  }
 }
 
 export function FormularioPostulante({
@@ -39,9 +46,45 @@ export function FormularioPostulante({
 }) {
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  async function conGuardado(
+    formData: FormData,
+    accion: (formData: FormData) => Promise<{ error?: string } | { ok?: boolean } | void>,
+    mensajeOk: string,
+  ) {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    setError(null);
+    setMensaje(null);
+    try {
+      const adjuntoError = validarAdjuntosCliente(formData);
+      if (adjuntoError) {
+        setError(adjuntoError);
+        return;
+      }
+      const result = await accion(formData);
+      if (result && "error" in result && result.error) {
+        setError(result.error);
+        return;
+      }
+      limpiarInputsArchivo(formRef.current);
+      setMensaje(mensajeOk);
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }
 
   return (
-    <form className="page-workspace grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden">
+    <form
+      ref={formRef}
+      className="page-workspace grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden"
+      aria-busy={saving}
+    >
       <div className="shrink-0 space-y-3 bg-background">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -53,29 +96,19 @@ export function FormularioPostulante({
               <button
                 className="btn btn-sm btn-secondary"
                 type="submit"
+                disabled={saving}
                 formAction={async (formData) => {
-                  const adjuntoError = validarAdjuntosCliente(formData);
-                  if (adjuntoError) {
-                    setError(adjuntoError);
-                    setMensaje(null);
-                    return;
-                  }
-                  const result = await guardarBorrador(formData);
-                  if (result?.error) {
-                    setError(result.error);
-                    setMensaje(null);
-                  } else {
-                    setError(null);
-                    setMensaje("Borrador guardado.");
-                  }
+                  await conGuardado(formData, guardarBorrador, "Borrador guardado.");
                 }}
               >
-                Guardar borrador
+                {saving ? "Guardando…" : "Guardar borrador"}
               </button>
               <button
                 className="btn btn-sm btn-primary"
                 type="submit"
+                disabled={saving}
                 formAction={async (formData) => {
+                  if (savingRef.current) return;
                   if (
                     !window.confirm(
                       esCorreccion
@@ -85,23 +118,18 @@ export function FormularioPostulante({
                   ) {
                     return;
                   }
-                  const adjuntoError = validarAdjuntosCliente(formData);
-                  if (adjuntoError) {
-                    setError(adjuntoError);
-                    setMensaje(null);
-                    return;
-                  }
-                  const result = await enviarPostulacion(formData);
-                  if (result?.error) {
-                    setError(result.error);
-                    setMensaje(null);
-                  } else {
-                    setError(null);
-                    setMensaje(esCorreccion ? "Correcciones enviadas." : "Caso enviado.");
-                  }
+                  await conGuardado(
+                    formData,
+                    enviarPostulacion,
+                    esCorreccion ? "Correcciones enviadas." : "Caso enviado.",
+                  );
                 }}
               >
-                {esCorreccion ? "Enviar correcciones" : "Enviar caso"}
+                {saving
+                  ? "Guardando…"
+                  : esCorreccion
+                    ? "Enviar correcciones"
+                    : "Enviar caso"}
               </button>
             </div>
           ) : null}

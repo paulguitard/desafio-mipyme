@@ -3,6 +3,58 @@
 import { useState } from "react";
 import type { PeldanoEscala } from "@/lib/preguntas";
 
+type ItemHistorial = {
+  id: string;
+  ronda: number;
+  veredicto: string;
+  comentario: string;
+  nota: number | null;
+  createdAt?: string | null;
+  etiqueta?: string;
+};
+
+function etiquetaNota(nota: number | null, escala: PeldanoEscala[]) {
+  if (nota == null || escala.length === 0) return null;
+  const peldano = escala.find((item) => item.valor === nota);
+  return peldano?.etiqueta ? `Nota: ${nota} · ${peldano.etiqueta}` : `Nota: ${nota}`;
+}
+
+function ContenidoRevisionLectura({
+  item,
+  escala,
+  soloNotas,
+}: {
+  item: ItemHistorial;
+  escala: PeldanoEscala[];
+  soloNotas: boolean;
+}) {
+  const notaTexto = etiquetaNota(item.nota, escala);
+
+  if (soloNotas) {
+    return (
+      <div className="historial-feed-valor space-y-1">
+        {notaTexto ? <p>{notaTexto}</p> : <p className="text-muted">Sin nota</p>}
+      </div>
+    );
+  }
+
+  if (item.veredicto === "OBSERVACION") {
+    return (
+      <div className="historial-feed-valor space-y-1">
+        {item.comentario ? <p>{item.comentario}</p> : null}
+        {notaTexto ? <p>{notaTexto}</p> : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="historial-feed-valor space-y-1">
+      <p>{item.veredicto === "OK" ? "Sin observaciones" : "Sin veredicto"}</p>
+      {notaTexto ? <p>{notaTexto}</p> : null}
+    </div>
+  );
+}
+
 export function PanelEvaluacionPregunta({
   preguntaId,
   canEdit,
@@ -12,6 +64,9 @@ export function PanelEvaluacionPregunta({
   notaInicial,
   escala,
   historial,
+  soloNotas = false,
+  namePrefix = "",
+  tipo = "evaluacion",
 }: {
   preguntaId: string;
   canEdit: boolean;
@@ -20,110 +75,148 @@ export function PanelEvaluacionPregunta({
   comentarioInicial?: string;
   notaInicial?: number | null;
   escala: PeldanoEscala[];
-  historial: { id: string; ronda: number; veredicto: string; comentario: string; nota: number | null }[];
+  historial: ItemHistorial[];
+  soloNotas?: boolean;
+  namePrefix?: string;
+  tipo?: "evaluacion" | "supervision";
 }) {
-  const [veredicto, setVeredicto] = useState(veredictoInicial ?? "");
+  const [veredicto, setVeredicto] = useState(soloNotas ? "OK" : (veredictoInicial ?? ""));
   const [nota, setNota] = useState<number | null>(notaInicial ?? null);
-  const [comentario, setComentario] = useState(comentarioInicial ?? "");
+  const [comentario, setComentario] = useState(soloNotas ? "" : (comentarioInicial ?? ""));
+
+  const campoVeredicto = `${namePrefix}veredicto-${preguntaId}`;
+  const campoNota = `${namePrefix}nota-${preguntaId}`;
+  const campoComentario = `${namePrefix}comentario-${preguntaId}`;
+  const esSupervision = tipo === "supervision";
+
+  const items: ItemHistorial[] = [...historial].sort((a, b) => b.ronda - a.ronda);
+  if (!items.some((item) => item.ronda === ronda)) {
+    items.unshift({
+      id: `pendiente-${preguntaId}-${ronda}`,
+      ronda,
+      veredicto: soloNotas ? "OK" : (veredictoInicial ?? ""),
+      comentario: soloNotas ? "" : (comentarioInicial ?? ""),
+      nota: notaInicial ?? null,
+      createdAt: null,
+    });
+  }
+
+  if (soloNotas && escala.length === 0) {
+    return (
+      <div className="card space-y-2 p-4">
+        <p className="text-muted">Esta pregunta no se califica con nota.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="card space-y-3 p-4">
-      <input type="hidden" name={`veredicto-${preguntaId}`} value={veredicto} />
-      {escala.length > 0 ? (
-        <input type="hidden" name={`nota-${preguntaId}`} value={nota ?? ""} />
+      <input type="hidden" name={campoVeredicto} value={soloNotas ? "OK" : veredicto} />
+      {escala.length > 0 && !esSupervision ? (
+        <input type="hidden" name={campoNota} value={nota ?? ""} />
+      ) : null}
+      {!canEdit || soloNotas || veredicto !== "OBSERVACION" ? (
+        <input type="hidden" name={campoComentario} value={soloNotas ? "" : comentario} />
       ) : null}
 
-      {canEdit ? (
-        <>
-          <p className="font-semibold">Tu evaluación (ronda {ronda})</p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              className={`btn btn-sm ${veredicto === "OBSERVACION" ? "btn-primary" : "btn-secondary"}`}
-              type="button"
-              onClick={() => setVeredicto("OBSERVACION")}
-            >
-              Comentar observaciones
-            </button>
-            <button
-              className={`btn btn-sm ${veredicto === "OK" ? "btn-primary" : "btn-secondary"}`}
-              type="button"
-              onClick={() => setVeredicto("OK")}
-            >
-              Sin observaciones
-            </button>
-          </div>
-          {escala.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-sm font-semibold">Nota</p>
-              <div className="flex flex-wrap gap-2">
-                {escala.map((item) => {
-                  const activo = nota === item.valor;
-                  return (
-                    <button
-                      key={item.valor}
-                      className={`btn btn-sm ${activo ? "btn-navy" : "btn-ghost"}`}
-                      type="button"
-                      onClick={() => setNota(item.valor)}
-                    >
-                      {item.valor}
-                      {item.etiqueta ? ` · ${item.etiqueta}` : ""}
-                    </button>
-                  );
-                })}
+      <ol className="historial-feed">
+        {items.map((item, index) => {
+          const esActual = item.ronda === ronda;
+          const editable = canEdit && esActual;
+
+          return (
+            <li key={item.id} className="historial-feed-item">
+              <div className="historial-feed-rail" aria-hidden="true">
+                <span className="historial-feed-dot" />
+                {index < items.length - 1 ? <span className="historial-feed-line" /> : null}
               </div>
-            </div>
-          ) : null}
-          {veredicto === "OBSERVACION" ? (
-            <div className="field">
-              <label htmlFor={`comentario-${preguntaId}`}>Comentario (obligatorio)</label>
-              <textarea
-                className="input"
-                id={`comentario-${preguntaId}`}
-                name={`comentario-${preguntaId}`}
-                value={comentario}
-                onChange={(event) => setComentario(event.target.value)}
-              />
-            </div>
-          ) : (
-            <input type="hidden" name={`comentario-${preguntaId}`} value={comentario} />
-          )}
-        </>
-      ) : (
-        <div className="space-y-2">
-          <p className="font-semibold">Evaluación (ronda {ronda})</p>
-          <p>
-            {veredictoInicial === "OK"
-              ? "Sin observaciones"
-              : veredictoInicial === "OBSERVACION"
-                ? "Con observaciones"
-                : "Sin veredicto"}
-          </p>
-          {escala.length > 0 && notaInicial != null ? (
-            <p>
-              Nota: {notaInicial}
-              {escala.find((item) => item.valor === notaInicial)?.etiqueta
-                ? ` · ${escala.find((item) => item.valor === notaInicial)?.etiqueta}`
-                : ""}
-            </p>
-          ) : null}
-          {comentarioInicial ? <p>{comentarioInicial}</p> : null}
-        </div>
-      )}
+              <div className="historial-feed-card">
+                <div className="historial-feed-meta">
+                  <strong>
+                    {item.etiqueta
+                      ? item.etiqueta
+                      : editable
+                        ? soloNotas
+                          ? `Tu nota (ronda ${item.ronda})`
+                          : esSupervision
+                            ? `Tu supervisión (ciclo ${item.ronda})`
+                            : `Tu evaluación (ronda ${item.ronda})`
+                        : soloNotas
+                          ? `Nota (ronda ${item.ronda})`
+                          : esSupervision
+                            ? `Supervisión (ciclo ${item.ronda})`
+                            : `Evaluación (ronda ${item.ronda})`}
+                  </strong>
+                  {index === 0 ? <span className="historial-feed-badge">Más reciente</span> : null}
+                </div>
+                {item.createdAt ? (
+                  <time className="historial-feed-date" dateTime={item.createdAt}>
+                    {new Date(item.createdAt).toLocaleString("es-CL")}
+                  </time>
+                ) : null}
 
-      {historial.length > 0 ? (
-        <div className="rounded-xl border border-border bg-white p-3">
-          <h3 className="font-semibold">Observaciones anteriores de esta evaluación</h3>
-          <ul className="mt-2 space-y-2">
-            {historial.map((item) => (
-              <li key={item.id}>
-                Ronda {item.ronda}: {item.veredicto === "OK" ? "Sin observaciones" : "Con observaciones"}
-                {item.nota != null ? ` · Nota ${item.nota}` : ""}
-                {item.comentario ? ` — ${item.comentario}` : ""}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+                {editable ? (
+                  <div className="mt-3 space-y-3">
+                    {soloNotas ? null : (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          className={`btn btn-sm ${veredicto === "OBSERVACION" ? "btn-primary" : "btn-secondary"}`}
+                          type="button"
+                          onClick={() => setVeredicto("OBSERVACION")}
+                        >
+                          Comentar observaciones
+                        </button>
+                        <button
+                          className={`btn btn-sm ${veredicto === "OK" ? "btn-primary" : "btn-secondary"}`}
+                          type="button"
+                          onClick={() => setVeredicto("OK")}
+                        >
+                          Sin observaciones
+                        </button>
+                      </div>
+                    )}
+                    {escala.length > 0 && !esSupervision ? (
+                      <div className="space-y-2">
+                        <p className="text-sm font-semibold">Nota</p>
+                        <div className="flex flex-wrap gap-2">
+                          {escala.map((peldano) => {
+                            const activo = nota === peldano.valor;
+                            return (
+                              <button
+                                key={peldano.valor}
+                                className={`btn btn-sm ${activo ? "btn-navy" : "btn-ghost"}`}
+                                type="button"
+                                onClick={() => setNota(peldano.valor)}
+                              >
+                                {peldano.valor}
+                                {peldano.etiqueta ? ` · ${peldano.etiqueta}` : ""}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                    {!soloNotas && veredicto === "OBSERVACION" ? (
+                      <div className="field">
+                        <label htmlFor={campoComentario}>Comentario (obligatorio)</label>
+                        <textarea
+                          className="input"
+                          id={campoComentario}
+                          name={campoComentario}
+                          value={comentario}
+                          onChange={(event) => setComentario(event.target.value)}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <ContenidoRevisionLectura item={item} escala={escala} soloNotas={soloNotas} />
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }

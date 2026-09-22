@@ -62,20 +62,23 @@ export function HistorialVersionesRespuesta({
 
   return (
     <>
-      <button
-        type="button"
-        className={`historial-versiones-btn ${conCambios ? "is-changed" : "is-single"}`}
-        aria-label={etiqueta}
-        title={etiqueta}
-        onClick={() => setOpen(true)}
-      >
-        <IconoHistorial />
-        {conCambios ? (
-          <span className="historial-versiones-count" aria-hidden="true">
-            {cantidad}
-          </span>
-        ) : null}
-      </button>
+      <div className={`historial-versiones ${conCambios ? "is-changed" : "is-single"}`}>
+        <span className="historial-versiones-label">Versiones</span>
+        <button
+          type="button"
+          className="historial-versiones-btn"
+          aria-label={etiqueta}
+          title={etiqueta}
+          onClick={() => setOpen(true)}
+        >
+          <IconoHistorial />
+          {conCambios ? (
+            <span className="historial-versiones-count" aria-hidden="true">
+              {cantidad}
+            </span>
+          ) : null}
+        </button>
+      </div>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Historial de versiones" tall>
         <ol className="historial-feed">

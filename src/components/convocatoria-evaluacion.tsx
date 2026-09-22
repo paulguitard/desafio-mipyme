@@ -5,13 +5,22 @@ import { createPortal } from "react-dom";
 import {
   agregarEvaluadorAlPool,
   agregarEvaluadoresAlPool,
+  agregarSupervisorAlPool,
+  agregarSupervisoresAlPool,
   asignarEvaluadorAPostulacion,
   asignarEvaluadoresAutomatico,
+  asignarSupervisorAPostulacion,
+  asignarSupervisoresAutomatico,
+  cargarDetalleFichaAdmin,
   eliminarPostulacion,
   guardarConfigEvaluacion,
   quitarEvaluadorDelPool,
+  quitarSupervisorDelPool,
 } from "@/actions/convocatorias";
+import { FichaDetalleAdmin } from "@/components/ficha-detalle-admin";
 import { Modal } from "@/components/modal";
+import type { DetalleFichaAdmin } from "@/lib/convocatoria-admin-data";
+import { rondaRespuestaEmprendedor } from "@/lib/estado";
 import { parseValor } from "@/lib/preguntas";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
 
@@ -32,6 +41,13 @@ type Asignacion = {
   evaluadorNombre: string;
   orden: number;
   estado: string;
+  rondaActual: number;
+  intencionPendiente?: string | null;
+};
+
+type SupervisionFicha = {
+  supervisorId: string;
+  supervisorNombre: string;
 };
 
 type PreguntaFiltro = { id: string; enunciado: string; obligatoria: boolean; opciones?: string };
@@ -47,6 +63,7 @@ type PostulacionItem = {
   nombreCaso: string;
   respuestas: RespuestaFiltro[];
   asignaciones: Asignacion[];
+  supervision?: SupervisionFicha | null;
 };
 
 type EstadoRespuestaFicha = "pendiente" | "observaciones" | "completa";
@@ -112,13 +129,25 @@ function etiquetaEstadoRespuesta(estado: EstadoRespuestaFicha) {
 
 function claseEstadoAsignacion(estado: string) {
   if (estado === "FINALIZADA") return "eval-avatar-finalizada";
-  if (estado === "CON_OBSERVACIONES" || estado === "REPARADA") return "eval-avatar-observada";
+  if (
+    estado === "CON_OBSERVACIONES" ||
+    estado === "REPARADA" ||
+    estado === "DEVUELTA_SUPERVISOR"
+  ) {
+    return "eval-avatar-observada";
+  }
   return "eval-avatar-pendiente";
 }
 
 function estadoAsignacionFicha(estado: string) {
   if (estado === "FINALIZADA") return "finalizada";
-  if (estado === "CON_OBSERVACIONES" || estado === "REPARADA") return "observada";
+  if (
+    estado === "CON_OBSERVACIONES" ||
+    estado === "REPARADA" ||
+    estado === "DEVUELTA_SUPERVISOR"
+  ) {
+    return "observada";
+  }
   return "pendiente";
 }
 
@@ -197,7 +226,27 @@ function IconoBasurero() {
   );
 }
 
+function estadoSupervisionFicha(postulacion: PostulacionItem) {
+  if (postulacion.asignaciones.some((item) => item.estado === "DEVUELTA_SUPERVISOR")) {
+    return "observada";
+  }
+  if (
+    postulacion.asignaciones.length > 0 &&
+    postulacion.asignaciones.every((item) => item.estado === "FINALIZADA")
+  ) {
+    return "finalizada";
+  }
+  return "pendiente";
+}
+
+function etiquetaEstadoSupervision(estado: string) {
+  if (estado === "finalizada") return "Finalizada";
+  if (estado === "observada") return "Observada";
+  return "Pendiente";
+}
+
 const DRAG_EVALUADOR = "application/x-evaluador-id";
+const DRAG_SUPERVISOR = "application/x-supervisor-id";
 
 export function ConvocatoriaEvaluacion({
   convocatoriaId,
@@ -207,6 +256,8 @@ export function ConvocatoriaEvaluacion({
   pool,
   evaluadoresDisponibles,
   postulaciones,
+  poolSupervisores = [],
+  supervisoresDisponibles = [],
   onMutated,
 }: {
   convocatoriaId: string;
@@ -216,6 +267,8 @@ export function ConvocatoriaEvaluacion({
   pool: PoolItem[];
   evaluadoresDisponibles: Evaluador[];
   postulaciones: PostulacionItem[];
+  poolSupervisores?: PoolItem[];
+  supervisoresDisponibles?: Evaluador[];
   onMutated?: () => Promise<void> | void;
 }) {
   const [error, setError] = useState<string | null>(null);
@@ -234,6 +287,9 @@ export function ConvocatoriaEvaluacion({
   const [filtroEstadoRespuesta, setFiltroEstadoRespuesta] = useState("");
   const [filtroEstadoEvaluacion, setFiltroEstadoEvaluacion] = useState("");
   const [filtroEvaluadorId, setFiltroEvaluadorId] = useState("");
+  const [filtroEstadoSupervision, setFiltroEstadoSupervision] = useState("");
+  const [filtroSupervisorId, setFiltroSupervisorId] = useState("");
+  const [panelLateral, setPanelLateral] = useState<"evaluadores" | "supervisores">("evaluadores");
   const [portalListo, setPortalListo] = useState(false);
   const [agregando, setAgregando] = useState(false);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -242,10 +298,17 @@ export function ConvocatoriaEvaluacion({
   const [editandoCasos, setEditandoCasos] = useState(false);
   const [valorCasos, setValorCasos] = useState(String(evaluacionesPorPostulacion));
   const [guardandoCasos, setGuardandoCasos] = useState(false);
+  const [detalleOpen, setDetalleOpen] = useState(false);
+  const [detalleLoadingId, setDetalleLoadingId] = useState<string | null>(null);
+  const [detalleError, setDetalleError] = useState<string | null>(null);
+  const [detalle, setDetalle] = useState<DetalleFichaAdmin | null>(null);
   const inputCasosRef = useRef<HTMLInputElement>(null);
   const cancelandoCasosRef = useRef(false);
   const abierta = estadoConvocatoria === "ABIERTA";
-  const poolIds = useMemo(() => new Set(pool.map((item) => item.evaluadorId)), [pool]);
+  const esSupervisores = panelLateral === "supervisores";
+  const poolActivo = esSupervisores ? poolSupervisores : pool;
+  const disponiblesActivos = esSupervisores ? supervisoresDisponibles : evaluadoresDisponibles;
+  const poolIds = useMemo(() => new Set(poolActivo.map((item) => item.evaluadorId)), [poolActivo]);
   const respuestas = useMemo(() => postulaciones, [postulaciones]);
 
   const respuestasFiltradas = useMemo(() => {
@@ -274,6 +337,17 @@ export function ConvocatoriaEvaluacion({
         });
         if (!coincide) return false;
       }
+      if (filtroSupervisorId || filtroEstadoSupervision) {
+        if (filtroSupervisorId && postulacion.supervision?.supervisorId !== filtroSupervisorId) {
+          return false;
+        }
+        if (
+          filtroEstadoSupervision &&
+          estadoSupervisionFicha(postulacion) !== filtroEstadoSupervision
+        ) {
+          return false;
+        }
+      }
       if (!filtroPreguntaId || !filtroContiene.trim()) return true;
       const respuesta = postulacion.respuestas.find((item) => item.preguntaId === filtroPreguntaId);
       return contiene(textoPlano(parseValor(respuesta?.valor ?? "")), filtroContiene);
@@ -285,6 +359,8 @@ export function ConvocatoriaEvaluacion({
     filtroEstadoEvaluacion,
     filtroEstadoRespuesta,
     filtroEvaluadorId,
+    filtroEstadoSupervision,
+    filtroSupervisorId,
     filtroPreguntaId,
     preguntas,
     respuestas,
@@ -292,9 +368,9 @@ export function ConvocatoriaEvaluacion({
 
   const evaluadoresFiltrados = useMemo(() => {
     const q = filtroNombre.trim().toLocaleLowerCase("es-CL");
-    if (!q) return evaluadoresDisponibles;
-    return evaluadoresDisponibles.filter((item) => item.name.toLocaleLowerCase("es-CL").includes(q));
-  }, [evaluadoresDisponibles, filtroNombre]);
+    if (!q) return disponiblesActivos;
+    return disponiblesActivos.filter((item) => item.name.toLocaleLowerCase("es-CL").includes(q));
+  }, [disponiblesActivos, filtroNombre]);
 
   const paraAgregar = useMemo(
     () => evaluadoresFiltrados.filter((item) => !poolIds.has(item.id)),
@@ -374,20 +450,22 @@ export function ConvocatoriaEvaluacion({
     const formData = new FormData();
     formData.set("convocatoriaId", convocatoriaId);
     formData.set("evaluadorId", evaluadorId);
-    const result = await agregarEvaluadorAlPool(formData);
+    const result = esSupervisores
+      ? await agregarSupervisorAlPool(formData)
+      : await agregarEvaluadorAlPool(formData);
     setAgregando(false);
     if (result?.error) {
       setAgregarError(result.error);
       return;
     }
-    setAgregarMensaje("Evaluador agregado.");
+    setAgregarMensaje(esSupervisores ? "Supervisor agregado." : "Evaluador agregado.");
     setSeleccionados((ids) => ids.filter((id) => id !== evaluadorId));
     await onMutated?.();
   }
 
   async function agregarSeleccion() {
     if (seleccionados.length === 0) {
-      setAgregarError("Selecciona al menos un evaluador.");
+      setAgregarError(esSupervisores ? "Selecciona al menos un supervisor." : "Selecciona al menos un evaluador.");
       return;
     }
     setAgregarError(null);
@@ -396,13 +474,17 @@ export function ConvocatoriaEvaluacion({
     const formData = new FormData();
     formData.set("convocatoriaId", convocatoriaId);
     for (const id of seleccionados) formData.append("evaluadorId", id);
-    const result = await agregarEvaluadoresAlPool(formData);
+    const result = esSupervisores
+      ? await agregarSupervisoresAlPool(formData)
+      : await agregarEvaluadoresAlPool(formData);
     setAgregando(false);
     if (result?.error) {
       setAgregarError(result.error);
       return;
     }
-    setAgregarMensaje(result?.mensaje ?? "Evaluadores agregados.");
+    setAgregarMensaje(
+      result?.mensaje ?? (esSupervisores ? "Supervisores agregados." : "Evaluadores agregados."),
+    );
     setSeleccionados([]);
     await onMutated?.();
   }
@@ -422,6 +504,24 @@ export function ConvocatoriaEvaluacion({
       return;
     }
     setMensaje(result?.mensaje ?? "Evaluador asignado.");
+    await onMutated?.();
+  }
+
+  async function soltarSupervisor(postulacionId: string, supervisorId: string) {
+    setError(null);
+    setMensaje(null);
+    setAsignando(true);
+    const formData = new FormData();
+    formData.set("postulacionId", postulacionId);
+    formData.set("supervisorId", supervisorId);
+    const result = await asignarSupervisorAPostulacion(formData);
+    setAsignando(false);
+    setDropTargetId(null);
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
+    setMensaje(result?.mensaje ?? "Supervisor asignado.");
     await onMutated?.();
   }
 
@@ -446,29 +546,81 @@ export function ConvocatoriaEvaluacion({
     await onMutated?.();
   }
 
+  async function abrirDetalle(postulacion: PostulacionItem) {
+    setDetalleOpen(true);
+    setDetalle(null);
+    setDetalleError(null);
+    setDetalleLoadingId(postulacion.id);
+    const result = await cargarDetalleFichaAdmin(postulacion.id);
+    setDetalleLoadingId(null);
+    if (result?.error) {
+      setDetalleError(result.error);
+      return;
+    }
+    if (result?.data) setDetalle(result.data);
+  }
+
+  function cerrarDetalle() {
+    setDetalleOpen(false);
+    setDetalle(null);
+    setDetalleError(null);
+    setDetalleLoadingId(null);
+  }
+
   return (
     <div className="eval-panel eval-shell-open">
       <div className="eval-shell">
-      <aside className="eval-side" aria-label="Evaluadores de la convocatoria">
+      <aside className="eval-side" aria-label="Evaluadores y supervisores de la convocatoria">
         <div className="eval-side-header">
-          <h3 className="text-lg font-semibold text-navy">Evaluadores ({pool.length})</h3>
+          <h3 className="text-lg font-semibold text-navy">
+            {esSupervisores ? `Supervisores (${poolActivo.length})` : `Evaluadores (${poolActivo.length})`}
+          </h3>
+        </div>
+        <div className="eval-side-tabs">
+          <button
+            type="button"
+            className={`eval-side-tab${esSupervisores ? "" : " is-active"}`}
+            onClick={() => {
+              setPanelLateral("evaluadores");
+              setSeleccionados([]);
+            }}
+          >
+            Evaluadores
+          </button>
+          <button
+            type="button"
+            className={`eval-side-tab${esSupervisores ? " is-active" : ""}`}
+            onClick={() => {
+              setPanelLateral("supervisores");
+              setSeleccionados([]);
+            }}
+          >
+            Supervisores
+          </button>
         </div>
 
         <div className="eval-side-body space-y-4">
           {poolError ? <p className="text-danger">{poolError}</p> : null}
           {poolMensaje ? <p className="font-semibold text-navy">{poolMensaje}</p> : null}
 
-          {pool.length === 0 ? (
-            <p className="text-muted">Todavía no hay evaluadores asignados a esta convocatoria.</p>
+          {poolActivo.length === 0 ? (
+            <p className="text-muted">
+              {esSupervisores
+                ? "Todavía no hay supervisores asignados a esta convocatoria."
+                : "Todavía no hay evaluadores asignados a esta convocatoria."}
+            </p>
           ) : (
             <ul className="space-y-2">
-              {pool.map((item) => (
+              {poolActivo.map((item) => (
                 <li
                   key={item.evaluadorId}
                   className={`eval-side-item${abierta ? " eval-side-item-draggable" : ""}`}
                   draggable={abierta}
                   onDragStart={(event) => {
-                    event.dataTransfer.setData(DRAG_EVALUADOR, item.evaluadorId);
+                    event.dataTransfer.setData(
+                      esSupervisores ? DRAG_SUPERVISOR : DRAG_EVALUADOR,
+                      item.evaluadorId,
+                    );
                     event.dataTransfer.effectAllowed = "copy";
                   }}
                   onDragEnd={() => setDropTargetId(null)}
@@ -480,16 +632,19 @@ export function ConvocatoriaEvaluacion({
                       action={async (formData) => {
                         setPoolError(null);
                         setPoolMensaje(null);
-                        const result = await quitarEvaluadorDelPool(formData);
+                        const result = esSupervisores
+                          ? await quitarSupervisorDelPool(formData)
+                          : await quitarEvaluadorDelPool(formData);
                         if (result?.error) setPoolError(result.error);
                         else {
-                          setPoolMensaje("Evaluador quitado.");
+                          setPoolMensaje(esSupervisores ? "Supervisor quitado." : "Evaluador quitado.");
                           await onMutated?.();
                         }
                       }}
                     >
                       <input type="hidden" name="convocatoriaId" value={convocatoriaId} />
                       <input type="hidden" name="evaluadorId" value={item.evaluadorId} />
+                      <input type="hidden" name="supervisorId" value={item.evaluadorId} />
                       <button
                         className="eval-side-remove"
                         type="submit"
@@ -502,7 +657,7 @@ export function ConvocatoriaEvaluacion({
                       </button>
                     </form>
                   </div>
-                  <div className="eval-side-metrics" aria-label="Resumen de evaluaciones">
+                  <div className="eval-side-metrics" aria-label="Resumen">
                     <span>
                       <strong>{item.asignadas}</strong> asignadas
                     </span>
@@ -520,6 +675,14 @@ export function ConvocatoriaEvaluacion({
         </div>
 
         <div className="eval-side-footer">
+          {esSupervisores ? (
+            <div className="eval-side-config">
+              <span className="eval-side-config-label">Supervisiones por caso:</span>
+              <div className="eval-side-config-value">
+                <span className="eval-side-config-num">1</span>
+              </div>
+            </div>
+          ) : (
           <div className="eval-side-config">
             <span className="eval-side-config-label" id="label-evaluaciones-caso">
               Evaluaciones por caso:
@@ -572,12 +735,15 @@ export function ConvocatoriaEvaluacion({
               </div>
             )}
           </div>
+          )}
 
           <form
             action={async (formData) => {
               setError(null);
               setMensaje(null);
-              const result = await asignarEvaluadoresAutomatico(formData);
+              const result = esSupervisores
+                ? await asignarSupervisoresAutomatico(formData)
+                : await asignarEvaluadoresAutomatico(formData);
               if (result && "error" in result && result.error) {
                 setError(result.error);
               } else {
@@ -594,7 +760,7 @@ export function ConvocatoriaEvaluacion({
             <button
               className="btn btn-sm btn-navy w-full"
               type="submit"
-              disabled={!abierta || pool.length === 0}
+              disabled={!abierta || poolActivo.length === 0}
             >
               Asignación automática
             </button>
@@ -609,10 +775,11 @@ export function ConvocatoriaEvaluacion({
               setAgregarMensaje(null);
             }}
           >
-            Incorporar evaluadores
+            {esSupervisores ? "Incorporar supervisores" : "Incorporar evaluadores"}
           </button>
         </div>
       </aside>
+
 
       <div className="eval-main" aria-label="Respuestas de la convocatoria">
         <div className="respuestas-filtros space-y-3">
@@ -714,6 +881,36 @@ export function ConvocatoriaEvaluacion({
                 ))}
               </select>
             </div>
+            <div className="field">
+              <label htmlFor="filtro-estado-supervision">Estado supervisión</label>
+              <select
+                className="input"
+                id="filtro-estado-supervision"
+                value={filtroEstadoSupervision}
+                onChange={(event) => setFiltroEstadoSupervision(event.target.value)}
+              >
+                <option value="">Todos</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="observada">Observada</option>
+                <option value="finalizada">Finalizada</option>
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="filtro-supervisor">Supervisor</label>
+              <select
+                className="input"
+                id="filtro-supervisor"
+                value={filtroSupervisorId}
+                onChange={(event) => setFiltroSupervisorId(event.target.value)}
+              >
+                <option value="">Todos</option>
+                {poolSupervisores.map((item) => (
+                  <option key={item.evaluadorId} value={item.evaluadorId}>
+                    {item.evaluador.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {error ? <p className="text-danger">{error}</p> : null}
@@ -725,6 +922,7 @@ export function ConvocatoriaEvaluacion({
             <div className="eval-lista-cabecera" aria-hidden="true">
               <span>Estado respuestas</span>
               <span>Estado evaluaciones</span>
+              <span>Estado supervisión</span>
               <span className="eval-lista-cabecera-accion">
                 <span className="sr-only">Acciones</span>
               </span>
@@ -738,17 +936,24 @@ export function ConvocatoriaEvaluacion({
           {respuestasFiltradas.map((postulacion) => {
             const estadoRespuesta = estadoRespuestaFicha(postulacion, preguntas);
             const completa = estadoRespuesta === "completa";
-            const puedeAsignar =
+            const puedeAsignarEval =
               abierta && !asignando && completa && postulacion.estado !== "FINALIZADA";
+            const puedeAsignarSup =
+              puedeAsignarEval && !postulacion.supervision;
             const esDestino = dropTargetId === postulacion.id;
             return (
               <article
                 key={postulacion.id}
                 className={`eval-ficha${esDestino ? " is-drop-target" : ""}${
-                  puedeAsignar ? "" : " is-locked"
+                  puedeAsignarEval || puedeAsignarSup ? "" : " is-locked"
                 }${eliminandoId === postulacion.id ? " is-deleting" : ""}`}
                 onDragOver={(event) => {
-                  if (!puedeAsignar) return;
+                  const tipos = Array.from(event.dataTransfer.types);
+                  const esSup = tipos.includes(DRAG_SUPERVISOR);
+                  const esEval = tipos.includes(DRAG_EVALUADOR);
+                  if (esSup && !puedeAsignarSup) return;
+                  if (esEval && !puedeAsignarEval) return;
+                  if (!esSup && !esEval && !puedeAsignarEval && !puedeAsignarSup) return;
                   event.preventDefault();
                   event.dataTransfer.dropEffect = "copy";
                   setDropTargetId(postulacion.id);
@@ -759,16 +964,36 @@ export function ConvocatoriaEvaluacion({
                 }}
                 onDrop={(event) => {
                   event.preventDefault();
-                  if (!puedeAsignar) return;
+                  const supervisorId = event.dataTransfer.getData(DRAG_SUPERVISOR);
+                  if (supervisorId) {
+                    if (!puedeAsignarSup) return;
+                    void soltarSupervisor(postulacion.id, supervisorId);
+                    return;
+                  }
                   const evaluadorId = event.dataTransfer.getData(DRAG_EVALUADOR);
-                  if (!evaluadorId) return;
+                  if (!evaluadorId || !puedeAsignarEval) return;
                   void soltarEvaluador(postulacion.id, evaluadorId);
                 }}
               >
                 <div className="eval-ficha-respuesta">
                   <div className="eval-ficha-respuesta-top">
+                    <button
+                      className="btn btn-sm btn-secondary eval-ficha-ver"
+                      type="button"
+                      disabled={detalleLoadingId === postulacion.id}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        void abrirDetalle(postulacion);
+                      }}
+                    >
+                      Ver
+                    </button>
                     <span className={`eval-ficha-pill is-${estadoRespuesta}`}>
                       {etiquetaEstadoRespuesta(estadoRespuesta)}
+                    </span>
+                    <span className="eval-ficha-ronda">
+                      Ronda {rondaRespuestaEmprendedor(postulacion.asignaciones)}
                     </span>
                     <span className="eval-ficha-id" title={postulacion.id}>
                       ID#{idCorto(postulacion.id)}
@@ -792,7 +1017,7 @@ export function ConvocatoriaEvaluacion({
                         ? "Respondiendo observaciones"
                         : estadoRespuesta === "pendiente"
                           ? "Respuesta pendiente"
-                          : puedeAsignar
+                          : puedeAsignarEval
                             ? "Arrastra un evaluador aquí"
                             : "Sin evaluadores asignados"}
                     </p>
@@ -818,6 +1043,41 @@ export function ConvocatoriaEvaluacion({
                           </li>
                         );
                       })}
+                    </ul>
+                  )}
+                </div>
+                <div className="eval-ficha-supervision">
+                  {!postulacion.supervision ? (
+                    <p className="eval-ficha-empty">
+                      {puedeAsignarSup ? "Arrastra un supervisor aquí" : "Sin supervisor"}
+                    </p>
+                  ) : (
+                    <ul className="eval-ficha-avatars">
+                      {(() => {
+                        const estadoSup = estadoSupervisionFicha(postulacion);
+                        const estadoFake =
+                          estadoSup === "finalizada"
+                            ? "FINALIZADA"
+                            : estadoSup === "observada"
+                              ? "CON_OBSERVACIONES"
+                              : "PENDIENTE";
+                        return (
+                          <li
+                            className={`eval-avatar ${claseEstadoAsignacion(estadoFake)}`}
+                            title={`${postulacion.supervision.supervisorNombre} · ${etiquetaEstadoSupervision(estadoSup)}`}
+                          >
+                            <span className={`eval-avatar-pill is-${estadoSup}`}>
+                              {etiquetaEstadoSupervision(estadoSup)}
+                            </span>
+                            <span className="eval-avatar-icon">
+                              {IconoEstadoEvaluacion(estadoFake)}
+                            </span>
+                            <span className="eval-avatar-name">
+                              {postulacion.supervision.supervisorNombre}
+                            </span>
+                          </li>
+                        );
+                      })()}
                     </ul>
                   )}
                 </div>
@@ -847,7 +1107,7 @@ export function ConvocatoriaEvaluacion({
         ? createPortal(
             <Modal
               open={agregarOpen}
-              title="Incorporar evaluadores"
+              title={esSupervisores ? "Incorporar supervisores" : "Incorporar evaluadores"}
               wide
               onClose={() => {
                 setAgregarOpen(false);
@@ -859,8 +1119,9 @@ export function ConvocatoriaEvaluacion({
             >
               <div className="space-y-4">
                 <p className="text-muted">
-                  Elige evaluadores registrados para sumarlos a esta convocatoria. Puedes agregar uno o varios a
-                  la vez.
+                  {esSupervisores
+                    ? "Elige supervisores registrados para sumarlos a esta convocatoria. Puedes agregar uno o varios a la vez."
+                    : "Elige evaluadores registrados para sumarlos a esta convocatoria. Puedes agregar uno o varios a la vez."}
                 </p>
                 {agregarError ? <p className="text-danger">{agregarError}</p> : null}
                 {agregarMensaje ? <p className="font-semibold text-navy">{agregarMensaje}</p> : null}
@@ -876,10 +1137,18 @@ export function ConvocatoriaEvaluacion({
                   />
                 </div>
 
-                {evaluadoresDisponibles.length === 0 ? (
-                  <p className="text-muted">No hay evaluadores registrados en el sistema.</p>
+                {disponiblesActivos.length === 0 ? (
+                  <p className="text-muted">
+                    {esSupervisores
+                      ? "No hay supervisores registrados en el sistema."
+                      : "No hay evaluadores registrados en el sistema."}
+                  </p>
                 ) : evaluadoresFiltrados.length === 0 ? (
-                  <p className="text-muted">Ningún evaluador coincide con el filtro.</p>
+                  <p className="text-muted">
+                    {esSupervisores
+                      ? "Ningún supervisor coincide con el filtro."
+                      : "Ningún evaluador coincide con el filtro."}
+                  </p>
                 ) : (
                   <>
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -992,6 +1261,30 @@ export function ConvocatoriaEvaluacion({
                   </>
                 )}
               </div>
+            </Modal>,
+            document.body,
+          )
+        : null}
+
+      {portalListo
+        ? createPortal(
+            <Modal
+              open={detalleOpen}
+              title={
+                detalle
+                  ? `${etiquetaNombreCaso(detalle.nombreCaso)} · ${detalle.convocatoriaTitulo}`
+                  : "Detalle de la ficha"
+              }
+              wide
+              tall
+              toned
+              onClose={cerrarDetalle}
+            >
+              {detalleLoadingId ? (
+                <p className="respuestas-lista text-muted">Cargando fichaâ€¦</p>
+              ) : null}
+              {detalleError ? <p className="respuestas-lista text-danger">{detalleError}</p> : null}
+              {detalle ? <FichaDetalleAdmin key={detalle.id} data={detalle} /> : null}
             </Modal>,
             document.body,
           )

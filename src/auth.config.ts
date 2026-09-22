@@ -1,6 +1,6 @@
 import "@/lib/env";
 import type { NextAuthConfig } from "next-auth";
-import { loginPathForRole, normalizeRole, type Role } from "@/lib/roles";
+import { esRolCatalogoEvaluador, loginPathForRole, normalizeRole, type Role } from "@/lib/roles";
 
 export const authConfig = {
   trustHost: true,
@@ -23,6 +23,8 @@ export const authConfig = {
       if (session.user) {
         session.user.id = (token.id as string) ?? "";
         session.user.role = normalizeRole((token.role as string) ?? "") ?? "EMPRENDEDOR";
+        if (typeof token.name === "string") session.user.name = token.name;
+        if (typeof token.email === "string") session.user.email = token.email;
       }
       return session;
     },
@@ -36,7 +38,7 @@ export const authConfig = {
       if (!needsAdmin && !needsEval && !needsEmprendedor) return true;
       if (!role) return false;
       if (needsAdmin) return role === "ADMIN";
-      if (needsEval) return role === "EVALUADOR";
+      if (needsEval) return esRolCatalogoEvaluador(role);
       if (needsEmprendedor) return role === "EMPRENDEDOR";
       return true;
     },

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 export function Modal({
   open,
@@ -24,6 +25,7 @@ export function Modal({
   const ref = useRef<HTMLDialogElement>(null);
   const openRef = useRef(open);
   openRef.current = open;
+  const [portalListo, setPortalListo] = useState(false);
 
   const className = [
     "modal-dialog",
@@ -35,13 +37,19 @@ export function Modal({
     .join(" ");
 
   useEffect(() => {
+    setPortalListo(true);
+  }, []);
+
+  useEffect(() => {
     const node = ref.current;
     if (!node) return;
     if (open && !node.open) node.showModal();
     if (!open && node.open) node.close();
-  }, [open]);
+  }, [open, portalListo]);
 
-  return (
+  if (!portalListo) return null;
+
+  return createPortal(
     <dialog
       ref={ref}
       className={className}
@@ -83,6 +91,7 @@ export function Modal({
         </div>
         <div className="modal-body">{children}</div>
       </div>
-    </dialog>
+    </dialog>,
+    document.body,
   );
 }

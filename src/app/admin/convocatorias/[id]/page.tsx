@@ -55,6 +55,8 @@ export default async function ConvocatoriaDetallePage({
         preguntas={panel.preguntas}
         pool={panel.pool}
         evaluadoresDisponibles={panel.evaluadoresDisponibles}
+        poolSupervisores={panel.poolSupervisores}
+        supervisoresDisponibles={panel.supervisoresDisponibles}
         postulaciones={panel.postulaciones}
       />
     </div>

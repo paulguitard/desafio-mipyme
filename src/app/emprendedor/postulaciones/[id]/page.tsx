@@ -5,6 +5,7 @@ import { PreguntaCampo } from "@/components/pregunta-campo";
 import { prisma } from "@/lib/db";
 import { postulacionEditable, type EstadoPostulacion } from "@/lib/estado";
 import { convocatoriaAbiertaParaPostular } from "@/lib/convocatoria";
+import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { asegurarPreguntaNombreCaso } from "@/lib/nombre-caso";
 import { requireUser } from "@/lib/session";
 import { notFound } from "next/navigation";
@@ -31,7 +32,7 @@ export default async function PostulacionPage({
       },
       respuestas: true,
       asignaciones: {
-        include: { evaluador: true, revisiones: true },
+        include: { evaluador: true, revisiones: true, revisionesGenerales: true },
         orderBy: { orden: "asc" },
       },
     },
@@ -42,12 +43,35 @@ export default async function PostulacionPage({
   const abierta = convocatoriaAbiertaParaPostular(postulacion.convocatoria);
   const canEdit = postulacionEditable(estado, abierta);
   const esCorreccion = estado === "CON_OBSERVACIONES";
+  const modoEvaluacion = parseModoEvaluacion(postulacion.convocatoria.formulario.modoEvaluacion);
+  const esGeneral = modoEvaluacion === "GENERAL";
 
   const observadas = new Set<string>();
-  const comentariosPorPregunta = new Map<string, { evaluacion: number; nombre: string; comentario: string }[]>();
+  const comentariosPorPregunta = new Map<
+    string,
+    { evaluacion: number; nombre: string; comentario: string }[]
+  >();
+  const comentariosGenerales: { evaluacion: number; nombre: string; comentario: string }[] = [];
+
   if (esCorreccion) {
     for (const asignacion of postulacion.asignaciones) {
       if (asignacion.estado !== "CON_OBSERVACIONES") continue;
+
+      if (esGeneral) {
+        const general = asignacion.revisionesGenerales.find(
+          (revision) =>
+            revision.ronda === asignacion.rondaActual && revision.veredicto === "OBSERVACION",
+        );
+        if (general?.comentario) {
+          comentariosGenerales.push({
+            evaluacion: asignacion.orden,
+            nombre: asignacion.evaluador.name,
+            comentario: general.comentario,
+          });
+        }
+        continue;
+      }
+
       for (const revision of asignacion.revisiones) {
         if (revision.ronda !== asignacion.rondaActual || revision.veredicto !== "OBSERVACION") continue;
         observadas.add(revision.preguntaId);
@@ -72,39 +96,57 @@ export default async function PostulacionPage({
       meta={
         <div className="space-y-2">
           <p className="text-muted">{postulacion.convocatoria.titulo}</p>
-          {postulacion.convocatoria.formulario.descripcion ? <p>{postulacion.convocatoria.formulario.descripcion}</p> : null}
+          {postulacion.convocatoria.formulario.descripcion ? (
+            <p>{postulacion.convocatoria.formulario.descripcion}</p>
+          ) : null}
           <BadgePostulacion estado={postulacion.estado} />
           {!abierta ? (
             <p className="font-semibold text-danger">La convocatoria está cerrada. Solo puedes consultar.</p>
           ) : null}
           {esCorreccion ? (
-            <p>Hay observaciones. Corrige solo las preguntas marcadas y vuelve a enviar.</p>
+            <p>
+              {esGeneral
+                ? "Hay una observación general. Puedes corregir el formulario completo y volver a enviar."
+                : "Hay observaciones. Corrige solo las preguntas marcadas y vuelve a enviar."}
+            </p>
           ) : null}
         </div>
       }
     >
-        {postulacion.convocatoria.formulario.preguntas.map((pregunta) => {
-          const respuesta = postulacion.respuestas.find((r) => r.preguntaId === pregunta.id);
-          const locked = esCorreccion && observadas.size > 0 && !observadas.has(pregunta.id);
-          const comentarios = comentariosPorPregunta.get(pregunta.id) ?? [];
-          return (
-            <div key={pregunta.id} className="space-y-2">
-              <PreguntaCampo
-                pregunta={pregunta}
-                respuesta={respuesta}
-                disabled={!canEdit || locked}
-              />
-              {comentarios.map((item) => (
-                <p key={`${item.evaluacion}-${item.comentario}`} className="rounded-lg bg-orange-50 p-3">
-                  <strong>
-                    Evaluación {item.evaluacion} ({item.nombre}):
-                  </strong>{" "}
-                  {item.comentario}
-                </p>
-              ))}
-            </div>
-          );
-        })}
-      </FormularioPostulante>
+      {esCorreccion && comentariosGenerales.length > 0 ? (
+        <div className="space-y-2">
+          {comentariosGenerales.map((item) => (
+            <p key={`${item.evaluacion}-${item.comentario}`} className="rounded-lg bg-orange-50 p-3">
+              <strong>
+                Evaluación {item.evaluacion} ({item.nombre}):
+              </strong>{" "}
+              {item.comentario}
+            </p>
+          ))}
+        </div>
+      ) : null}
+      {postulacion.convocatoria.formulario.preguntas.map((pregunta) => {
+        const respuesta = postulacion.respuestas.find((r) => r.preguntaId === pregunta.id);
+        const locked = !esGeneral && esCorreccion && observadas.size > 0 && !observadas.has(pregunta.id);
+        const comentarios = comentariosPorPregunta.get(pregunta.id) ?? [];
+        return (
+          <div key={pregunta.id} className="space-y-2">
+            <PreguntaCampo
+              pregunta={pregunta}
+              respuesta={respuesta}
+              disabled={!canEdit || locked}
+            />
+            {comentarios.map((item) => (
+              <p key={`${item.evaluacion}-${item.comentario}`} className="rounded-lg bg-orange-50 p-3">
+                <strong>
+                  Evaluación {item.evaluacion} ({item.nombre}):
+                </strong>{" "}
+                {item.comentario}
+              </p>
+            ))}
+          </div>
+        );
+      })}
+    </FormularioPostulante>
   );
 }

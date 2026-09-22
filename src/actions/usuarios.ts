@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
+import { isStoredFile, parseArchivos } from "@/lib/preguntas";
 import { requireUser } from "@/lib/session";
 import { isRole } from "@/lib/roles";
+import { deleteUpload } from "@/lib/storage";
 import { parseUsuariosCsv } from "@/lib/usuarios-csv";
 
 export async function crearUsuario(formData: FormData) {
@@ -28,6 +30,7 @@ export async function crearUsuario(formData: FormData) {
       passwordHash: await hashPassword(password),
       passwordAssigned: password,
       role,
+      origen: "ADMIN",
     },
   });
 
@@ -62,6 +65,78 @@ export async function actualizarUsuario(formData: FormData) {
 
   await prisma.user.update({ where: { id }, data });
   revalidatePath("/admin/usuarios");
+  return { ok: true };
+}
+
+export async function eliminarUsuario(formData: FormData) {
+  const admin = await requireUser("ADMIN");
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Datos incompletos." };
+  if (id === admin.id) return { error: "No puedes eliminar tu propia cuenta." };
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+    include: {
+      _count: { select: { formulariosCreados: true } },
+      postulaciones: {
+        include: {
+          respuestas: { include: { versiones: true } },
+        },
+      },
+    },
+  });
+  if (!user) return { error: "Usuario no encontrado." };
+
+  if (user._count.formulariosCreados > 0) {
+    return {
+      error:
+        "No se puede eliminar: este usuario creó formularios. Reasigna o elimina esos formularios primero.",
+    };
+  }
+
+  if (user.role === "ADMIN") {
+    const adminCount = await prisma.user.count({ where: { role: "ADMIN" } });
+    if (adminCount <= 1) {
+      return { error: "No se puede eliminar el único administrador." };
+    }
+  }
+
+  const adjuntos = new Set<string>();
+  for (const postulacion of user.postulaciones) {
+    for (const respuesta of postulacion.respuestas) {
+      for (const archivo of parseArchivos(respuesta.archivos).filter(isStoredFile)) {
+        adjuntos.add(archivo.relativePath);
+      }
+      for (const version of respuesta.versiones) {
+        for (const archivo of parseArchivos(version.archivos).filter(isStoredFile)) {
+          adjuntos.add(archivo.relativePath);
+        }
+      }
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (user.postulaciones.length > 0) {
+      await tx.postulacion.deleteMany({ where: { postulanteId: id } });
+    }
+    await tx.asignacionEvaluador.deleteMany({ where: { evaluadorId: id } });
+    await tx.convocatoriaEvaluador.deleteMany({ where: { evaluadorId: id } });
+    await tx.asignacionSupervisor.deleteMany({ where: { supervisorId: id } });
+    await tx.convocatoriaSupervisor.deleteMany({ where: { supervisorId: id } });
+    await tx.user.delete({ where: { id } });
+  });
+
+  for (const relativePath of adjuntos) {
+    try {
+      await deleteUpload(relativePath);
+    } catch {
+      /* el registro ya se eliminó; no bloquear por un archivo huérfano */
+    }
+  }
+
+  revalidatePath("/admin/usuarios");
+  revalidatePath("/admin");
+  revalidatePath("/evaluador");
   return { ok: true };
 }
 
@@ -133,6 +208,7 @@ export async function cargarUsuariosMasivo(formData: FormData) {
       passwordHash: hashes[index],
       passwordAssigned: usuario.password,
       role: usuario.role,
+      origen: "ADMIN",
     })),
   });
 

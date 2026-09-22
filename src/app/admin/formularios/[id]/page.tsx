@@ -12,12 +12,20 @@ export default async function FormularioDetallePage({
   await asegurarPreguntaNombreCaso(id);
   const formulario = await prisma.formulario.findUnique({
     where: { id },
-    include: { preguntas: { orderBy: { orden: "asc" } } },
+    include: {
+      preguntas: { orderBy: { orden: "asc" } },
+      _count: { select: { convocatorias: true } },
+    },
   });
   if (!formulario) notFound();
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
-      <FormularioEditor formulario={formulario} />
+      <FormularioEditor
+        formulario={{
+          ...formulario,
+          puedeCambiarModo: formulario._count.convocatorias === 0,
+        }}
+      />
     </div>
   );
 }

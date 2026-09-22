@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { actualizarUsuario, cargarUsuariosMasivo, crearUsuario } from "@/actions/usuarios";
+import { useMemo, useState } from "react";
+import {
+  actualizarUsuario,
+  cargarUsuariosMasivo,
+  crearUsuario,
+  eliminarUsuario,
+} from "@/actions/usuarios";
 import { Modal } from "@/components/modal";
 import type { Role } from "@/lib/roles";
 import { ROLE_LABELS } from "@/lib/roles";
+import { USER_ORIGEN, type UserOrigen } from "@/lib/user-origen";
 import { PLANTILLA_USUARIOS_CSV } from "@/lib/usuarios-csv";
 
 type UserRow = {
@@ -13,6 +19,7 @@ type UserRow = {
   email: string;
   passwordAssigned: string;
   role: string;
+  origen: string;
 };
 
 type ImportResult = {
@@ -20,30 +27,93 @@ type ImportResult = {
   omitidos: { linea: number; mensaje: string }[];
 };
 
-type ModalActivo = "crear" | "carga" | null;
+type ModalActivo = "crear" | "carga" | "editar" | null;
+type Filtro =
+  | { kind: "todos" }
+  | { kind: "origen"; value: UserOrigen }
+  | { kind: "rol"; value: Role };
+
+const FILTROS_ROL: { id: Role; roles: Role[] }[] = [
+  { id: "EMPRENDEDOR", roles: ["EMPRENDEDOR"] },
+  { id: "EVALUADOR", roles: ["EVALUADOR", "SUPERVISOR"] },
+  { id: "ADMIN", roles: ["ADMIN"] },
+];
 
 export function UsuariosAdmin({ users }: { users: UserRow[] }) {
   const [error, setError] = useState<string | null>(null);
-  const [editing, setEditing] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<UserRow | null>(null);
+  const [eliminando, setEliminando] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [modal, setModal] = useState<ModalActivo>(null);
+  const [filtro, setFiltro] = useState<Filtro>({ kind: "todos" });
+
+  const visibles = useMemo(() => {
+    if (filtro.kind === "todos") return users;
+    if (filtro.kind === "origen") {
+      return users.filter((user) => user.origen === filtro.value);
+    }
+    const grupo = FILTROS_ROL.find((item) => item.id === filtro.value);
+    const roles = grupo?.roles ?? [filtro.value];
+    return users.filter((user) => roles.includes(user.role as Role));
+  }, [users, filtro]);
+
+  const conteoOrigenAdmin = users.filter((u) => u.origen === USER_ORIGEN.ADMIN).length;
+  const conteoRegistro = users.filter((u) => u.origen === USER_ORIGEN.REGISTRO).length;
+  const conteoPorRol = useMemo(() => {
+    const counts = Object.fromEntries(FILTROS_ROL.map((item) => [item.id, 0])) as Record<Role, number>;
+    for (const user of users) {
+      const grupo = FILTROS_ROL.find((item) => item.roles.includes(user.role as Role));
+      if (grupo) counts[grupo.id] += 1;
+    }
+    return counts;
+  }, [users]);
 
   function abrirCrear() {
     setError(null);
+    setEditingUser(null);
     setModal("crear");
   }
 
   function abrirCarga() {
     setError(null);
     setImportResult(null);
+    setEditingUser(null);
     setModal("carga");
   }
 
-  function cerrarModal() {
-    if (importing) return;
-    setModal(null);
+  function abrirEditar(user: UserRow) {
     setError(null);
+    setEditingUser(user);
+    setModal("editar");
+  }
+
+  function cerrarModal() {
+    if (importing || eliminando) return;
+    setModal(null);
+    setEditingUser(null);
+    setError(null);
+  }
+
+  async function onEliminar() {
+    if (!editingUser) return;
+    const confirmar = window.confirm(
+      `¿Eliminar a ${editingUser.name} (${editingUser.email})?\n\nSe borrarán sus postulaciones, asignaciones y tokens de recuperación asociados. Esta acción no se puede deshacer.`,
+    );
+    if (!confirmar) return;
+
+    setError(null);
+    setEliminando(true);
+    const formData = new FormData();
+    formData.set("id", editingUser.id);
+    const result = await eliminarUsuario(formData);
+    setEliminando(false);
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
+    setModal(null);
+    setEditingUser(null);
   }
 
   function descargarPlantilla() {
@@ -71,6 +141,51 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
               </button>
             </div>
           </div>
+
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar usuarios">
+            <button
+              type="button"
+              className={`btn btn-sm ${filtro.kind === "todos" ? "btn-navy" : "btn-secondary"}`}
+              onClick={() => setFiltro({ kind: "todos" })}
+            >
+              Todos ({users.length})
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${
+                filtro.kind === "origen" && filtro.value === USER_ORIGEN.ADMIN
+                  ? "btn-navy"
+                  : "btn-secondary"
+              }`}
+              onClick={() => setFiltro({ kind: "origen", value: USER_ORIGEN.ADMIN })}
+            >
+              Creados por admin ({conteoOrigenAdmin})
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${
+                filtro.kind === "origen" && filtro.value === USER_ORIGEN.REGISTRO
+                  ? "btn-navy"
+                  : "btn-secondary"
+              }`}
+              onClick={() => setFiltro({ kind: "origen", value: USER_ORIGEN.REGISTRO })}
+            >
+              Registro propio ({conteoRegistro})
+            </button>
+            {FILTROS_ROL.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`btn btn-sm ${
+                  filtro.kind === "rol" && filtro.value === item.id ? "btn-navy" : "btn-secondary"
+                }`}
+                onClick={() => setFiltro({ kind: "rol", value: item.id })}
+              >
+                {ROLE_LABELS[item.id]} ({conteoPorRol[item.id]})
+              </button>
+            ))}
+          </div>
+
           {error && modal === null ? <p className="text-danger">{error}</p> : null}
         </div>
 
@@ -82,70 +197,36 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
                 <th className="p-3">Correo</th>
                 <th className="p-3">Contraseña</th>
                 <th className="p-3">Rol</th>
+                <th className="p-3">Origen</th>
                 <th className="p-3">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((user) =>
-                editing === user.id ? (
-                  <tr key={user.id} className="border-b border-border align-top">
-                    <td colSpan={5} className="p-3">
-                      <form
-                        className="grid gap-3 md:grid-cols-2"
-                        action={async (formData) => {
-                          const result = await actualizarUsuario(formData);
-                          if (result?.error) setError(result.error);
-                          else setEditing(null);
-                        }}
-                      >
-                        <input type="hidden" name="id" value={user.id} />
-                        <div className="field">
-                          <label>Nombre</label>
-                          <input className="input" name="name" defaultValue={user.name} required />
-                        </div>
-                        <div className="field">
-                          <label>Correo</label>
-                          <input className="input" name="email" type="email" defaultValue={user.email} required />
-                        </div>
-                        <div className="field">
-                          <label>Nueva contraseña (opcional)</label>
-                          <input className="input" name="password" />
-                        </div>
-                        <div className="field">
-                          <label>Rol</label>
-                          <select className="input" name="role" defaultValue={user.role}>
-                            {(Object.keys(ROLE_LABELS) as Role[]).map((role) => (
-                              <option key={role} value={role}>
-                                {ROLE_LABELS[role]}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="flex gap-2 md:col-span-2">
-                          <button className="btn btn-primary" type="submit">
-                            Guardar cambios
-                          </button>
-                          <button className="btn btn-secondary" type="button" onClick={() => setEditing(null)}>
-                            Cancelar
-                          </button>
-                        </div>
-                      </form>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={user.id} className="border-b border-border">
-                    <td className="p-3">{user.name}</td>
-                    <td className="p-3">{user.email}</td>
-                    <td className="p-3 font-mono">{user.passwordAssigned}</td>
-                    <td className="p-3">{ROLE_LABELS[user.role as Role] ?? user.role}</td>
-                    <td className="p-3">
-                      <button className="btn btn-ghost" type="button" onClick={() => setEditing(user.id)}>
-                        Editar
-                      </button>
-                    </td>
-                  </tr>
-                ),
-              )}
+              {visibles.length === 0 ? (
+                <tr>
+                  <td className="p-6 text-muted" colSpan={6}>
+                    No hay usuarios en este filtro.
+                  </td>
+                </tr>
+              ) : null}
+              {visibles.map((user) => (
+                <tr key={user.id} className="border-b border-border">
+                  <td className="p-3">{user.name}</td>
+                  <td className="p-3">{user.email}</td>
+                  <td className="p-3 font-mono">
+                    {user.passwordAssigned ? user.passwordAssigned : "—"}
+                  </td>
+                  <td className="p-3">{ROLE_LABELS[user.role as Role] ?? user.role}</td>
+                  <td className="p-3">
+                    {user.origen === USER_ORIGEN.REGISTRO ? "Registro propio" : "Admin"}
+                  </td>
+                  <td className="p-3">
+                    <button className="btn btn-ghost" type="button" onClick={() => abrirEditar(user)}>
+                      Editar
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -193,6 +274,80 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
         </form>
       </Modal>
 
+      <Modal
+        open={modal === "editar" && editingUser !== null}
+        title="Editar usuario"
+        onClose={cerrarModal}
+      >
+        {error ? <p className="text-danger">{error}</p> : null}
+        {editingUser ? (
+          <form
+            key={editingUser.id}
+            className="grid gap-4 md:grid-cols-2"
+            action={async (formData) => {
+              const result = await actualizarUsuario(formData);
+              if (result?.error) {
+                setError(result.error);
+                return;
+              }
+              setError(null);
+              setModal(null);
+              setEditingUser(null);
+            }}
+          >
+            <input type="hidden" name="id" value={editingUser.id} />
+            <div className="field">
+              <label htmlFor="edit-name">Nombre</label>
+              <input
+                className="input"
+                id="edit-name"
+                name="name"
+                defaultValue={editingUser.name}
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="edit-email">Correo</label>
+              <input
+                className="input"
+                id="edit-email"
+                name="email"
+                type="email"
+                defaultValue={editingUser.email}
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="edit-password">Nueva contraseña (opcional)</label>
+              <input className="input" id="edit-password" name="password" />
+            </div>
+            <div className="field">
+              <label htmlFor="edit-role">Rol</label>
+              <select className="input" id="edit-role" name="role" defaultValue={editingUser.role}>
+                {(Object.keys(ROLE_LABELS) as Role[]).map((role) => (
+                  <option key={role} value={role}>
+                    {ROLE_LABELS[role]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 md:col-span-2">
+              <button className="btn btn-primary" type="submit" disabled={eliminando}>
+                Guardar cambios
+              </button>
+              <button
+                className="btn btn-ghost text-danger"
+                type="button"
+                disabled={eliminando}
+                onClick={() => void onEliminar()}
+              >
+                {eliminando ? "Eliminando…" : "Eliminar usuario"}
+              </button>
+            </div>
+          </form>
+        ) : null}
+      </Modal>
+
       <Modal open={modal === "carga"} title="Carga masiva" onClose={cerrarModal}>
         {error ? <p className="text-danger">{error}</p> : null}
         <form
@@ -215,7 +370,7 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
         >
           <p className="text-muted">
             Sube un CSV con columnas nombre, correo, contraseña y rol. El rol puede ser Administración,
-            Evaluador o Emprendedor.
+            Evaluador, Supervisor o Emprendedor.
           </p>
           <button className="btn btn-secondary w-fit" type="button" onClick={descargarPlantilla}>
             Descargar plantilla

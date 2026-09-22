@@ -13,6 +13,8 @@ const POSTULACION_CLASS: Record<EstadoPostulacion, string> = {
 const ASIGNACION_CLASS: Record<EstadoAsignacion, string> = {
   PENDIENTE: "bg-slate-100 text-navy",
   EN_REVISION: "bg-amber-100 text-amber-950",
+  EN_SUPERVISION: "bg-sky-100 text-sky-950",
+  DEVUELTA_SUPERVISOR: "bg-orange-100 text-orange-950",
   CON_OBSERVACIONES: "bg-red/10 text-red",
   REPARADA: "bg-violet-100 text-violet-950",
   FINALIZADA: "bg-emerald-100 text-emerald-900",

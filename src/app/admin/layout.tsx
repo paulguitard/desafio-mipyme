@@ -1,3 +1,4 @@
+import { AdminConfigLauncher } from "@/components/admin-config-modal";
 import { AppHeader } from "@/components/app-header";
 import { AppShell } from "@/components/app-shell";
 import { requireUser } from "@/lib/session";
@@ -17,6 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             { href: "/admin/formularios", label: "Formularios" },
             { href: "/admin/convocatorias", label: "Convocatorias" },
           ]}
+          trailing={<AdminConfigLauncher />}
         />
       }
     >

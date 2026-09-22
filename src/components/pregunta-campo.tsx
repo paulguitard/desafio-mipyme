@@ -97,6 +97,13 @@ function BotonesSiNo({
   );
 }
 
+function etiquetaArchivo(file: StoredFile) {
+  const nombre = file.originalName.toLowerCase();
+  if (file.mimeType.includes("pdf") || nombre.endsWith(".pdf")) return "PDF";
+  const ext = file.originalName.split(".").pop()?.toUpperCase();
+  return ext && ext.length <= 5 ? ext : "DOC";
+}
+
 function AdjuntoArchivo({ file }: { file: StoredFile }) {
   if (file.kind === "image") {
     return (
@@ -113,14 +120,27 @@ function AdjuntoArchivo({ file }: { file: StoredFile }) {
     );
   }
 
+  const etiqueta = etiquetaArchivo(file);
+
   return (
     <a
-      className="pregunta-adjuntos-file"
+      className="pregunta-adjuntos-doc"
       href={publicUploadUrl(file)}
       target="_blank"
       rel="noreferrer"
+      title={`Abrir ${file.originalName}`}
+      aria-label={`Abrir ${file.originalName}`}
     >
-      {file.originalName}
+      <span className="pregunta-adjuntos-doc-sheet" aria-hidden="true">
+        <span className="pregunta-adjuntos-doc-fold" />
+        <span className="pregunta-adjuntos-doc-badge">{etiqueta}</span>
+        <span className="pregunta-adjuntos-doc-lines">
+          <span />
+          <span />
+          <span />
+        </span>
+      </span>
+      <span className="pregunta-adjuntos-doc-name">{file.originalName}</span>
     </a>
   );
 }

@@ -1,6 +1,8 @@
 export const ESTADOS_ASIGNACION = [
   "PENDIENTE",
   "EN_REVISION",
+  "EN_SUPERVISION",
+  "DEVUELTA_SUPERVISOR",
   "CON_OBSERVACIONES",
   "REPARADA",
   "FINALIZADA",
@@ -19,6 +21,9 @@ export const ESTADOS_POSTULACION = [
 
 export type EstadoPostulacion = (typeof ESTADOS_POSTULACION)[number];
 
+export const INTENCIONES_SUPERVISION = ["OBSERVACIONES", "FINALIZAR"] as const;
+export type IntencionSupervision = (typeof INTENCIONES_SUPERVISION)[number];
+
 export const ESTADO_POSTULACION_LABEL: Record<EstadoPostulacion, string> = {
   BORRADOR: "Borrador",
   ENVIADA: "Enviada",
@@ -31,10 +36,20 @@ export const ESTADO_POSTULACION_LABEL: Record<EstadoPostulacion, string> = {
 export const ESTADO_ASIGNACION_LABEL: Record<EstadoAsignacion, string> = {
   PENDIENTE: "Pendiente",
   EN_REVISION: "En revisión",
+  EN_SUPERVISION: "En supervisión",
+  DEVUELTA_SUPERVISOR: "Devuelta por el supervisor",
   CON_OBSERVACIONES: "Con observaciones",
   REPARADA: "Reparada por el emprendedor",
   FINALIZADA: "Finalizada",
 };
+
+export function evaluadorPuedeEditar(estado: string) {
+  return (
+    estado !== "FINALIZADA" &&
+    estado !== "CON_OBSERVACIONES" &&
+    estado !== "EN_SUPERVISION"
+  );
+}
 
 export function derivarEstadoPostulacion(args: {
   enviadaAt: Date | null;
@@ -48,7 +63,11 @@ export function derivarEstadoPostulacion(args: {
 
   const noFinal = args.asignaciones.filter((a) => a.estado !== "FINALIZADA");
   const hayPendienteRevision = noFinal.some(
-    (a) => a.estado === "PENDIENTE" || a.estado === "EN_REVISION",
+    (a) =>
+      a.estado === "PENDIENTE" ||
+      a.estado === "EN_REVISION" ||
+      a.estado === "EN_SUPERVISION" ||
+      a.estado === "DEVUELTA_SUPERVISOR",
   );
   const hayReparada = noFinal.some((a) => a.estado === "REPARADA");
   const hayObservaciones = noFinal.some((a) => a.estado === "CON_OBSERVACIONES");
@@ -68,4 +87,17 @@ export function postulacionEditable(
 ): boolean {
   if (!convocatoriaAbierta) return false;
   return estadoPostulacion === "BORRADOR" || estadoPostulacion === "CON_OBSERVACIONES";
+}
+
+export function rondaRespuestaEmprendedor(
+  asignaciones: { estado: string; rondaActual: number }[],
+): number {
+  if (asignaciones.length === 0) return 1;
+  return Math.max(
+    ...asignaciones.map((asignacion) =>
+      asignacion.estado === "CON_OBSERVACIONES"
+        ? asignacion.rondaActual + 1
+        : asignacion.rondaActual,
+    ),
+  );
 }

@@ -22,6 +22,7 @@ import {
 } from "@/lib/preguntas";
 import { postulacionEditable, type EstadoPostulacion } from "@/lib/estado";
 import { convocatoriaAbiertaParaPostular } from "@/lib/convocatoria";
+import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { asegurarPreguntaNombreCaso } from "@/lib/nombre-caso";
 import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
 import { randomUUID } from "node:crypto";
@@ -34,7 +35,9 @@ async function cargaPostulacionDelUsuario(id: string, emprendedorId: string) {
         include: { formulario: { include: { preguntas: { orderBy: { orden: "asc" } } } } },
       },
       respuestas: true,
-      asignaciones: { include: { revisiones: true, evaluador: true } },
+      asignaciones: {
+        include: { revisiones: true, revisionesGenerales: true, evaluador: true },
+      },
     },
   });
   if (!postulacion || postulacion.postulanteId !== emprendedorId) return null;
@@ -42,13 +45,29 @@ async function cargaPostulacionDelUsuario(id: string, emprendedorId: string) {
 }
 
 function preguntasObservadas(postulacion: {
+  convocatoria: { formulario: { modoEvaluacion: string; preguntas: { id: string }[] } };
   asignaciones: {
     estado: string;
     rondaActual: number;
     revisiones: { preguntaId: string; ronda: number; veredicto: string }[];
+    revisionesGenerales: { ronda: number; veredicto: string }[];
   }[];
 }) {
   const ids = new Set<string>();
+  const modo = parseModoEvaluacion(postulacion.convocatoria.formulario.modoEvaluacion);
+
+  if (modo === "GENERAL") {
+    const hayObservacionGeneral = postulacion.asignaciones.some((asignacion) => {
+      if (asignacion.estado !== "CON_OBSERVACIONES") return false;
+      return asignacion.revisionesGenerales.some(
+        (revision) =>
+          revision.ronda === asignacion.rondaActual && revision.veredicto === "OBSERVACION",
+      );
+    });
+    // En evaluación general todas las preguntas quedan editables al corregir.
+    return hayObservacionGeneral ? new Set<string>() : ids;
+  }
+
   for (const asignacion of postulacion.asignaciones) {
     if (asignacion.estado !== "CON_OBSERVACIONES") continue;
     for (const revision of asignacion.revisiones) {
@@ -188,17 +207,28 @@ async function persistirRespuestas(args: {
     const archivos: StoredAttachment[] = existing
       ? parseArchivos(existing.archivos).filter(isStoredFile)
       : [];
+    const nombresYaGuardados = new Set(
+      archivos.filter(isStoredFile).map((a) => a.originalName.trim().toLowerCase()),
+    );
 
     if (pregunta.permiteArchivo) {
       const file = args.formData.get(`archivo-${pregunta.id}`);
       if (file instanceof File && file.size > 0) {
-        archivos.push(await saveUpload(file, "file"));
+        const nombre = file.name.trim().toLowerCase();
+        if (!nombresYaGuardados.has(nombre)) {
+          archivos.push(await saveUpload(file, "file"));
+          nombresYaGuardados.add(nombre);
+        }
       }
     }
     if (pregunta.permiteImagen) {
       const file = args.formData.get(`imagen-${pregunta.id}`);
       if (file instanceof File && file.size > 0) {
-        archivos.push(await saveUpload(file, "image"));
+        const nombre = file.name.trim().toLowerCase();
+        if (!nombresYaGuardados.has(nombre)) {
+          archivos.push(await saveUpload(file, "image"));
+          nombresYaGuardados.add(nombre);
+        }
       }
     }
 

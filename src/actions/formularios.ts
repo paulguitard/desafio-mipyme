@@ -8,6 +8,7 @@ import {
   datosPreguntaNombreCaso,
   esPreguntaNombreCaso,
 } from "@/lib/nombre-caso";
+import { esModoEvaluacion, parseModoEvaluacion, type ModoEvaluacion } from "@/lib/modo-evaluacion";
 import {
   esTipoFormato,
   parseEscalaNotas,
@@ -150,12 +151,14 @@ export async function crearFormulario(formData: FormData) {
   const admin = await requireUser("ADMIN");
   const titulo = String(formData.get("titulo") ?? "").trim();
   const descripcion = String(formData.get("descripcion") ?? "").trim();
+  const modoEvaluacion = parseModoEvaluacion(formData.get("modoEvaluacion"));
   if (!titulo) return { error: "El título es obligatorio." };
 
   const form = await prisma.formulario.create({
     data: {
       titulo,
       descripcion,
+      modoEvaluacion,
       creadoPorId: admin.id,
       preguntas: {
         create: [{ orden: 1, ...datosPreguntaNombreCaso() }],
@@ -173,11 +176,34 @@ export async function actualizarFormulario(formData: FormData) {
   const descripcion = String(formData.get("descripcion") ?? "").trim();
   if (!id || !titulo) return { error: "El título es obligatorio." };
 
+  const existente = await prisma.formulario.findUnique({
+    where: { id },
+    include: { _count: { select: { convocatorias: true } } },
+  });
+  if (!existente) return { error: "Formulario no encontrado." };
+
+  const data: { titulo: string; descripcion: string; modoEvaluacion?: ModoEvaluacion } = {
+    titulo,
+    descripcion,
+  };
+
+  if (formData.has("modoEvaluacion")) {
+    const modoRaw = String(formData.get("modoEvaluacion") ?? "").trim();
+    if (!esModoEvaluacion(modoRaw)) {
+      return { error: "El tipo de evaluación no es válido." };
+    }
+    if (existente._count.convocatorias > 0 && modoRaw !== existente.modoEvaluacion) {
+      return { error: "No puedes cambiar el tipo de evaluación de un formulario con convocatorias." };
+    }
+    data.modoEvaluacion = modoRaw;
+  }
+
   await prisma.formulario.update({
     where: { id },
-    data: { titulo, descripcion },
+    data,
   });
   revalidatePath(`/admin/formularios/${id}`);
+  revalidatePath("/admin/formularios");
   return { ok: true };
 }
 
@@ -321,6 +347,7 @@ export async function actualizarPregunta(formData: FormData) {
 export async function crearFormularioCompleto(payload: {
   titulo: string;
   descripcion: string;
+  modoEvaluacion?: string;
   preguntas: {
     enunciado: string;
     ayuda: string;
@@ -337,6 +364,7 @@ export async function crearFormularioCompleto(payload: {
   const admin = await requireUser("ADMIN");
   const titulo = payload.titulo.trim();
   if (!titulo) return { error: "El título es obligatorio." };
+  const modoEvaluacion = parseModoEvaluacion(payload.modoEvaluacion);
 
   const payloadPreguntas = esPreguntaNombreCaso(payload.preguntas[0] ?? { opciones: "" })
     ? payload.preguntas
@@ -366,6 +394,7 @@ export async function crearFormularioCompleto(payload: {
     data: {
       titulo,
       descripcion: payload.descripcion.trim(),
+      modoEvaluacion,
       creadoPorId: admin.id,
       preguntas: {
         create: payloadPreguntas.map((pregunta, index) => ({
