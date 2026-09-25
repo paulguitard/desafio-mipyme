@@ -10,6 +10,7 @@ export function Modal({
   children,
   wide,
   tall,
+  compact,
   toned,
   headerExtra,
 }: {
@@ -19,6 +20,7 @@ export function Modal({
   children: ReactNode;
   wide?: boolean;
   tall?: boolean;
+  compact?: boolean;
   toned?: boolean;
   headerExtra?: ReactNode;
 }) {
@@ -31,6 +33,7 @@ export function Modal({
     "modal-dialog",
     wide ? "modal-wide" : "",
     tall ? "modal-tall" : "",
+    compact ? "modal-compact" : "",
     toned ? "modal-toned" : "",
   ]
     .filter(Boolean)

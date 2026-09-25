@@ -8,8 +8,9 @@ import {
   eliminarUsuario,
 } from "@/actions/usuarios";
 import { Modal } from "@/components/modal";
+import { ESCUELAS } from "@/lib/escuelas";
 import type { Role } from "@/lib/roles";
-import { ROLE_LABELS } from "@/lib/roles";
+import { ROLE_LABELS, esRolCatalogoEvaluador } from "@/lib/roles";
 import { USER_ORIGEN, type UserOrigen } from "@/lib/user-origen";
 import { PLANTILLA_USUARIOS_CSV } from "@/lib/usuarios-csv";
 
@@ -19,6 +20,7 @@ type UserRow = {
   email: string;
   passwordAssigned: string;
   role: string;
+  escuela: string | null;
   origen: string;
 };
 
@@ -39,6 +41,41 @@ const FILTROS_ROL: { id: Role; roles: Role[] }[] = [
   { id: "ADMIN", roles: ["ADMIN"] },
 ];
 
+function EscuelaSelect({
+  id,
+  name,
+  value,
+  required,
+  onChange,
+}: {
+  id: string;
+  name: string;
+  value: string;
+  required?: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="field">
+      <label htmlFor={id}>Escuela</label>
+      <select
+        className="input"
+        id={id}
+        name={name}
+        value={value}
+        required={required}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="">{required ? "Selecciona una escuela" : "Sin escuela"}</option>
+        {ESCUELAS.map((escuela) => (
+          <option key={escuela} value={escuela}>
+            {escuela}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 export function UsuariosAdmin({ users }: { users: UserRow[] }) {
   const [error, setError] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
@@ -47,6 +84,10 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [modal, setModal] = useState<ModalActivo>(null);
   const [filtro, setFiltro] = useState<Filtro>({ kind: "todos" });
+  const [crearRole, setCrearRole] = useState<Role>("EMPRENDEDOR");
+  const [crearEscuela, setCrearEscuela] = useState("");
+  const [editRole, setEditRole] = useState<Role>("EMPRENDEDOR");
+  const [editEscuela, setEditEscuela] = useState("");
 
   const visibles = useMemo(() => {
     if (filtro.kind === "todos") return users;
@@ -72,6 +113,8 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
   function abrirCrear() {
     setError(null);
     setEditingUser(null);
+    setCrearRole("EMPRENDEDOR");
+    setCrearEscuela("");
     setModal("crear");
   }
 
@@ -85,6 +128,8 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
   function abrirEditar(user: UserRow) {
     setError(null);
     setEditingUser(user);
+    setEditRole(user.role as Role);
+    setEditEscuela(user.escuela ?? "");
     setModal("editar");
   }
 
@@ -190,13 +235,14 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
         </div>
 
         <div className="card min-h-0 overflow-auto overscroll-contain">
-          <table className="w-full min-w-[720px] text-left">
+          <table className="w-full min-w-[820px] text-left">
             <thead className="sticky top-0 z-10 bg-[var(--card)]">
               <tr className="border-b border-border">
                 <th className="p-3">Nombre</th>
                 <th className="p-3">Correo</th>
                 <th className="p-3">Contraseña</th>
                 <th className="p-3">Rol</th>
+                <th className="p-3">Escuela</th>
                 <th className="p-3">Origen</th>
                 <th className="p-3">Acciones</th>
               </tr>
@@ -204,7 +250,7 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
             <tbody>
               {visibles.length === 0 ? (
                 <tr>
-                  <td className="p-6 text-muted" colSpan={6}>
+                  <td className="p-6 text-muted" colSpan={7}>
                     No hay usuarios en este filtro.
                   </td>
                 </tr>
@@ -217,6 +263,7 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
                     {user.passwordAssigned ? user.passwordAssigned : "—"}
                   </td>
                   <td className="p-3">{ROLE_LABELS[user.role as Role] ?? user.role}</td>
+                  <td className="p-3">{user.escuela ?? "—"}</td>
                   <td className="p-3">
                     {user.origen === USER_ORIGEN.REGISTRO ? "Registro propio" : "Admin"}
                   </td>
@@ -260,7 +307,17 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
           </div>
           <div className="field">
             <label htmlFor="role">Rol</label>
-            <select className="input" id="role" name="role" defaultValue="EMPRENDEDOR">
+            <select
+              className="input"
+              id="role"
+              name="role"
+              value={crearRole}
+              onChange={(event) => {
+                const next = event.target.value as Role;
+                setCrearRole(next);
+                if (!esRolCatalogoEvaluador(next)) setCrearEscuela("");
+              }}
+            >
               {(Object.keys(ROLE_LABELS) as Role[]).map((role) => (
                 <option key={role} value={role}>
                   {ROLE_LABELS[role]}
@@ -268,6 +325,17 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
               ))}
             </select>
           </div>
+          {esRolCatalogoEvaluador(crearRole) ? (
+            <div className="md:col-span-2">
+              <EscuelaSelect
+                id="escuela"
+                name="escuela"
+                value={crearEscuela}
+                required
+                onChange={setCrearEscuela}
+              />
+            </div>
+          ) : null}
           <button className="btn btn-primary md:col-span-2" type="submit">
             Guardar usuario
           </button>
@@ -323,7 +391,17 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
             </div>
             <div className="field">
               <label htmlFor="edit-role">Rol</label>
-              <select className="input" id="edit-role" name="role" defaultValue={editingUser.role}>
+              <select
+                className="input"
+                id="edit-role"
+                name="role"
+                value={editRole}
+                onChange={(event) => {
+                  const next = event.target.value as Role;
+                  setEditRole(next);
+                  if (!esRolCatalogoEvaluador(next)) setEditEscuela("");
+                }}
+              >
                 {(Object.keys(ROLE_LABELS) as Role[]).map((role) => (
                   <option key={role} value={role}>
                     {ROLE_LABELS[role]}
@@ -331,6 +409,16 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
                 ))}
               </select>
             </div>
+            {esRolCatalogoEvaluador(editRole) ? (
+              <div className="md:col-span-2">
+                <EscuelaSelect
+                  id="edit-escuela"
+                  name="escuela"
+                  value={editEscuela}
+                  onChange={setEditEscuela}
+                />
+              </div>
+            ) : null}
             <div className="flex flex-wrap items-center justify-between gap-3 md:col-span-2">
               <button className="btn btn-primary" type="submit" disabled={eliminando}>
                 Guardar cambios
@@ -369,8 +457,8 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
           }}
         >
           <p className="text-muted">
-            Sube un CSV con columnas nombre, correo, contraseña y rol. El rol puede ser Administración,
-            Evaluador, Supervisor o Emprendedor.
+            Sube un CSV con columnas nombre, correo, contraseña, rol y escuela. La escuela es
+            obligatoria para Evaluador y Supervisor; el resto de roles puede dejarla vacía.
           </p>
           <button className="btn btn-secondary w-fit" type="button" onClick={descargarPlantilla}>
             Descargar plantilla

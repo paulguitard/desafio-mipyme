@@ -5,7 +5,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: "Administración",
   EVALUADOR: "Evaluador",
   SUPERVISOR: "Supervisor",
-  EMPRENDEDOR: "Emprendedor",
+  EMPRENDEDOR: "Participante",
 };
 
 export function isRole(value: string): value is Role {
@@ -17,7 +17,7 @@ export function esRolCatalogoEvaluador(value: string): boolean {
 }
 
 export function normalizeRole(value: string): Role | null {
-  if (value === "POSTULANTE") return "EMPRENDEDOR";
+  if (value === "POSTULANTE" || value === "PARTICIPANTE") return "EMPRENDEDOR";
   if (isRole(value)) return value;
   return null;
 }
@@ -25,19 +25,19 @@ export function normalizeRole(value: string): Role | null {
 export function homeForRole(role: Role): string {
   if (role === "ADMIN") return "/admin";
   if (role === "EVALUADOR" || role === "SUPERVISOR") return "/evaluador";
-  return "/emprendedor";
+  return "/participante";
 }
 
 export function loginPathForRole(role: Role): string {
   if (role === "ADMIN") return "/ingresar/admin";
   if (role === "EVALUADOR" || role === "SUPERVISOR") return "/ingresar/evaluador";
-  return "/ingresar/emprendedor";
+  return "/ingresar/participante";
 }
 
 export function roleFromLoginSlug(slug: string): Role | null {
   if (slug === "admin") return "ADMIN";
   if (slug === "evaluador") return "EVALUADOR";
-  if (slug === "emprendedor" || slug === "postulante") return "EMPRENDEDOR";
+  if (slug === "participante" || slug === "emprendedor" || slug === "postulante") return "EMPRENDEDOR";
   return null;
 }
 

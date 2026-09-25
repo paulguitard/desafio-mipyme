@@ -23,7 +23,7 @@ export default async function AdminHomePage() {
 
   const administradores = countByRole.ADMIN ?? 0;
   const evaluadores = (countByRole.EVALUADOR ?? 0) + (countByRole.SUPERVISOR ?? 0);
-  const emprendedores = countByRole.EMPRENDEDOR ?? 0;
+  const participantes = countByRole.EMPRENDEDOR ?? 0;
   const abiertas = countByEstado.ABIERTA ?? 0;
   const cerradas = countByEstado.CERRADA ?? 0;
 
@@ -33,13 +33,13 @@ export default async function AdminHomePage() {
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-red">Administración</p>
         <h1 className="text-3xl font-extrabold text-navy">Configuración</h1>
       </div>
-      <p className="max-w-2xl text-muted">
+      <p className="text-muted">
         Crea usuarios, formularios y convocatorias. Configura el pool de evaluadores y asígnalos a cada caso.
       </p>
       <div className="grid items-stretch gap-4 md:grid-cols-3">
         <a className="card card-link flex h-full flex-col p-6" href="/admin/usuarios">
           <h2 className="text-2xl font-bold text-navy">Usuarios</h2>
-          <p className="mt-2 text-muted">Alta de administradores, evaluadores y emprendedores.</p>
+          <p className="mt-2 text-muted">Alta de administradores, evaluadores y participantes.</p>
           <dl className="mt-auto grid grid-cols-3 gap-2 border-t border-[var(--border)] pt-4">
             <div className="flex flex-col">
               <dt className="min-h-8 text-xs font-semibold uppercase tracking-wide text-muted">Admin.</dt>
@@ -50,14 +50,14 @@ export default async function AdminHomePage() {
               <dd className="mt-1 text-2xl font-extrabold leading-none text-navy">{evaluadores}</dd>
             </div>
             <div className="flex flex-col">
-              <dt className="min-h-8 text-xs font-semibold uppercase tracking-wide text-muted">Emprendedores</dt>
-              <dd className="mt-1 text-2xl font-extrabold leading-none text-navy">{emprendedores}</dd>
+              <dt className="min-h-8 text-xs font-semibold uppercase tracking-wide text-muted">Participantes</dt>
+              <dd className="mt-1 text-2xl font-extrabold leading-none text-navy">{participantes}</dd>
             </div>
           </dl>
         </a>
         <a className="card card-link flex h-full flex-col p-6" href="/admin/formularios">
           <h2 className="text-2xl font-bold text-navy">Formularios</h2>
-          <p className="mt-2 text-muted">Preguntas que responderán los emprendedores.</p>
+          <p className="mt-2 text-muted">Preguntas que responderán los participantes.</p>
           <dl className="mt-auto border-t border-[var(--border)] pt-4">
             <div className="flex flex-col">
               <dt className="min-h-8 text-xs font-semibold uppercase tracking-wide text-muted">

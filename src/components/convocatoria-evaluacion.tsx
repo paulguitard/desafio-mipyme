@@ -80,10 +80,6 @@ function contiene(haystack: string, needle: string) {
   return haystack.toLocaleLowerCase("es-CL").includes(q);
 }
 
-function idCorto(id: string) {
-  return id.slice(-8).toUpperCase();
-}
-
 function respuestaConValor(valor: string) {
   const parsed = parseValor(valor);
   if (parsed == null) return false;
@@ -976,7 +972,10 @@ export function ConvocatoriaEvaluacion({
                 }}
               >
                 <div className="eval-ficha-respuesta">
-                  <div className="eval-ficha-respuesta-top">
+                  <span className="eval-ficha-ronda">
+                    Ronda {rondaRespuestaEmprendedor(postulacion.asignaciones)}
+                  </span>
+                  <div className="eval-ficha-ver-col">
                     <button
                       className="btn btn-sm btn-secondary eval-ficha-ver"
                       type="button"
@@ -989,24 +988,25 @@ export function ConvocatoriaEvaluacion({
                     >
                       Ver
                     </button>
-                    <span className={`eval-ficha-pill is-${estadoRespuesta}`}>
-                      {etiquetaEstadoRespuesta(estadoRespuesta)}
-                    </span>
-                    <span className="eval-ficha-ronda">
-                      Ronda {rondaRespuestaEmprendedor(postulacion.asignaciones)}
-                    </span>
-                    <span className="eval-ficha-id" title={postulacion.id}>
-                      ID#{idCorto(postulacion.id)}
-                    </span>
                   </div>
-                  <div className="eval-ficha-meta">
-                    <div className="eval-ficha-caso">
-                      <span className="eval-ficha-label">Nombre del caso</span>
-                      <span className="eval-ficha-value">{etiquetaNombreCaso(postulacion.nombreCaso)}</span>
-                    </div>
-                    <div className="eval-ficha-nombre">
-                      <span className="eval-ficha-label">Emprendedor</span>
-                      <span className="eval-ficha-value">{postulacion.emprendedorNombre}</span>
+                  <div className="eval-ficha-respuesta-body">
+                    <div className="eval-ficha-meta-row">
+                      <div className="eval-ficha-caso">
+                        <span className="eval-ficha-label">Nombre del caso</span>
+                        <span className="eval-ficha-value">
+                          {etiquetaNombreCaso(postulacion.nombreCaso)}
+                        </span>
+                      </div>
+                      <div className="eval-ficha-nombre">
+                        <span className="eval-ficha-label">Participante</span>
+                        <span className="eval-ficha-value">{postulacion.emprendedorNombre}</span>
+                      </div>
+                      <div className="eval-ficha-estado">
+                        <span className="eval-ficha-label">Estado</span>
+                        <span className={`eval-ficha-value is-${estadoRespuesta}`}>
+                          {etiquetaEstadoRespuesta(estadoRespuesta)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>

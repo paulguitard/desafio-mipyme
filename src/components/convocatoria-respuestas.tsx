@@ -87,7 +87,7 @@ export function ConvocatoriaRespuestas({ data }: { data: RespuestasConvocatoria 
       <div className="respuestas-filtros">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="field">
-            <label htmlFor="filtro-nombre">Nombre del emprendedor</label>
+            <label htmlFor="filtro-nombre">Nombre del participante</label>
             <input
               className="input"
               id="filtro-nombre"

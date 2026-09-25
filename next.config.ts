@@ -9,9 +9,12 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
-      { source: "/postulante", destination: "/emprendedor", permanent: false },
-      { source: "/postulante/:path*", destination: "/emprendedor/:path*", permanent: false },
-      { source: "/ingresar/postulante", destination: "/ingresar/emprendedor", permanent: false },
+      { source: "/emprendedor", destination: "/participante", permanent: false },
+      { source: "/emprendedor/:path*", destination: "/participante/:path*", permanent: false },
+      { source: "/ingresar/emprendedor", destination: "/ingresar/participante", permanent: false },
+      { source: "/postulante", destination: "/participante", permanent: false },
+      { source: "/postulante/:path*", destination: "/participante/:path*", permanent: false },
+      { source: "/ingresar/postulante", destination: "/ingresar/participante", permanent: false },
     ];
   },
 };

@@ -62,7 +62,7 @@ export function ResetPasswordForm({
           </p>
           <a
             className="btn btn-primary w-full uppercase tracking-wide text-center"
-            href="/ingresar/emprendedor"
+            href="/ingresar/participante"
           >
             Ir a ingresar
           </a>

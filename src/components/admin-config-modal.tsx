@@ -198,7 +198,7 @@ export function AdminConfigLauncher() {
                   </h3>
                   <p className="mt-1 text-sm text-muted">
                     Definí asunto, textos, colores e imagen del mail que reciben los
-                    emprendedores al pedir restablecer la contraseña. Placeholders:{" "}
+                    participantes al pedir restablecer la contraseña. Placeholders:{" "}
                     <code className="rounded bg-white/70 px-1">{"{{nombre}}"}</code> y{" "}
                     <code className="rounded bg-white/70 px-1">{"{{enlace}}"}</code>.
                   </p>

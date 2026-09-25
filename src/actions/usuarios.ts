@@ -5,9 +5,35 @@ import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
 import { isStoredFile, parseArchivos } from "@/lib/preguntas";
 import { requireUser } from "@/lib/session";
-import { isRole } from "@/lib/roles";
+import { esRolCatalogoEvaluador, isRole } from "@/lib/roles";
+import { isEscuela, parseEscuelaInput } from "@/lib/escuelas";
 import { deleteUpload } from "@/lib/storage";
 import { parseUsuariosCsv } from "@/lib/usuarios-csv";
+
+function resolveEscuelaParaRol(
+  role: string,
+  raw: string | null | undefined,
+  { required }: { required: boolean },
+): { escuela: string | null; error?: string } {
+  const escuela = parseEscuelaInput(raw);
+
+  if (!esRolCatalogoEvaluador(role)) {
+    return { escuela: null };
+  }
+
+  if (!escuela) {
+    if (required) {
+      return { escuela: null, error: "La escuela es obligatoria para evaluadores y supervisores." };
+    }
+    return { escuela: null };
+  }
+
+  if (!isEscuela(escuela)) {
+    return { escuela: null, error: "Selecciona una escuela válida del catálogo." };
+  }
+
+  return { escuela };
+}
 
 export async function crearUsuario(formData: FormData) {
   await requireUser("ADMIN");
@@ -20,6 +46,11 @@ export async function crearUsuario(formData: FormData) {
     return { error: "Completa nombre, correo, contraseña y rol." };
   }
 
+  const { escuela, error: escuelaError } = resolveEscuelaParaRol(role, formData.get("escuela")?.toString(), {
+    required: true,
+  });
+  if (escuelaError) return { error: escuelaError };
+
   const exists = await prisma.user.findUnique({ where: { email } });
   if (exists) return { error: "Ya existe un usuario con ese correo." };
 
@@ -30,6 +61,7 @@ export async function crearUsuario(formData: FormData) {
       passwordHash: await hashPassword(password),
       passwordAssigned: password,
       role,
+      escuela,
       origen: "ADMIN",
     },
   });
@@ -50,13 +82,19 @@ export async function actualizarUsuario(formData: FormData) {
     return { error: "Datos incompletos." };
   }
 
+  const { escuela, error: escuelaError } = resolveEscuelaParaRol(role, formData.get("escuela")?.toString(), {
+    required: false,
+  });
+  if (escuelaError) return { error: escuelaError };
+
   const data: {
     name: string;
     email: string;
     role: string;
+    escuela: string | null;
     passwordHash?: string;
     passwordAssigned?: string;
-  } = { name, email, role };
+  } = { name, email, role, escuela };
 
   if (password) {
     data.passwordHash = await hashPassword(password);
@@ -102,6 +140,9 @@ export async function eliminarUsuario(formData: FormData) {
   }
 
   const adjuntos = new Set<string>();
+  for (const archivo of parseArchivos(user.documentosFormalizacion).filter(isStoredFile)) {
+    adjuntos.add(archivo.relativePath);
+  }
   for (const postulacion of user.postulaciones) {
     for (const respuesta of postulacion.respuestas) {
       for (const archivo of parseArchivos(respuesta.archivos).filter(isStoredFile)) {
@@ -208,6 +249,7 @@ export async function cargarUsuariosMasivo(formData: FormData) {
       passwordHash: hashes[index],
       passwordAssigned: usuario.password,
       role: usuario.role,
+      escuela: usuario.escuela,
       origen: "ADMIN",
     })),
   });

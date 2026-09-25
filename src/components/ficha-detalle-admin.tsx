@@ -68,7 +68,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
           <div className="eval-detalle-headers">
             <div className="eval-detalle-head is-caso">
               <h2>Caso</h2>
-              <p>Respuestas del emprendedor</p>
+              <p>Respuestas del participante</p>
             </div>
             <div className="eval-detalle-head is-eval">
               <h2>Evaluación</h2>

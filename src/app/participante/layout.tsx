@@ -3,7 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 
-export default async function EmprendedorLayout({ children }: { children: React.ReactNode }) {
+export default async function ParticipanteLayout({ children }: { children: React.ReactNode }) {
   const sessionUser = await requireUser("EMPRENDEDOR");
   const user = await prisma.user.findUnique({
     where: { id: sessionUser.id },
@@ -15,11 +15,11 @@ export default async function EmprendedorLayout({ children }: { children: React.
       maxWidthClass="max-w-4xl"
       header={
         <AppHeader
-          title="Panel de emprendedor"
-          name={user?.name ?? sessionUser.name ?? "Emprendedor"}
+          title="Panel de participante"
+          name={user?.name ?? sessionUser.name ?? "Participante"}
           links={[
-            { href: "/emprendedor", label: "Panel" },
-            { href: "/emprendedor/perfil", label: "Mi Perfil" },
+            { href: "/participante", label: "Panel" },
+            { href: "/participante/perfil", label: "Mi Perfil" },
           ]}
         />
       }

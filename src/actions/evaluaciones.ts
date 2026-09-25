@@ -107,7 +107,7 @@ export async function guardarRevision(formData: FormData) {
     return { error: "Esta evaluación ya está finalizada." };
   }
   if (asignacion.estado === "CON_OBSERVACIONES") {
-    return { error: "Espera la corrección del emprendedor." };
+    return { error: "Espera la corrección del participante." };
   }
   if (asignacion.estado === "EN_SUPERVISION") {
     return { error: "Espera la revisión del supervisor." };
@@ -202,7 +202,7 @@ export async function enviarObservaciones(formData: FormData) {
   await sincronizarEstadoPostulacion(asignacion.postulacionId);
   revalidatePath(`/evaluador/evaluaciones/${asignacionId}`);
   revalidatePath("/evaluador");
-  revalidatePath("/emprendedor");
+  revalidatePath("/participante");
   return { ok: true };
 }
 
@@ -255,6 +255,6 @@ export async function finalizarEvaluacion(formData: FormData) {
   await sincronizarEstadoPostulacion(asignacion.postulacionId);
   revalidatePath(`/evaluador/evaluaciones/${asignacionId}`);
   revalidatePath("/evaluador");
-  revalidatePath("/emprendedor");
+  revalidatePath("/participante");
   return { ok: true };
 }

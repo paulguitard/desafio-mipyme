@@ -15,8 +15,18 @@ model User {
   passwordHash     String
   passwordAssigned String
   role             String
+  /// Solo evaluadores/supervisores. Catálogo en src/lib/escuelas.ts
+  escuela          String?
   /// ADMIN = creado por administración / CSV; REGISTRO = auto-registro o Google
   origen           String   @default("ADMIN")
+  /// RUT normalizado sin puntos ni guión (ej. 123456785). Solo participantes.
+  rutPersonal      String?
+  direccionPersonal String?
+  /// Solo dígitos, móvil chileno (9 cifras).
+  telefonoMovil    String?
+  contactoWhatsapp Boolean  @default(false)
+  /// JSON StoredFile[] — PDFs de formalización empresa (máx. 5).
+  documentosFormalizacion String @default("[]")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

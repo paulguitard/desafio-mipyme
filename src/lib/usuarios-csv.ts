@@ -1,4 +1,5 @@
-import { ROLE_LABELS, isRole, type Role } from "@/lib/roles";
+import { ROLE_LABELS, esRolCatalogoEvaluador, isRole, type Role } from "@/lib/roles";
+import { ESCUELAS, isEscuela, type Escuela } from "@/lib/escuelas";
 
 export type UsuarioCsv = {
   linea: number;
@@ -6,6 +7,7 @@ export type UsuarioCsv = {
   email: string;
   password: string;
   role: Role;
+  escuela: Escuela | null;
 };
 
 export type FilaCsvError = {
@@ -18,7 +20,7 @@ export type ParseUsuariosCsvResult = {
   errores: FilaCsvError[];
 };
 
-const HEADER_ALIASES: Record<string, "name" | "email" | "password" | "role"> = {
+const HEADER_ALIASES: Record<string, "name" | "email" | "password" | "role" | "escuela"> = {
   nombre: "name",
   name: "name",
   correo: "email",
@@ -29,6 +31,7 @@ const HEADER_ALIASES: Record<string, "name" | "email" | "password" | "role"> = {
   clave: "password",
   rol: "role",
   role: "role",
+  escuela: "escuela",
 };
 
 const ROLE_ALIASES: Record<string, Role> = {
@@ -40,6 +43,7 @@ const ROLE_ALIASES: Record<string, Role> = {
   evaluadora: "EVALUADOR",
   supervisor: "SUPERVISOR",
   supervisora: "SUPERVISOR",
+  participante: "EMPRENDEDOR",
   emprendedor: "EMPRENDEDOR",
   emprendedora: "EMPRENDEDOR",
   postulante: "EMPRENDEDOR",
@@ -130,6 +134,14 @@ function resolveRole(value: string): Role | null {
   return byLabel ?? null;
 }
 
+function resolveEscuela(value: string): Escuela | null | "invalid" {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (isEscuela(trimmed)) return trimmed;
+  const byFold = ESCUELAS.find((escuela) => fold(escuela) === fold(trimmed));
+  return byFold ?? "invalid";
+}
+
 export function parseUsuariosCsv(text: string): ParseUsuariosCsvResult {
   const rows = parseCsvRows(text);
   if (rows.length < 2) {
@@ -141,6 +153,7 @@ export function parseUsuariosCsv(text: string): ParseUsuariosCsvResult {
   const emailIdx = headers.indexOf("email");
   const passwordIdx = headers.indexOf("password");
   const roleIdx = headers.indexOf("role");
+  const escuelaIdx = headers.indexOf("escuela");
 
   if (nameIdx < 0 || emailIdx < 0 || passwordIdx < 0 || roleIdx < 0) {
     return {
@@ -148,7 +161,7 @@ export function parseUsuariosCsv(text: string): ParseUsuariosCsvResult {
       errores: [
         {
           linea: 1,
-          mensaje: "Faltan columnas. Usa: nombre, correo, contraseña, rol.",
+          mensaje: "Faltan columnas. Usa: nombre, correo, contraseña, rol (y escuela para evaluadores/supervisores).",
         },
       ],
     };
@@ -166,11 +179,13 @@ export function parseUsuariosCsv(text: string): ParseUsuariosCsvResult {
     const password = (cells[passwordIdx] ?? "").trim();
     const roleRaw = cells[roleIdx] ?? "";
     const role = resolveRole(roleRaw);
+    const escuelaRaw = escuelaIdx >= 0 ? (cells[escuelaIdx] ?? "") : "";
+    const escuelaResolved = resolveEscuela(escuelaRaw);
 
     if (!name || !email || !password || !role) {
       errores.push({
         linea,
-        mensaje: "Completa nombre, correo, contraseña y un rol válido (Administración, Evaluador, Supervisor o Emprendedor).",
+        mensaje: "Completa nombre, correo, contraseña y un rol válido (Administración, Evaluador, Supervisor o Participante).",
       });
       continue;
     }
@@ -185,15 +200,33 @@ export function parseUsuariosCsv(text: string): ParseUsuariosCsvResult {
       continue;
     }
 
+    if (escuelaResolved === "invalid") {
+      errores.push({
+        linea,
+        mensaje: "Escuela inválida. Usa una de las siete escuelas del catálogo AIEP.",
+      });
+      continue;
+    }
+
+    if (esRolCatalogoEvaluador(role) && !escuelaResolved) {
+      errores.push({
+        linea,
+        mensaje: "La escuela es obligatoria para evaluadores y supervisores.",
+      });
+      continue;
+    }
+
+    const escuela = esRolCatalogoEvaluador(role) ? escuelaResolved : null;
+
     seenEmails.add(email);
-    usuarios.push({ linea, name, email, password, role });
+    usuarios.push({ linea, name, email, password, role, escuela });
   }
 
   return { usuarios, errores };
 }
 
 export const PLANTILLA_USUARIOS_CSV = [
-  "nombre,correo,contraseña,rol",
-  "Ana Pérez,ana.perez@ejemplo.com,ClaveSegura1,Emprendedor",
-  "Luis Soto,luis.soto@ejemplo.com,ClaveSegura1,Evaluador",
+  "nombre,correo,contraseña,rol,escuela",
+  "Ana Pérez,ana.perez@ejemplo.com,ClaveSegura1,Participante,",
+  'Luis Soto,luis.soto@ejemplo.com,ClaveSegura1,Evaluador,"Ingeniería, Energía y Tecnología"',
 ].join("\n");

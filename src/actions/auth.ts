@@ -105,7 +105,7 @@ export async function signInWithGoogleAction() {
   }
 
   try {
-    await signIn("google", { redirectTo: "/emprendedor" });
+    await signIn("google", { redirectTo: "/participante" });
   } catch (error) {
     if (error instanceof AuthError) {
       const kind = String((error as { type?: string }).type ?? "");
@@ -121,7 +121,7 @@ export async function signInWithGoogleAction() {
       }
       if (kind === "AccessDenied") {
         return {
-          error: "Esa cuenta de Google no puede ingresar como emprendedor.",
+          error: "Esa cuenta de Google no puede ingresar como participante.",
         };
       }
       return {
@@ -225,7 +225,7 @@ export async function requestPasswordResetAction(formData: FormData) {
 
   try {
     const user = await prisma.user.findUnique({ where: { email } });
-    // Solo emprendedores auto-registrados (modal / Google). Admin y evaluador: sin mail, mismo mensaje.
+    // Solo participantes auto-registrados (modal / Google). Admin y evaluador: sin mail, mismo mensaje.
     if (
       !user ||
       normalizeRole(user.role) !== "EMPRENDEDOR" ||

@@ -106,7 +106,7 @@ export async function SupervisorHome({
               </h2>
               <BadgePostulacion estado={item.postulacion.estado} />
             </div>
-            <p className="mt-2 text-muted">Emprendedor: {item.postulacion.postulante.name}</p>
+            <p className="mt-2 text-muted">Participante: {item.postulacion.postulante.name}</p>
             <ul className="mt-3 flex flex-wrap gap-2">
               {item.postulacion.asignaciones.length === 0 ? (
                 <li className="text-sm text-muted">Sin evaluadores asignados</li>

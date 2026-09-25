@@ -21,6 +21,7 @@ export default async function UsuariosPage() {
       email: true,
       passwordAssigned: true,
       role: true,
+      escuela: true,
       origen: true,
     },
   });

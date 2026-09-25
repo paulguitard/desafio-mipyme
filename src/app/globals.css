@@ -747,6 +747,22 @@ html:has(.app-shell) body {
   max-width: min(72rem, calc(100% - 2rem));
 }
 
+.modal-dialog.modal-compact {
+  max-width: min(28rem, calc(100% - 2rem));
+  max-height: min(90vh, 24rem);
+}
+
+.modal-dialog.modal-compact .modal-panel {
+  max-height: min(90vh, 24rem);
+  gap: 0.85rem;
+  padding: 1.25rem;
+}
+
+.modal-dialog.modal-compact .modal-title {
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+
 .modal-dialog.modal-tall {
   width: min(56rem, calc(100% - 2rem));
   height: min(88vh, 56rem);
@@ -953,8 +969,8 @@ html:has(.app-shell) body {
 }
 
 .modal-dialog.modal-wide.modal-tall:has(.eval-shell-open) {
-  width: min(100%, calc(100vw - 1.5rem));
-  max-width: min(100%, calc(100vw - 1.5rem));
+  width: min(92rem, calc(100vw - 1.5rem));
+  max-width: min(92rem, calc(100vw - 1.5rem));
 }
 
 .ficha-detalle-admin {
@@ -1228,11 +1244,13 @@ html:has(.app-shell) body {
 }
 
 .eval-ficha {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.7fr) minmax(0, 0.5fr) auto;
+  /* respuesta | 2 avatares eval | 1 avatar supervisión | acciones */
+  grid-template-columns: minmax(0, 1fr) 11.25rem 8.25rem auto;
   gap: 1rem 1.5rem;
   align-items: center;
-  padding: 1rem 1.15rem;
+  padding: 1.15rem 1.15rem 1rem;
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 0.85rem;
@@ -1245,7 +1263,7 @@ html:has(.app-shell) body {
 
 .eval-lista-cabecera {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.7fr) minmax(0, 0.5fr) auto;
+  grid-template-columns: minmax(0, 1fr) 11.25rem 8.25rem auto;
   gap: 1rem 1.5rem;
   padding: 0 1.15rem;
   color: var(--navy);
@@ -1259,8 +1277,14 @@ html:has(.app-shell) body {
   text-align: center;
 }
 
-.eval-lista-cabecera > span:first-child {
+.eval-lista-cabecera > span:first-child,
+.eval-lista-cabecera > span:nth-child(2) {
   padding-right: 1.25rem;
+}
+
+.eval-lista-cabecera > span:nth-child(2),
+.eval-lista-cabecera > span:nth-child(3) {
+  white-space: nowrap;
 }
 
 .eval-ficha.is-drop-target {
@@ -1275,53 +1299,20 @@ html:has(.app-shell) body {
 
 .eval-ficha-respuesta {
   display: grid;
-  gap: 0.55rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.85rem 1rem;
+  align-items: center;
   min-width: 0;
+  overflow: hidden;
   padding-right: 1.25rem;
   border-right: 1px solid var(--border);
 }
 
-.eval-ficha-pill {
-  display: inline-flex;
-  width: fit-content;
-  align-items: center;
-  border-radius: 999px;
-  padding: 0.2rem 0.7rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: 0.02em;
-}
-
-.eval-ficha-pill.is-completa {
-  background: #e6f6ec;
-  color: #0f7a45;
-}
-
-.eval-ficha-pill.is-observaciones {
-  background: #fff6d6;
-  color: #9a7b00;
-}
-
-.eval-ficha-pill.is-pendiente {
-  background: #fdecec;
-  color: #c0392b;
-}
-
-.eval-ficha-meta {
+.eval-ficha-ver-col {
   display: flex;
-  min-width: 0;
-  align-items: baseline;
-  gap: 1.25rem;
-}
-
-.eval-ficha-respuesta-top {
-  display: inline-flex;
-  width: max-content;
-  max-width: 100%;
   align-items: center;
-  justify-content: flex-start;
-  gap: 0.5rem;
+  justify-content: center;
+  align-self: stretch;
 }
 
 .eval-ficha-ver {
@@ -1330,35 +1321,45 @@ html:has(.app-shell) body {
   line-height: 1.2;
 }
 
+.eval-ficha-respuesta-body {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.eval-ficha-meta-row {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
 .eval-ficha-ronda {
-  flex: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  padding: 0.22rem 0.6rem 0.28rem 0.7rem;
+  border-radius: 0.85rem 0 0.55rem 0;
+  background: #d7e6f7;
   color: var(--navy);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.02em;
-  line-height: 1;
+  line-height: 1.15;
   white-space: nowrap;
 }
 
-.eval-ficha-id {
-  flex: none;
-  color: var(--muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.eval-ficha-caso {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
+.eval-ficha-caso,
 .eval-ficha-nombre {
+  flex: 1 1 0;
   min-width: 0;
-  flex: 1 1 auto;
+}
+
+.eval-ficha-estado {
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .eval-ficha-evaluacion {
@@ -1366,6 +1367,8 @@ html:has(.app-shell) body {
   min-width: 0;
   align-items: center;
   justify-content: flex-start;
+  padding-right: 1.25rem;
+  border-right: 1px solid var(--border);
 }
 
 .eval-ficha-supervision {
@@ -1373,6 +1376,18 @@ html:has(.app-shell) body {
   min-width: 0;
   align-items: center;
   justify-content: flex-start;
+}
+
+.eval-ficha-supervision .eval-avatar {
+  max-width: 100%;
+}
+
+.eval-ficha-supervision .eval-avatar-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
 }
 
 .eval-ficha-acciones {
@@ -1421,6 +1436,18 @@ html:has(.app-shell) body {
   font-weight: 700;
   line-height: 1.25;
   word-break: break-word;
+}
+
+.eval-ficha-value.is-completa {
+  color: #0f7a45;
+}
+
+.eval-ficha-value.is-observaciones {
+  color: #9a7b00;
+}
+
+.eval-ficha-value.is-pendiente {
+  color: #c0392b;
 }
 
 .eval-ficha-empty {
@@ -1532,6 +1559,8 @@ html:has(.app-shell) body {
 
   .eval-ficha-evaluacion {
     grid-column: 1;
+    padding-right: 0;
+    border-right: none;
   }
 
   .eval-ficha-acciones {
@@ -1545,7 +1574,8 @@ html:has(.app-shell) body {
     gap: 0.35rem;
   }
 
-  .eval-lista-cabecera > span:first-child {
+  .eval-lista-cabecera > span:first-child,
+  .eval-lista-cabecera > span:nth-child(2) {
     padding-right: 0;
   }
 }

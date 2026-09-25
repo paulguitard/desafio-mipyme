@@ -10,7 +10,7 @@ const FILTROS: { id: string; label: string; estados?: EstadoAsignacion[] }[] = [
   { id: "pendientes", label: "Pendientes", estados: ["PENDIENTE", "EN_REVISION", "DEVUELTA_SUPERVISOR"] },
   { id: "supervision", label: "En supervisión", estados: ["EN_SUPERVISION"] },
   { id: "observaciones", label: "Con observaciones", estados: ["CON_OBSERVACIONES"] },
-  { id: "reparadas", label: "Reparadas por el emprendedor", estados: ["REPARADA"] },
+  { id: "reparadas", label: "Reparadas por el participante", estados: ["REPARADA"] },
   { id: "finalizadas", label: "Finalizadas", estados: ["FINALIZADA"] },
 ];
 
@@ -94,7 +94,7 @@ export default async function EvaluadorHomePage({
             <BadgeAsignacion estado={item.estado} />
           </div>
           <p className="text-muted">
-            Emprendedor: {item.postulacion.postulante.name} · {ESTADO_ASIGNACION_LABEL[item.estado as EstadoAsignacion]}
+            Participante: {item.postulacion.postulante.name} · {ESTADO_ASIGNACION_LABEL[item.estado as EstadoAsignacion]}
           </p>
         </a>
       ))}

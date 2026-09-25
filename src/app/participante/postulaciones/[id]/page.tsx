@@ -91,7 +91,7 @@ export default async function PostulacionPage({
       postulacionId={postulacion.id}
       canEdit={canEdit}
       esCorreccion={esCorreccion}
-      back={<BotonAtras href="/emprendedor" />}
+      back={<BotonAtras href="/participante" />}
       title={<h1 className="text-3xl font-extrabold text-navy">{postulacion.convocatoria.formulario.titulo}</h1>}
       meta={
         <div className="space-y-2">

@@ -11,7 +11,7 @@ import {
 } from "@/lib/convocatoria";
 import { publicUploadUrl } from "@/lib/preguntas";
 
-export default async function EmprendedorHomePage() {
+export default async function ParticipanteHomePage() {
   const user = await requireUser("EMPRENDEDOR");
   const [convocatorias, postulaciones] = await Promise.all([
     prisma.convocatoria.findMany({
@@ -114,7 +114,7 @@ export default async function EmprendedorHomePage() {
         <h2 className="text-3xl font-extrabold text-navy">Mis casos</h2>
         {postulaciones.length === 0 ? <p className="text-muted">Aún no tienes casos.</p> : null}
         {postulaciones.map((item) => (
-          <a key={item.id} href={`/emprendedor/postulaciones/${item.id}`} className="card card-link block p-6">
+          <a key={item.id} href={`/participante/postulaciones/${item.id}`} className="card card-link block p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-xl font-bold text-navy">{item.convocatoria.titulo}</h3>
               <BadgePostulacion estado={item.estado} />

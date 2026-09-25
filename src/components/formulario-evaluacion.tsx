@@ -7,6 +7,8 @@ import {
   guardarSupervision,
   procederSupervision,
 } from "@/actions/supervisiones";
+import { ConfirmacionEnvio } from "@/components/confirmacion-envio";
+import type { IntencionSupervision } from "@/lib/estado";
 import type { ModoEvaluacion } from "@/lib/modo-evaluacion";
 
 function mensajeAccion(result: { error?: string } | { ok: boolean; error?: undefined } | void | null) {
@@ -14,11 +16,23 @@ function mensajeAccion(result: { error?: string } | { ok: boolean; error?: undef
   return null;
 }
 
+type AccionEnvio =
+  | "enviar-observaciones-supervisor"
+  | "finalizar-evaluacion"
+  | "enviar-observaciones-evaluador"
+  | "proceder";
+
+type PendienteEnvio = {
+  formData: FormData;
+  accion: AccionEnvio;
+};
+
 export function FormularioEvaluacion({
   asignacionId,
   canEdit,
   modoEvaluacion = "POR_PREGUNTA",
   rolAccion = "evaluador",
+  intencionPendiente = null,
   back,
   title,
   meta,
@@ -32,6 +46,7 @@ export function FormularioEvaluacion({
   canEdit: boolean;
   modoEvaluacion?: ModoEvaluacion;
   rolAccion?: "evaluador" | "supervisor" | "lectura";
+  intencionPendiente?: IntencionSupervision | string | null;
   back: React.ReactNode;
   title: React.ReactNode;
   meta?: React.ReactNode;
@@ -43,9 +58,130 @@ export function FormularioEvaluacion({
 }) {
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendienteEnvio, setPendienteEnvio] = useState<PendienteEnvio | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
   const esGeneral = modoEvaluacion === "GENERAL";
   const esSupervisor = rolAccion === "supervisor";
   const mostrarAcciones = canEdit && rolAccion !== "lectura";
+  const finalizaAlProceder = intencionPendiente === "FINALIZAR";
+
+  function abrirConfirmacion(formData: FormData, accion: AccionEnvio) {
+    if (confirmando) return;
+    setPendienteEnvio({ formData, accion });
+  }
+
+  async function confirmarEnvio() {
+    if (!pendienteEnvio || confirmando) return;
+    setConfirmando(true);
+    setError(null);
+    setMensaje(null);
+    try {
+      const { formData, accion } = pendienteEnvio;
+      let result: { error?: string } | { ok: boolean } | void | null = null;
+      let mensajeOk = "";
+
+      if (accion === "enviar-observaciones-supervisor") {
+        result = await enviarObservaciones(formData);
+        mensajeOk = "Observaciones enviadas al supervisor.";
+      } else if (accion === "finalizar-evaluacion") {
+        result = await finalizarEvaluacion(formData);
+        mensajeOk = "Finalización enviada al supervisor.";
+      } else if (accion === "enviar-observaciones-evaluador") {
+        result = await enviarObservacionesSupervision(formData);
+        mensajeOk = "Observaciones enviadas al evaluador.";
+      } else {
+        result = await procederSupervision(formData);
+        mensajeOk = "Supervisión procedida.";
+      }
+
+      const errorAccion = mensajeAccion(result);
+      if (errorAccion) {
+        setError(errorAccion);
+        setPendienteEnvio(null);
+        return;
+      }
+      setMensaje(mensajeOk);
+      setPendienteEnvio(null);
+    } finally {
+      setConfirmando(false);
+    }
+  }
+
+  const modalConfirmacion = (() => {
+    if (!pendienteEnvio) return null;
+    const { accion } = pendienteEnvio;
+
+    if (accion === "enviar-observaciones-supervisor") {
+      return {
+        title: "¿Enviar a supervisor?",
+        confirmLabel: "Enviar a supervisor",
+        body: (
+          <>
+            <p>Las observaciones se enviarán al supervisor.</p>
+            <p>No podrás editar hasta que el supervisor las devuelva.</p>
+          </>
+        ),
+      };
+    }
+
+    if (accion === "finalizar-evaluacion") {
+      return {
+        title: "¿Finalizar evaluación?",
+        confirmLabel: "Finalizar evaluación",
+        body: (
+          <>
+            <p>La finalización se enviará al supervisor.</p>
+            <p>
+              {esGeneral
+                ? "La observación general debe quedar sin observaciones y con nota si corresponde."
+                : "Todas las preguntas deben quedar sin observaciones y con nota si corresponde."}
+            </p>
+            <p>
+              No podrás editar mientras esté en supervisión. Si el supervisor procede, la evaluación
+              quedará cerrada.
+            </p>
+          </>
+        ),
+      };
+    }
+
+    if (accion === "enviar-observaciones-evaluador") {
+      return {
+        title: "¿Enviar observaciones?",
+        confirmLabel: "Enviar observaciones",
+        body: (
+          <>
+            <p>Las observaciones se enviarán al evaluador.</p>
+            <p>No podrás seguir editando hasta que el evaluador vuelva a enviar.</p>
+          </>
+        ),
+      };
+    }
+
+    if (finalizaAlProceder) {
+      return {
+        title: "¿Proceder con la finalización?",
+        confirmLabel: "Proceder",
+        body: (
+          <>
+            <p>Se cerrará la evaluación.</p>
+            <p>El participante y el evaluador no podrán seguir editando.</p>
+          </>
+        ),
+      };
+    }
+
+    return {
+      title: "¿Proceder con las observaciones?",
+      confirmLabel: "Proceder",
+      body: (
+        <>
+          <p>Las observaciones se enviarán al participante, que podrá corregir lo observado.</p>
+          <p>Esta supervisión quedará cerrada.</p>
+        </>
+      ),
+    };
+  })();
 
   return (
     <form className="page-workspace grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden">
@@ -62,6 +198,7 @@ export function FormularioEvaluacion({
                   <button
                     className="btn btn-sm btn-secondary"
                     type="submit"
+                    disabled={confirmando}
                     formAction={async (formData) => {
                       const result = await guardarSupervision(formData);
                       const errorAccion = mensajeAccion(result);
@@ -79,17 +216,9 @@ export function FormularioEvaluacion({
                   <button
                     className="btn btn-sm btn-gold"
                     type="submit"
-                    formAction={async (formData) => {
-                      if (!window.confirm("¿Enviar observaciones al evaluador?")) return;
-                      const result = await enviarObservacionesSupervision(formData);
-                      const errorAccion = mensajeAccion(result);
-                      if (errorAccion) {
-                        setError(errorAccion);
-                        setMensaje(null);
-                      } else {
-                        setError(null);
-                        setMensaje("Observaciones enviadas al evaluador.");
-                      }
+                    disabled={confirmando}
+                    formAction={(formData) => {
+                      abrirConfirmacion(formData, "enviar-observaciones-evaluador");
                     }}
                   >
                     Enviar observaciones
@@ -97,23 +226,9 @@ export function FormularioEvaluacion({
                   <button
                     className="btn btn-sm btn-primary"
                     type="submit"
-                    formAction={async (formData) => {
-                      if (
-                        !window.confirm(
-                          "¿Proceder? Si el evaluador envió observaciones, irán al emprendedor. Si finalizó, se cerrará esta evaluación.",
-                        )
-                      ) {
-                        return;
-                      }
-                      const result = await procederSupervision(formData);
-                      const errorAccion = mensajeAccion(result);
-                      if (errorAccion) {
-                        setError(errorAccion);
-                        setMensaje(null);
-                      } else {
-                        setError(null);
-                        setMensaje("Supervisión procedida.");
-                      }
+                    disabled={confirmando}
+                    formAction={(formData) => {
+                      abrirConfirmacion(formData, "proceder");
                     }}
                   >
                     Proceder
@@ -124,6 +239,7 @@ export function FormularioEvaluacion({
                   <button
                     className="btn btn-sm btn-secondary"
                     type="submit"
+                    disabled={confirmando}
                     formAction={async (formData) => {
                       const result = await guardarRevision(formData);
                       if (result?.error) {
@@ -140,16 +256,9 @@ export function FormularioEvaluacion({
                   <button
                     className="btn btn-sm btn-gold"
                     type="submit"
-                    formAction={async (formData) => {
-                      if (!window.confirm("¿Enviar al supervisor?")) return;
-                      const result = await enviarObservaciones(formData);
-                      if (result?.error) {
-                        setError(result.error);
-                        setMensaje(null);
-                      } else {
-                        setError(null);
-                        setMensaje("Observaciones enviadas al supervisor.");
-                      }
+                    disabled={confirmando}
+                    formAction={(formData) => {
+                      abrirConfirmacion(formData, "enviar-observaciones-supervisor");
                     }}
                   >
                     Enviar a supervisor
@@ -157,24 +266,9 @@ export function FormularioEvaluacion({
                   <button
                     className="btn btn-sm btn-primary"
                     type="submit"
-                    formAction={async (formData) => {
-                      if (
-                        !window.confirm(
-                          esGeneral
-                            ? "¿Enviar la finalización al supervisor? La observación general debe quedar sin observaciones y con nota si corresponde."
-                            : "¿Enviar la finalización al supervisor? Todas las preguntas deben quedar sin observaciones y con nota si corresponde.",
-                        )
-                      ) {
-                        return;
-                      }
-                      const result = await finalizarEvaluacion(formData);
-                      if (result?.error) {
-                        setError(result.error);
-                        setMensaje(null);
-                      } else {
-                        setError(null);
-                        setMensaje("Finalización enviada al supervisor.");
-                      }
+                    disabled={confirmando}
+                    formAction={(formData) => {
+                      abrirConfirmacion(formData, "finalizar-evaluacion");
                     }}
                   >
                     Finalizar evaluación
@@ -195,7 +289,7 @@ export function FormularioEvaluacion({
           <div className="eval-detalle-headers">
             <div className="eval-detalle-head is-caso">
               <h2>Caso</h2>
-              <p>Respuestas del emprendedor</p>
+              <p>Respuestas del participante</p>
             </div>
             <div className="eval-detalle-head is-eval">
               <h2>Evaluación</h2>
@@ -225,6 +319,21 @@ export function FormularioEvaluacion({
           )}
         </div>
       </section>
+
+      {modalConfirmacion ? (
+        <ConfirmacionEnvio
+          open
+          title={modalConfirmacion.title}
+          confirmLabel={modalConfirmacion.confirmLabel}
+          confirming={confirmando}
+          onCancel={() => {
+            if (!confirmando) setPendienteEnvio(null);
+          }}
+          onConfirm={confirmarEnvio}
+        >
+          {modalConfirmacion.body}
+        </ConfirmacionEnvio>
+      ) : null}
     </form>
   );
 }

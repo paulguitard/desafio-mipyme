@@ -39,14 +39,17 @@ async function compressImageToMaxBytes(
 export async function prepareUploadBuffer(
   file: File,
   kind: "file" | "image",
+  options?: { maxFileBytes?: number },
 ): Promise<{ originalName: string; mimeType: string; buffer: Buffer }> {
   let originalName = file.name || (kind === "image" ? "imagen" : "archivo");
   let mimeType = file.type || "application/octet-stream";
   let buffer = Buffer.from(await file.arrayBuffer());
 
   if (kind === "file") {
-    if (buffer.length > MAX_FILE_BYTES) {
-      throw new Error("El archivo no puede superar 2 MB.");
+    const maxBytes = options?.maxFileBytes ?? MAX_FILE_BYTES;
+    if (buffer.length > maxBytes) {
+      const mb = Math.round((maxBytes / (1024 * 1024)) * 10) / 10;
+      throw new Error(`El archivo no puede superar ${mb} MB.`);
     }
     return { originalName, mimeType, buffer };
   }

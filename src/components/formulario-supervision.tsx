@@ -43,6 +43,7 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
       asignacionId={asignacion.id}
       canEdit={canEdit}
       rolAccion="supervisor"
+      intencionPendiente={asignacion.intencionPendiente}
       modoEvaluacion={modoEvaluacion}
       back={<BotonAtras href="/evaluador" />}
       title={

@@ -29,7 +29,7 @@ export const ESTADO_POSTULACION_LABEL: Record<EstadoPostulacion, string> = {
   ENVIADA: "Enviada",
   EN_EVALUACION: "En evaluación",
   CON_OBSERVACIONES: "Con observaciones",
-  REPARADA_POR_EL_EMPRENDEDOR: "Reparada por el emprendedor",
+  REPARADA_POR_EL_EMPRENDEDOR: "Reparada por el participante",
   FINALIZADA: "Finalizada",
 };
 
@@ -39,7 +39,7 @@ export const ESTADO_ASIGNACION_LABEL: Record<EstadoAsignacion, string> = {
   EN_SUPERVISION: "En supervisión",
   DEVUELTA_SUPERVISOR: "Devuelta por el supervisor",
   CON_OBSERVACIONES: "Con observaciones",
-  REPARADA: "Reparada por el emprendedor",
+  REPARADA: "Reparada por el participante",
   FINALIZADA: "Finalizada",
 };
 

@@ -17,10 +17,10 @@ npx tsx prisma/seed.ts
 
 Admin inicial: `admin@test.com` / `bitacora`
 
-El admin crea evaluadores y emprendedores en Configuración → Usuarios. Las contraseñas visibles en el listado son solo para este prototipo.
+El admin crea evaluadores y participantes en Configuración → Usuarios. Las contraseñas visibles en el listado son solo para este prototipo.
 
 ## Roles
 
 - **Administración**: usuarios, formularios, convocatorias (abrir/cerrar) y asignación de evaluadores.
-- **Emprendedor**: convocatorias abiertas, casos y correcciones cuando el estado es “Con observaciones”.
+- **Participante**: convocatorias abiertas, casos y correcciones cuando el estado es “Con observaciones”.
 - **Evaluador**: evaluaciones independientes (Evaluación 1, 2, …), observaciones por pregunta e historial de cambios.

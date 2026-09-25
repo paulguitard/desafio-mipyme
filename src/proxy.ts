@@ -13,6 +13,7 @@ export default auth((req) => {
   const guards: { prefix: string; expected: Role }[] = [
     { prefix: "/admin", expected: "ADMIN" },
     { prefix: "/evaluador", expected: "EVALUADOR" },
+    { prefix: "/participante", expected: "EMPRENDEDOR" },
     { prefix: "/emprendedor", expected: "EMPRENDEDOR" },
   ];
 
@@ -36,5 +37,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/admin/:path*", "/evaluador/:path*", "/emprendedor/:path*"],
+  matcher: ["/admin/:path*", "/evaluador/:path*", "/participante/:path*", "/emprendedor/:path*"],
 };

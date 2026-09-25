@@ -71,8 +71,9 @@ async function uploadBuffer(
 export async function saveUpload(
   file: File,
   kind: "file" | "image",
+  options?: { maxFileBytes?: number },
 ): Promise<StoredFile> {
-  const prepared = await prepareUploadBuffer(file, kind);
+  const prepared = await prepareUploadBuffer(file, kind, options);
   const id = randomUUID();
   const result = await uploadBuffer(prepared.buffer, {
     publicId: id,

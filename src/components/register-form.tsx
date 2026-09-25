@@ -41,7 +41,7 @@ export function RegisterForm() {
 
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-red">Registro</p>
-        <h1 className="mt-1 text-3xl font-extrabold text-navy">Emprendedor</h1>
+        <h1 className="mt-1 text-3xl font-extrabold text-navy">Participante</h1>
       </div>
 
       {error ? (
@@ -99,7 +99,7 @@ export function RegisterForm() {
 
       <a
         className="block text-center font-bold text-navy underline-offset-4 hover:underline"
-        href="/ingresar/emprendedor"
+        href="/ingresar/participante"
       >
         Ya tengo cuenta — Ingresar
       </a>

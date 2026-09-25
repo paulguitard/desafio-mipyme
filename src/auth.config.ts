@@ -34,12 +34,13 @@ export const authConfig = {
 
       const needsAdmin = pathname.startsWith("/admin");
       const needsEval = pathname.startsWith("/evaluador");
-      const needsEmprendedor = pathname.startsWith("/emprendedor");
-      if (!needsAdmin && !needsEval && !needsEmprendedor) return true;
+      const needsParticipante =
+        pathname.startsWith("/participante") || pathname.startsWith("/emprendedor");
+      if (!needsAdmin && !needsEval && !needsParticipante) return true;
       if (!role) return false;
       if (needsAdmin) return role === "ADMIN";
       if (needsEval) return esRolCatalogoEvaluador(role);
-      if (needsEmprendedor) return role === "EMPRENDEDOR";
+      if (needsParticipante) return role === "EMPRENDEDOR";
       return true;
     },
   },

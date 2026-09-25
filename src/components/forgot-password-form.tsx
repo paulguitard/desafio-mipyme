@@ -43,7 +43,7 @@ export function ForgotPasswordForm() {
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-red">Cuenta</p>
         <h1 className="mt-1 text-3xl font-extrabold text-navy">Recuperar contraseña</h1>
         <p className="mt-2 text-sm text-muted">
-          Solo para emprendedores registrados en la plataforma. Te enviaremos un enlace si la
+          Solo para participantes registrados en la plataforma. Te enviaremos un enlace si la
           cuenta aplica.
         </p>
       </div>
@@ -66,7 +66,7 @@ export function ForgotPasswordForm() {
       </button>
       <a
         className="block text-center font-bold text-navy underline-offset-4 hover:underline"
-        href="/ingresar/emprendedor"
+        href="/ingresar/participante"
       >
         Volver al ingreso
       </a>

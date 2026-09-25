@@ -11,7 +11,7 @@ function FigureEvaluador() {
   );
 }
 
-function FigureEmprendedor() {
+function FigureParticipante() {
   return (
     <svg viewBox="0 0 160 160" className="h-16 w-16 shrink-0" aria-hidden="true">
       <rect width="160" height="160" rx="28" fill="#fde8ec" />
@@ -61,11 +61,11 @@ export default function HomePage() {
         </h1>
         <div className="mx-auto grid w-full max-w-3xl items-start gap-10 md:grid-cols-2">
           <a
-            href="/ingresar/emprendedor"
+            href="/ingresar/participante"
             className="card card-link card-portal flex min-h-28 items-center gap-4 p-4"
           >
-            <FigureEmprendedor />
-            <span className="font-heading text-2xl font-bold text-navy">Soy emprendedor</span>
+            <FigureParticipante />
+            <span className="font-heading text-2xl font-bold text-navy">Soy participante</span>
           </a>
           <div className="flex flex-col gap-2">
             <a

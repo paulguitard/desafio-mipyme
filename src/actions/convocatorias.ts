@@ -52,7 +52,7 @@ async function leerImagen(formData: FormData, actual: string) {
 function revalidateConvocatorias(id?: string) {
   revalidatePath("/admin/convocatorias");
   revalidatePath("/admin");
-  revalidatePath("/emprendedor");
+  revalidatePath("/participante");
   if (id) revalidatePath(`/admin/convocatorias/${id}`);
 }
 

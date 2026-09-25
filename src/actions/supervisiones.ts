@@ -27,7 +27,7 @@ function revalidateSupervision(asignacionId: string, postulacionId: string) {
   revalidatePath(`/evaluador/supervision/${postulacionId}`);
   revalidatePath(`/evaluador/evaluaciones/${asignacionId}`);
   revalidatePath("/evaluador");
-  revalidatePath("/emprendedor");
+  revalidatePath("/participante");
 }
 
 function leerVeredictoGeneral(formData: FormData) {

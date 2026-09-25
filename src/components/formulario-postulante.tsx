@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { enviarPostulacion, guardarBorrador } from "@/actions/postulaciones";
+import { ConfirmacionEnvio } from "@/components/confirmacion-envio";
 import {
   MAX_FILE_BYTES,
   MAX_IMAGE_INPUT_BYTES,
@@ -47,6 +48,8 @@ export function FormularioPostulante({
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pendienteEnvio, setPendienteEnvio] = useState<FormData | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
   const savingRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -79,6 +82,21 @@ export function FormularioPostulante({
     }
   }
 
+  async function confirmarEnvio() {
+    if (!pendienteEnvio || confirmando) return;
+    setConfirmando(true);
+    try {
+      await conGuardado(
+        pendienteEnvio,
+        enviarPostulacion,
+        esCorreccion ? "Correcciones enviadas." : "Caso enviado.",
+      );
+      setPendienteEnvio(null);
+    } finally {
+      setConfirmando(false);
+    }
+  }
+
   return (
     <form
       ref={formRef}
@@ -96,7 +114,7 @@ export function FormularioPostulante({
               <button
                 className="btn btn-sm btn-secondary"
                 type="submit"
-                disabled={saving}
+                disabled={saving || confirmando}
                 formAction={async (formData) => {
                   await conGuardado(formData, guardarBorrador, "Borrador guardado.");
                 }}
@@ -106,23 +124,10 @@ export function FormularioPostulante({
               <button
                 className="btn btn-sm btn-primary"
                 type="submit"
-                disabled={saving}
-                formAction={async (formData) => {
-                  if (savingRef.current) return;
-                  if (
-                    !window.confirm(
-                      esCorreccion
-                        ? "¿Enviar las correcciones al evaluador?"
-                        : "¿Enviar este caso? Después no podrás editarlo hasta que haya observaciones.",
-                    )
-                  ) {
-                    return;
-                  }
-                  await conGuardado(
-                    formData,
-                    enviarPostulacion,
-                    esCorreccion ? "Correcciones enviadas." : "Caso enviado.",
-                  );
+                disabled={saving || confirmando}
+                formAction={(formData) => {
+                  if (savingRef.current || confirmando) return;
+                  setPendienteEnvio(formData);
                 }}
               >
                 {saving
@@ -142,6 +147,29 @@ export function FormularioPostulante({
         <input type="hidden" name="postulacionId" value={postulacionId} />
         {children}
       </div>
+
+      <ConfirmacionEnvio
+        open={pendienteEnvio !== null}
+        title={esCorreccion ? "¿Enviar correcciones?" : "¿Enviar caso?"}
+        confirmLabel={esCorreccion ? "Enviar correcciones" : "Enviar caso"}
+        confirming={confirmando}
+        onCancel={() => {
+          if (!confirmando) setPendienteEnvio(null);
+        }}
+        onConfirm={confirmarEnvio}
+      >
+        {esCorreccion ? (
+          <>
+            <p>Las correcciones se enviarán al evaluador.</p>
+            <p>Después no podrás editar hasta que haya nuevas observaciones.</p>
+          </>
+        ) : (
+          <>
+            <p>El caso se enviará al evaluador.</p>
+            <p>Después no podrás editarlo hasta que haya observaciones.</p>
+          </>
+        )}
+      </ConfirmacionEnvio>
     </form>
   );
 }

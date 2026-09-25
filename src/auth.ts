@@ -24,7 +24,7 @@ async function findOrCreateEmprendedorFromGoogle(input: {
 
   const user = await prisma.user.create({
     data: {
-      name: input.name?.trim() || email.split("@")[0] || "Emprendedor",
+      name: input.name?.trim() || email.split("@")[0] || "Participante",
       email,
       passwordHash: await hashPassword(randomBytes(32).toString("hex")),
       passwordAssigned: "",

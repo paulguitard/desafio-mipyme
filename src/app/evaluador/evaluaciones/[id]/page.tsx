@@ -82,7 +82,7 @@ export default async function EvaluacionDetallePage({
       }
       meta={
         <div className="space-y-2">
-          <p className="text-muted">Emprendedor: {asignacion.postulacion.postulante.name}</p>
+          <p className="text-muted">Participante: {asignacion.postulacion.postulante.name}</p>
           {!abierta ? (
             <p className="font-semibold text-danger">Convocatoria cerrada. Solo lectura.</p>
           ) : null}
@@ -93,10 +93,10 @@ export default async function EvaluacionDetallePage({
             <p>El supervisor devolvió esta evaluación. Revisa sus observaciones y vuelve a enviar.</p>
           ) : null}
           {asignacion.estado === "CON_OBSERVACIONES" ? (
-            <p>Esperando que el emprendedor corrija las observaciones de esta evaluación.</p>
+            <p>Esperando que el participante corrija las observaciones de esta evaluación.</p>
           ) : null}
           {asignacion.estado === "REPARADA" ? (
-            <p>El emprendedor ya corrigió. Revisa los cambios en el historial de cada pregunta.</p>
+            <p>El participante ya corrigió. Revisa los cambios en el historial de cada pregunta.</p>
           ) : null}
         </div>
       }

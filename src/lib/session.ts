@@ -27,7 +27,7 @@ export async function requireCatalogoEvaluador() {
   return session.user;
 }
 
-/** Emprendedor, evaluador o supervisor (perfil propio). */
+/** Participante, evaluador o supervisor (perfil propio). */
 export async function requirePortalUser() {
   const session = await auth();
   if (!session?.user) {

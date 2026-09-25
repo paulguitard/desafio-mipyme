@@ -100,7 +100,7 @@ export async function iniciarPostulacion(formData: FormData) {
     },
   });
   if (existente) {
-    redirect(`/emprendedor/postulaciones/${existente.id}`);
+    redirect(`/participante/postulaciones/${existente.id}`);
   }
 
   const postulacion = await prisma.postulacion.create({
@@ -110,7 +110,7 @@ export async function iniciarPostulacion(formData: FormData) {
       estado: "BORRADOR",
     },
   });
-  redirect(`/emprendedor/postulaciones/${postulacion.id}`);
+  redirect(`/participante/postulaciones/${postulacion.id}`);
 }
 
 const MANTENER_VALOR = Symbol("mantener-valor");
@@ -361,7 +361,7 @@ export async function guardarBorrador(formData: FormData) {
     return { error: error instanceof Error ? error.message : "No se pudo guardar." };
   }
 
-  revalidatePath(`/emprendedor/postulaciones/${id}`);
+  revalidatePath(`/participante/postulaciones/${id}`);
   return { ok: true };
 }
 
@@ -410,7 +410,7 @@ export async function enviarPostulacion(formData: FormData) {
       !resp || respuestaVacia(resp.valor, resp.archivos, pregunta.tipo, pregunta.opciones);
     if (vacia) {
       if (!pregunta.obligatoria) continue;
-      revalidatePath(`/emprendedor/postulaciones/${id}`);
+      revalidatePath(`/participante/postulaciones/${id}`);
       return { error: `Se guardó el borrador, pero falta responder: ${pregunta.enunciado}` };
     }
     if (!resp) continue;
@@ -421,7 +421,7 @@ export async function enviarPostulacion(formData: FormData) {
       obligatoria: pregunta.obligatoria,
     });
     if (errorValor) {
-      revalidatePath(`/emprendedor/postulaciones/${id}`);
+      revalidatePath(`/participante/postulaciones/${id}`);
       return { error: `Se guardó el borrador, pero no se pudo enviar. ${pregunta.enunciado}: ${errorValor}` };
     }
   }
@@ -441,8 +441,8 @@ export async function enviarPostulacion(formData: FormData) {
   }
 
   await sincronizarEstadoPostulacion(id);
-  revalidatePath(`/emprendedor/postulaciones/${id}`);
-  revalidatePath("/emprendedor");
+  revalidatePath(`/participante/postulaciones/${id}`);
+  revalidatePath("/participante");
   revalidatePath("/evaluador");
   return { ok: true };
 }
