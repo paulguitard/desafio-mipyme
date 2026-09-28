@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
+import { validatePassword } from "@/lib/password-policy";
 import { isStoredFile, parseArchivos } from "@/lib/preguntas";
 import { requireUser } from "@/lib/session";
-import { esRolCatalogoEvaluador, isRole } from "@/lib/roles";
+import { esRolCatalogoEvaluador } from "@/lib/roles";
 import { isEscuela, parseEscuelaInput } from "@/lib/escuelas";
 import { deleteUpload } from "@/lib/storage";
 import { parseUsuariosCsv } from "@/lib/usuarios-csv";
+import { usuarioAltaSchema, usuarioEditarSchema } from "@/lib/validation";
 
 function resolveEscuelaParaRol(
   role: string,
@@ -37,14 +39,18 @@ function resolveEscuelaParaRol(
 
 export async function crearUsuario(formData: FormData) {
   await requireUser("ADMIN");
-  const name = String(formData.get("name") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const password = String(formData.get("password") ?? "");
-  const role = String(formData.get("role") ?? "");
-
-  if (!name || !email || !password || !isRole(role)) {
+  const parsed = usuarioAltaSchema.safeParse({
+    name: String(formData.get("name") ?? ""),
+    email: String(formData.get("email") ?? ""),
+    password: String(formData.get("password") ?? ""),
+    role: String(formData.get("role") ?? ""),
+  });
+  if (!parsed.success) {
     return { error: "Completa nombre, correo, contraseña y rol." };
   }
+  const { name, email, password, role } = parsed.data;
+  const passwordError = validatePassword(password);
+  if (passwordError) return { error: passwordError };
 
   const { escuela, error: escuelaError } = resolveEscuelaParaRol(role, formData.get("escuela")?.toString(), {
     required: true,
@@ -59,7 +65,8 @@ export async function crearUsuario(formData: FormData) {
       name,
       email,
       passwordHash: await hashPassword(password),
-      passwordAssigned: password,
+      passwordAssigned: "",
+      passwordChangedAt: new Date(),
       role,
       escuela,
       origen: "ADMIN",
@@ -67,25 +74,35 @@ export async function crearUsuario(formData: FormData) {
   });
 
   revalidatePath("/admin/usuarios");
-  return { ok: true };
+  return { ok: true, passwordOnce: password };
 }
 
 export async function actualizarUsuario(formData: FormData) {
   await requireUser("ADMIN");
-  const id = String(formData.get("id") ?? "");
-  const name = String(formData.get("name") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const password = String(formData.get("password") ?? "");
-  const role = String(formData.get("role") ?? "");
-
-  if (!id || !name || !email || !isRole(role)) {
+  const parsed = usuarioEditarSchema.safeParse({
+    id: String(formData.get("id") ?? ""),
+    name: String(formData.get("name") ?? ""),
+    email: String(formData.get("email") ?? ""),
+    password: String(formData.get("password") ?? ""),
+    role: String(formData.get("role") ?? ""),
+  });
+  if (!parsed.success) {
     return { error: "Datos incompletos." };
   }
+  const { id, name, email, password, role } = parsed.data;
 
   const { escuela, error: escuelaError } = resolveEscuelaParaRol(role, formData.get("escuela")?.toString(), {
     required: false,
   });
   if (escuelaError) return { error: escuelaError };
+
+  const actual = await prisma.user.findUnique({ where: { id }, select: { role: true } });
+  if (!actual) return { error: "Usuario no encontrado." };
+
+  if (password) {
+    const passwordError = validatePassword(password);
+    if (passwordError) return { error: passwordError };
+  }
 
   const data: {
     name: string;
@@ -94,16 +111,21 @@ export async function actualizarUsuario(formData: FormData) {
     escuela: string | null;
     passwordHash?: string;
     passwordAssigned?: string;
+    passwordChangedAt?: Date;
   } = { name, email, role, escuela };
 
   if (password) {
     data.passwordHash = await hashPassword(password);
-    data.passwordAssigned = password;
+    data.passwordAssigned = "";
+    data.passwordChangedAt = new Date();
+  }
+  if (role !== actual.role) {
+    data.passwordChangedAt = new Date();
   }
 
   await prisma.user.update({ where: { id }, data });
   revalidatePath("/admin/usuarios");
-  return { ok: true };
+  return password ? { ok: true, passwordOnce: password } : { ok: true };
 }
 
 export async function eliminarUsuario(formData: FormData) {
@@ -247,7 +269,8 @@ export async function cargarUsuariosMasivo(formData: FormData) {
       name: usuario.name,
       email: usuario.email,
       passwordHash: hashes[index],
-      passwordAssigned: usuario.password,
+      passwordAssigned: "",
+      passwordChangedAt: new Date(),
       role: usuario.role,
       escuela: usuario.escuela,
       origen: "ADMIN",

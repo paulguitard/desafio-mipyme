@@ -51,11 +51,7 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
           {nombreCaso} · {data.convocatoriaTitulo}
         </h1>
       }
-      headerEvaluacion={
-        esGeneral
-          ? `Observación general de ${asignacion.evaluadorNombre}`
-          : `Revisión de ${asignacion.evaluadorNombre}`
-      }
+      headerEvaluacion={`Revisión de ${asignacion.evaluadorNombre}`}
       headerSupervision={
         data.supervisorNombre
           ? `Tu revisión de la evaluación de ${asignacion.evaluadorNombre}`

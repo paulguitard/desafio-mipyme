@@ -15,22 +15,34 @@ export const authConfig = {
       if (user) {
         token.id = user.id;
         token.role = normalizeRole((user as { role?: string }).role ?? "") ?? undefined;
+        const stamped = (user as { passwordChangedAt?: string }).passwordChangedAt;
+        if (stamped) token.pwc = stamped;
       }
-      token.role = normalizeRole(String(token.role ?? "")) ?? token.role;
+      token.role = normalizeRole(String(token.role ?? "")) ?? undefined;
       return token;
     },
     session({ session, token }) {
       if (session.user) {
-        session.user.id = (token.id as string) ?? "";
-        session.user.role = normalizeRole((token.role as string) ?? "") ?? "EMPRENDEDOR";
+        const role = normalizeRole((token.role as string) ?? "");
+        session.user.id = role ? ((token.id as string) ?? "") : "";
+        if (role) session.user.role = role;
         if (typeof token.name === "string") session.user.name = token.name;
         if (typeof token.email === "string") session.user.email = token.email;
+        if (typeof token.pwc === "string") session.user.passwordChangedAt = token.pwc;
       }
       return session;
     },
     authorized({ auth, request }) {
       const pathname = request.nextUrl.pathname;
       const role = normalizeRole((auth?.user?.role as string) ?? "");
+      if (!auth?.user?.id) {
+        const guarded =
+          pathname.startsWith("/admin") ||
+          pathname.startsWith("/evaluador") ||
+          pathname.startsWith("/participante") ||
+          pathname.startsWith("/emprendedor");
+        if (guarded) return false;
+      }
 
       const needsAdmin = pathname.startsWith("/admin");
       const needsEval = pathname.startsWith("/evaluador");

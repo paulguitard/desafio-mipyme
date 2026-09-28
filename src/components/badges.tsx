@@ -29,9 +29,9 @@ export function BadgePostulacion({ estado }: { estado: string }) {
   return <span className={`badge ${cls}`}>{label}</span>;
 }
 
-export function BadgeAsignacion({ estado }: { estado: string }) {
+export function BadgeAsignacion({ estado, etiqueta }: { estado: string; etiqueta?: string }) {
   const key = estado as EstadoAsignacion;
-  const label = ESTADO_ASIGNACION_LABEL[key] ?? estado;
+  const label = etiqueta ?? ESTADO_ASIGNACION_LABEL[key] ?? estado;
   const cls = ASIGNACION_CLASS[key] ?? "bg-slate-100";
   return <span className={`badge ${cls}`}>{label}</span>;
 }

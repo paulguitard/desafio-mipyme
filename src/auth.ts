@@ -80,6 +80,7 @@ export const {
           name: user.name,
           email: user.email,
           role,
+          passwordChangedAt: user.passwordChangedAt.toISOString(),
         };
       },
     }),
@@ -110,10 +111,13 @@ export const {
         if (email) {
           const dbUser = await prisma.user.findUnique({ where: { email } });
           if (dbUser) {
+            const role = normalizeRole(dbUser.role);
+            if (!role) return {};
             token.id = dbUser.id;
-            token.role = normalizeRole(dbUser.role) ?? "EMPRENDEDOR";
+            token.role = role;
             token.email = dbUser.email;
             token.name = dbUser.name;
+            token.pwc = dbUser.passwordChangedAt.toISOString();
           }
         }
         return token;
@@ -123,6 +127,8 @@ export const {
         token.id = user.id;
         token.role =
           normalizeRole((user as { role?: string }).role ?? "") ?? undefined;
+        const stamped = (user as { passwordChangedAt?: string }).passwordChangedAt;
+        if (stamped) token.pwc = stamped;
         if (user.name) token.name = user.name;
         if (user.email) token.email = user.email;
       }
@@ -134,7 +140,23 @@ export const {
         }
       }
 
-      token.role = normalizeRole(String(token.role ?? "")) ?? token.role;
+      if (token.id) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: String(token.id) },
+          select: { role: true, name: true, email: true, passwordChangedAt: true },
+        });
+        if (!dbUser) return {};
+        const pwc = dbUser.passwordChangedAt.toISOString();
+        if (token.pwc && token.pwc !== pwc) return {};
+        const role = normalizeRole(dbUser.role);
+        if (!role) return {};
+        token.role = role;
+        token.pwc = pwc;
+        token.name = dbUser.name;
+        token.email = dbUser.email;
+      }
+
+      token.role = normalizeRole(String(token.role ?? "")) ?? undefined;
       return token;
     },
   },

@@ -46,6 +46,9 @@ export async function prepareUploadBuffer(
   let buffer = Buffer.from(await file.arrayBuffer());
 
   if (kind === "file") {
+    if (mimeType === "image/svg+xml" || originalName.toLowerCase().endsWith(".svg")) {
+      throw new Error("No se permiten archivos SVG.");
+    }
     const maxBytes = options?.maxFileBytes ?? MAX_FILE_BYTES;
     if (buffer.length > maxBytes) {
       const mb = Math.round((maxBytes / (1024 * 1024)) * 10) / 10;
@@ -54,14 +57,16 @@ export async function prepareUploadBuffer(
     return { originalName, mimeType, buffer };
   }
 
+  if (mimeType === "image/svg+xml" || originalName.toLowerCase().endsWith(".svg")) {
+    throw new Error("No se permiten imágenes SVG.");
+  }
   if (buffer.length > MAX_IMAGE_INPUT_BYTES) {
     throw new Error("La imagen no puede superar 10 MB antes de comprimirse.");
   }
-  if (buffer.length > MAX_IMAGE_BYTES) {
-    const compressed = await compressImageToMaxBytes(buffer, MAX_IMAGE_BYTES);
-    buffer = Buffer.from(compressed.buffer);
-    mimeType = compressed.mimeType;
-    originalName = withExtension(originalName, compressed.ext);
-  }
-  return { originalName, mimeType, buffer };
+  const compressed = await compressImageToMaxBytes(buffer, MAX_IMAGE_BYTES);
+  return {
+    originalName: withExtension(originalName, compressed.ext),
+    mimeType: compressed.mimeType,
+    buffer: Buffer.from(compressed.buffer),
+  };
 }

@@ -19,12 +19,26 @@ import {
 } from "@/actions/convocatorias";
 import { FichaDetalleAdmin } from "@/components/ficha-detalle-admin";
 import { Modal } from "@/components/modal";
+import { PoolPersonaModal } from "@/components/pool-persona-modal";
+import type { CasoPoolResumen } from "@/lib/convocatoria-admin-data";
 import type { DetalleFichaAdmin } from "@/lib/convocatoria-admin-data";
 import { rondaRespuestaEmprendedor } from "@/lib/estado";
 import { parseValor } from "@/lib/preguntas";
+import { ESCUELAS } from "@/lib/escuelas";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
+import {
+  contiene,
+  estadoAsignacionFicha,
+  estadoRespuestaFicha,
+  estadoSupervisionFicha,
+  etiquetaEstadoAsignacionFicha,
+  etiquetaEstadoSupervisionFicha,
+  type EstadoEvaluacionFicha,
+  type EstadoRespuestaFicha,
+  type EstadoSupervisionFicha,
+} from "@/lib/convocatoria-evaluacion-filtros";
 
-type Evaluador = { id: string; name: string; email: string };
+type Evaluador = { id: string; name: string; email: string; escuela: string | null };
 
 type PoolItem = {
   evaluadorId: string;
@@ -34,6 +48,9 @@ type PoolItem = {
   asignadas: number;
   revisadas: number;
   finalizadas: number;
+  casosAsignados: CasoPoolResumen[];
+  casosObservados: CasoPoolResumen[];
+  casosFinalizados: CasoPoolResumen[];
 };
 
 type Asignacion = {
@@ -66,92 +83,21 @@ type PostulacionItem = {
   supervision?: SupervisionFicha | null;
 };
 
-type EstadoRespuestaFicha = "pendiente" | "observaciones" | "completa";
-
 function textoPlano(valor: unknown) {
   if (Array.isArray(valor)) return valor.join(" ");
   if (valor == null) return "";
   return String(valor);
 }
 
-function contiene(haystack: string, needle: string) {
-  const q = needle.trim().toLocaleLowerCase("es-CL");
-  if (!q) return true;
-  return haystack.toLocaleLowerCase("es-CL").includes(q);
-}
-
-function respuestaConValor(valor: string) {
-  const parsed = parseValor(valor);
-  if (parsed == null) return false;
-  if (Array.isArray(parsed)) return parsed.some((item) => String(item).trim().length > 0);
-  if (typeof parsed === "object") return Object.keys(parsed as object).length > 0;
-  return String(parsed).trim().length > 0;
-}
-
-function estadoRespuestaFicha(
-  postulacion: PostulacionItem,
-  preguntas: PreguntaFiltro[],
-): EstadoRespuestaFicha {
-  if (
-    postulacion.estado === "CON_OBSERVACIONES" ||
-    postulacion.asignaciones.some((item) => item.estado === "CON_OBSERVACIONES")
-  ) {
-    return "observaciones";
-  }
-
-  const porPregunta = new Map(
-    postulacion.respuestas.map((item) => [item.preguntaId, item.valor] as const),
-  );
-  const respondidas = preguntas.filter((pregunta) =>
-    respuestaConValor(porPregunta.get(pregunta.id) ?? ""),
-  ).length;
-
-  if (respondidas === 0) return "pendiente";
-
-  const obligatorias = preguntas.filter((pregunta) => pregunta.obligatoria);
-  const base = obligatorias.length > 0 ? obligatorias : preguntas;
-  const completa =
-    Boolean(postulacion.enviadaAt) ||
-    base.every((pregunta) => respuestaConValor(porPregunta.get(pregunta.id) ?? ""));
-
-  return completa ? "completa" : "pendiente";
-}
-
 function etiquetaEstadoRespuesta(estado: EstadoRespuestaFicha) {
   if (estado === "observaciones") return "Respondiendo observaciones";
+  if (estado === "esperando-evaluacion") return "Esperando evaluación";
   if (estado === "completa") return "Completa";
   return "Pendiente";
 }
 
-function claseEstadoAsignacion(estado: string) {
-  if (estado === "FINALIZADA") return "eval-avatar-finalizada";
-  if (
-    estado === "CON_OBSERVACIONES" ||
-    estado === "REPARADA" ||
-    estado === "DEVUELTA_SUPERVISOR"
-  ) {
-    return "eval-avatar-observada";
-  }
-  return "eval-avatar-pendiente";
-}
-
-function estadoAsignacionFicha(estado: string) {
-  if (estado === "FINALIZADA") return "finalizada";
-  if (
-    estado === "CON_OBSERVACIONES" ||
-    estado === "REPARADA" ||
-    estado === "DEVUELTA_SUPERVISOR"
-  ) {
-    return "observada";
-  }
-  return "pendiente";
-}
-
-function etiquetaEstadoAsignacion(estado: string) {
-  const key = estadoAsignacionFicha(estado);
-  if (key === "finalizada") return "Finalizada";
-  if (key === "observada") return "Observada";
-  return "Pendiente";
+function claseAvatarEstado(estado: EstadoEvaluacionFicha | EstadoSupervisionFicha) {
+  return `eval-avatar-${estado}`;
 }
 
 function IconoAlerta() {
@@ -187,10 +133,21 @@ function IconoCheck() {
   );
 }
 
-function IconoEstadoEvaluacion(estado: string) {
-  const key = estadoAsignacionFicha(estado);
-  if (key === "finalizada") return <IconoCheck />;
-  if (key === "observada") return <IconoAmpolleta />;
+function IconoReloj() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm.8 3.2h-1.6v5.1l3.9 2.3.8-1.3-3.1-1.8V7.2z"
+      />
+    </svg>
+  );
+}
+
+function IconoEstadoFicha(estado: EstadoEvaluacionFicha | EstadoSupervisionFicha) {
+  if (estado === "finalizada") return <IconoCheck />;
+  if (estado === "esperando-respuesta") return <IconoAmpolleta />;
+  if (estado === "esperando-evaluacion" || estado === "esperando-supervision") return <IconoReloj />;
   return <IconoAlerta />;
 }
 
@@ -222,25 +179,6 @@ function IconoBasurero() {
   );
 }
 
-function estadoSupervisionFicha(postulacion: PostulacionItem) {
-  if (postulacion.asignaciones.some((item) => item.estado === "DEVUELTA_SUPERVISOR")) {
-    return "observada";
-  }
-  if (
-    postulacion.asignaciones.length > 0 &&
-    postulacion.asignaciones.every((item) => item.estado === "FINALIZADA")
-  ) {
-    return "finalizada";
-  }
-  return "pendiente";
-}
-
-function etiquetaEstadoSupervision(estado: string) {
-  if (estado === "finalizada") return "Finalizada";
-  if (estado === "observada") return "Observada";
-  return "Pendiente";
-}
-
 const DRAG_EVALUADOR = "application/x-evaluador-id";
 const DRAG_SUPERVISOR = "application/x-supervisor-id";
 
@@ -254,6 +192,9 @@ export function ConvocatoriaEvaluacion({
   postulaciones,
   poolSupervisores = [],
   supervisoresDisponibles = [],
+  page = 1,
+  pageSize = 40,
+  totalPostulaciones,
   onMutated,
 }: {
   convocatoriaId: string;
@@ -265,6 +206,9 @@ export function ConvocatoriaEvaluacion({
   postulaciones: PostulacionItem[];
   poolSupervisores?: PoolItem[];
   supervisoresDisponibles?: Evaluador[];
+  page?: number;
+  pageSize?: number;
+  totalPostulaciones?: number;
   onMutated?: () => Promise<void> | void;
 }) {
   const [error, setError] = useState<string | null>(null);
@@ -276,6 +220,7 @@ export function ConvocatoriaEvaluacion({
   const [agregarMensaje, setAgregarMensaje] = useState<string | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroEscuela, setFiltroEscuela] = useState("");
   const [filtroEmprendedor, setFiltroEmprendedor] = useState("");
   const [filtroCorreo, setFiltroCorreo] = useState("");
   const [filtroPreguntaId, setFiltroPreguntaId] = useState("");
@@ -298,13 +243,19 @@ export function ConvocatoriaEvaluacion({
   const [detalleLoadingId, setDetalleLoadingId] = useState<string | null>(null);
   const [detalleError, setDetalleError] = useState<string | null>(null);
   const [detalle, setDetalle] = useState<DetalleFichaAdmin | null>(null);
+  const [poolModalId, setPoolModalId] = useState<string | null>(null);
   const inputCasosRef = useRef<HTMLInputElement>(null);
   const cancelandoCasosRef = useRef(false);
+  const arrastrandoPoolRef = useRef(false);
   const abierta = estadoConvocatoria === "ABIERTA";
   const esSupervisores = panelLateral === "supervisores";
   const poolActivo = esSupervisores ? poolSupervisores : pool;
   const disponiblesActivos = esSupervisores ? supervisoresDisponibles : evaluadoresDisponibles;
   const poolIds = useMemo(() => new Set(poolActivo.map((item) => item.evaluadorId)), [poolActivo]);
+  const poolModalItem =
+    pool.find((item) => item.evaluadorId === poolModalId) ??
+    poolSupervisores.find((item) => item.evaluadorId === poolModalId) ??
+    null;
   const respuestas = useMemo(() => postulaciones, [postulaciones]);
 
   const respuestasFiltradas = useMemo(() => {
@@ -339,7 +290,7 @@ export function ConvocatoriaEvaluacion({
         }
         if (
           filtroEstadoSupervision &&
-          estadoSupervisionFicha(postulacion) !== filtroEstadoSupervision
+          estadoSupervisionFicha(postulacion.asignaciones) !== filtroEstadoSupervision
         ) {
           return false;
         }
@@ -364,9 +315,16 @@ export function ConvocatoriaEvaluacion({
 
   const evaluadoresFiltrados = useMemo(() => {
     const q = filtroNombre.trim().toLocaleLowerCase("es-CL");
-    if (!q) return disponiblesActivos;
-    return disponiblesActivos.filter((item) => item.name.toLocaleLowerCase("es-CL").includes(q));
-  }, [disponiblesActivos, filtroNombre]);
+    return disponiblesActivos.filter((item) => {
+      if (q && !item.name.toLocaleLowerCase("es-CL").includes(q)) return false;
+      if (filtroEscuela === "__none__") {
+        if (item.escuela) return false;
+      } else if (filtroEscuela && item.escuela !== filtroEscuela) {
+        return false;
+      }
+      return true;
+    });
+  }, [disponiblesActivos, filtroNombre, filtroEscuela]);
 
   const paraAgregar = useMemo(
     () => evaluadoresFiltrados.filter((item) => !poolIds.has(item.id)),
@@ -566,7 +524,7 @@ export function ConvocatoriaEvaluacion({
   return (
     <div className="eval-panel eval-shell-open">
       <div className="eval-shell">
-      <aside className="eval-side" aria-label="Evaluadores y supervisores de la convocatoria">
+      <aside className="eval-side" aria-label="Evaluadores y supervisores de la mentoría">
         <div className="eval-side-header">
           <h3 className="text-lg font-semibold text-navy">
             {esSupervisores ? `Supervisores (${poolActivo.length})` : `Evaluadores (${poolActivo.length})`}
@@ -576,6 +534,7 @@ export function ConvocatoriaEvaluacion({
           <button
             type="button"
             className={`eval-side-tab${esSupervisores ? "" : " is-active"}`}
+            data-tour="pool-evaluadores"
             onClick={() => {
               setPanelLateral("evaluadores");
               setSeleccionados([]);
@@ -586,6 +545,7 @@ export function ConvocatoriaEvaluacion({
           <button
             type="button"
             className={`eval-side-tab${esSupervisores ? " is-active" : ""}`}
+            data-tour="pool-supervisores"
             onClick={() => {
               setPanelLateral("supervisores");
               setSeleccionados([]);
@@ -602,29 +562,47 @@ export function ConvocatoriaEvaluacion({
           {poolActivo.length === 0 ? (
             <p className="text-muted">
               {esSupervisores
-                ? "Todavía no hay supervisores asignados a esta convocatoria."
-                : "Todavía no hay evaluadores asignados a esta convocatoria."}
+                ? "Todavía no hay supervisores asignados a esta mentoría."
+                : "Todavía no hay evaluadores asignados a esta mentoría."}
             </p>
           ) : (
             <ul className="space-y-2">
               {poolActivo.map((item) => (
                 <li
                   key={item.evaluadorId}
-                  className={`eval-side-item${abierta ? " eval-side-item-draggable" : ""}`}
+                  className={`eval-side-item eval-side-item-clickable${abierta ? " eval-side-item-draggable" : ""}`}
                   draggable={abierta}
+                  onClick={() => {
+                    if (arrastrandoPoolRef.current) {
+                      arrastrandoPoolRef.current = false;
+                      return;
+                    }
+                    setPoolModalId(item.evaluadorId);
+                  }}
                   onDragStart={(event) => {
+                    arrastrandoPoolRef.current = true;
                     event.dataTransfer.setData(
                       esSupervisores ? DRAG_SUPERVISOR : DRAG_EVALUADOR,
                       item.evaluadorId,
                     );
                     event.dataTransfer.effectAllowed = "copy";
                   }}
-                  onDragEnd={() => setDropTargetId(null)}
-                  title={abierta ? "Arrastra hacia una respuesta para asignar" : undefined}
+                  onDragEnd={() => {
+                    setDropTargetId(null);
+                    window.setTimeout(() => {
+                      arrastrandoPoolRef.current = false;
+                    }, 0);
+                  }}
+                  title={
+                    abierta
+                      ? "Clic para ver casos y cupo. Arrastra hacia una respuesta para asignar."
+                      : "Clic para ver casos y cupo."
+                  }
                 >
                   <div className="eval-side-item-top">
                     <p className="eval-side-item-name">{item.evaluador.name}</p>
                     <form
+                      onClick={(event) => event.stopPropagation()}
                       action={async (formData) => {
                         setPoolError(null);
                         setPoolMensaje(null);
@@ -655,7 +633,10 @@ export function ConvocatoriaEvaluacion({
                   </div>
                   <div className="eval-side-metrics" aria-label="Resumen">
                     <span>
-                      <strong>{item.asignadas}</strong> asignadas
+                      <strong>
+                        {item.maxEvaluaciones > 0 ? `${item.asignadas}/${item.maxEvaluaciones}` : item.asignadas}
+                      </strong>{" "}
+                      asignadas
                     </span>
                     <span>
                       <strong>{item.revisadas}</strong> observadas
@@ -757,6 +738,7 @@ export function ConvocatoriaEvaluacion({
               className="btn btn-sm btn-navy w-full"
               type="submit"
               disabled={!abierta || poolActivo.length === 0}
+              data-tour="asignacion-automatica"
             >
               Asignación automática
             </button>
@@ -765,6 +747,7 @@ export function ConvocatoriaEvaluacion({
           <button
             className="btn btn-sm btn-primary w-full"
             type="button"
+            data-tour="pool-incorporar"
             onClick={() => {
               setAgregarOpen(true);
               setAgregarError(null);
@@ -777,7 +760,7 @@ export function ConvocatoriaEvaluacion({
       </aside>
 
 
-      <div className="eval-main" aria-label="Respuestas de la convocatoria">
+      <div className="eval-main" aria-label="Respuestas de la mentoría" data-tour="lista-casos">
         <div className="respuestas-filtros space-y-3">
           <div
             className={`eval-filtros-row${filtroPreguntaId ? " has-contiene" : ""}`}
@@ -844,6 +827,7 @@ export function ConvocatoriaEvaluacion({
                 <option value="">Todos</option>
                 <option value="pendiente">Pendiente</option>
                 <option value="observaciones">Respondiendo observaciones</option>
+                <option value="esperando-evaluacion">Esperando evaluación</option>
                 <option value="completa">Completa</option>
               </select>
             </div>
@@ -857,7 +841,8 @@ export function ConvocatoriaEvaluacion({
               >
                 <option value="">Todos</option>
                 <option value="pendiente">Pendiente</option>
-                <option value="observada">Observada</option>
+                <option value="esperando-respuesta">Esperando respuesta</option>
+                <option value="esperando-supervision">Esperando supervisión</option>
                 <option value="finalizada">Finalizada</option>
               </select>
             </div>
@@ -887,7 +872,8 @@ export function ConvocatoriaEvaluacion({
               >
                 <option value="">Todos</option>
                 <option value="pendiente">Pendiente</option>
-                <option value="observada">Observada</option>
+                <option value="esperando-respuesta">Esperando respuesta</option>
+                <option value="esperando-evaluacion">Esperando evaluación</option>
                 <option value="finalizada">Finalizada</option>
               </select>
             </div>
@@ -914,6 +900,24 @@ export function ConvocatoriaEvaluacion({
         </div>
 
         <div className="respuestas-lista space-y-3">
+          {typeof totalPostulaciones === "number" && totalPostulaciones > pageSize ? (
+            <p className="text-sm text-muted">
+              Página {page} de {Math.ceil(totalPostulaciones / pageSize)} ({totalPostulaciones} casos).{" "}
+              {page > 1 ? (
+                <a className="text-accent underline" href={`?page=${page - 1}`}>
+                  Anterior
+                </a>
+              ) : null}
+              {page * pageSize < totalPostulaciones ? (
+                <>
+                  {page > 1 ? " · " : null}
+                  <a className="text-accent underline" href={`?page=${page + 1}`}>
+                    Siguiente
+                  </a>
+                </>
+              ) : null}
+            </p>
+          ) : null}
           {respuestasFiltradas.length > 0 ? (
             <div className="eval-lista-cabecera" aria-hidden="true">
               <span>Estado respuestas</span>
@@ -925,7 +929,7 @@ export function ConvocatoriaEvaluacion({
             </div>
           ) : null}
           {respuestas.length === 0 ? (
-            <p className="text-muted">Todavía no hay respuestas en esta convocatoria.</p>
+            <p className="text-muted">Todavía no hay respuestas en esta mentoría.</p>
           ) : respuestasFiltradas.length === 0 ? (
             <p className="text-muted">Ninguna ficha coincide con los filtros.</p>
           ) : null}
@@ -1014,7 +1018,7 @@ export function ConvocatoriaEvaluacion({
                   {postulacion.asignaciones.length === 0 ? (
                     <p className="eval-ficha-empty">
                       {estadoRespuesta === "observaciones"
-                        ? "Respondiendo observaciones"
+                        ? "Esperando respuesta"
                         : estadoRespuesta === "pendiente"
                           ? "Respuesta pendiente"
                           : puedeAsignarEval
@@ -1028,17 +1032,15 @@ export function ConvocatoriaEvaluacion({
                         return (
                           <li
                             key={`${postulacion.id}-${asignacion.evaluadorId}`}
-                            className={`eval-avatar ${claseEstadoAsignacion(asignacion.estado)}`}
-                            title={`${asignacion.evaluadorNombre} · ${etiquetaEstadoAsignacion(
-                              asignacion.estado,
+                            className={`eval-avatar ${claseAvatarEstado(estadoEval)}`}
+                            title={`${asignacion.evaluadorNombre} · ${etiquetaEstadoAsignacionFicha(
+                              estadoEval,
                             )}`}
                           >
                             <span className={`eval-avatar-pill is-${estadoEval}`}>
-                              {etiquetaEstadoAsignacion(asignacion.estado)}
+                              {etiquetaEstadoAsignacionFicha(estadoEval)}
                             </span>
-                            <span className="eval-avatar-icon">
-                              {IconoEstadoEvaluacion(asignacion.estado)}
-                            </span>
+                            <span className="eval-avatar-icon">{IconoEstadoFicha(estadoEval)}</span>
                             <span className="eval-avatar-name">{asignacion.evaluadorNombre}</span>
                           </li>
                         );
@@ -1054,24 +1056,16 @@ export function ConvocatoriaEvaluacion({
                   ) : (
                     <ul className="eval-ficha-avatars">
                       {(() => {
-                        const estadoSup = estadoSupervisionFicha(postulacion);
-                        const estadoFake =
-                          estadoSup === "finalizada"
-                            ? "FINALIZADA"
-                            : estadoSup === "observada"
-                              ? "CON_OBSERVACIONES"
-                              : "PENDIENTE";
+                        const estadoSup = estadoSupervisionFicha(postulacion.asignaciones);
                         return (
                           <li
-                            className={`eval-avatar ${claseEstadoAsignacion(estadoFake)}`}
-                            title={`${postulacion.supervision.supervisorNombre} · ${etiquetaEstadoSupervision(estadoSup)}`}
+                            className={`eval-avatar ${claseAvatarEstado(estadoSup)}`}
+                            title={`${postulacion.supervision.supervisorNombre} · ${etiquetaEstadoSupervisionFicha(estadoSup)}`}
                           >
                             <span className={`eval-avatar-pill is-${estadoSup}`}>
-                              {etiquetaEstadoSupervision(estadoSup)}
+                              {etiquetaEstadoSupervisionFicha(estadoSup)}
                             </span>
-                            <span className="eval-avatar-icon">
-                              {IconoEstadoEvaluacion(estadoFake)}
-                            </span>
+                            <span className="eval-avatar-icon">{IconoEstadoFicha(estadoSup)}</span>
                             <span className="eval-avatar-name">
                               {postulacion.supervision.supervisorNombre}
                             </span>
@@ -1115,26 +1109,46 @@ export function ConvocatoriaEvaluacion({
                 setAgregarMensaje(null);
                 setSeleccionados([]);
                 setFiltroNombre("");
+                setFiltroEscuela("");
               }}
             >
               <div className="space-y-4">
                 <p className="text-muted">
                   {esSupervisores
-                    ? "Elige supervisores registrados para sumarlos a esta convocatoria. Puedes agregar uno o varios a la vez."
-                    : "Elige evaluadores registrados para sumarlos a esta convocatoria. Puedes agregar uno o varios a la vez."}
+                    ? "Elige supervisores registrados para sumarlos a esta mentoría. Puedes agregar uno o varios a la vez."
+                    : "Elige evaluadores registrados para sumarlos a esta mentoría. Puedes agregar uno o varios a la vez."}
                 </p>
                 {agregarError ? <p className="text-danger">{agregarError}</p> : null}
                 {agregarMensaje ? <p className="font-semibold text-navy">{agregarMensaje}</p> : null}
 
-                <div className="field">
-                  <label htmlFor="filtro-evaluador-nombre">Filtrar por nombre</label>
-                  <input
-                    className="input"
-                    id="filtro-evaluador-nombre"
-                    value={filtroNombre}
-                    onChange={(event) => setFiltroNombre(event.target.value)}
-                    placeholder="Buscar por nombre"
-                  />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="field">
+                    <label htmlFor="filtro-evaluador-nombre">Filtrar por nombre</label>
+                    <input
+                      className="input"
+                      id="filtro-evaluador-nombre"
+                      value={filtroNombre}
+                      onChange={(event) => setFiltroNombre(event.target.value)}
+                      placeholder="Buscar por nombre"
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="filtro-evaluador-escuela">Filtrar por escuela</label>
+                    <select
+                      className="input"
+                      id="filtro-evaluador-escuela"
+                      value={filtroEscuela}
+                      onChange={(event) => setFiltroEscuela(event.target.value)}
+                    >
+                      <option value="">Todas</option>
+                      {ESCUELAS.map((escuela) => (
+                        <option key={escuela} value={escuela}>
+                          {escuela}
+                        </option>
+                      ))}
+                      <option value="__none__">Sin escuela</option>
+                    </select>
+                  </div>
                 </div>
 
                 {disponiblesActivos.length === 0 ? (
@@ -1146,8 +1160,8 @@ export function ConvocatoriaEvaluacion({
                 ) : evaluadoresFiltrados.length === 0 ? (
                   <p className="text-muted">
                     {esSupervisores
-                      ? "Ningún supervisor coincide con el filtro."
-                      : "Ningún evaluador coincide con el filtro."}
+                      ? "Ningún supervisor coincide con los filtros."
+                      : "Ningún evaluador coincide con los filtros."}
                   </p>
                 ) : (
                   <>
@@ -1184,8 +1198,11 @@ export function ConvocatoriaEvaluacion({
                             <th scope="col" className="eval-add-email">
                               Correo
                             </th>
+                            <th scope="col" className="eval-add-escuela">
+                              Escuela
+                            </th>
                             <th scope="col" className="eval-add-status">
-                              En convocatoria
+                              En mentoría
                             </th>
                             <th scope="col" className="eval-add-action">
                               Acción
@@ -1213,12 +1230,15 @@ export function ConvocatoriaEvaluacion({
                                 <td className="eval-add-email">
                                   <span className="text-muted">{evaluador.email}</span>
                                 </td>
+                                <td className="eval-add-escuela">
+                                  <span className="text-muted">{evaluador.escuela ?? "—"}</span>
+                                </td>
                                 <td className="eval-add-status">
                                   {yaEnPool ? (
                                     <span
                                       className="eval-status-icon eval-status-yes"
-                                      title="Ya está en la convocatoria"
-                                      aria-label="Ya está en la convocatoria"
+                                      title="Ya está en la mentoría"
+                                      aria-label="Ya está en la mentoría"
                                     >
                                       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                                         <path
@@ -1230,8 +1250,8 @@ export function ConvocatoriaEvaluacion({
                                   ) : (
                                     <span
                                       className="eval-status-icon eval-status-no"
-                                      title="No está en la convocatoria"
-                                      aria-label="No está en la convocatoria"
+                                      title="No está en la mentoría"
+                                      aria-label="No está en la mentoría"
                                     >
                                       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                                         <path
@@ -1262,6 +1282,22 @@ export function ConvocatoriaEvaluacion({
                 )}
               </div>
             </Modal>,
+            document.body,
+          )
+        : null}
+
+      {portalListo
+        ? createPortal(
+            <PoolPersonaModal
+              open={Boolean(poolModalId)}
+              item={poolModalItem}
+              convocatoriaId={convocatoriaId}
+              esSupervisor={
+                Boolean(poolModalId) && poolSupervisores.some((item) => item.evaluadorId === poolModalId)
+              }
+              onClose={() => setPoolModalId(null)}
+              onSaved={onMutated}
+            />,
             document.body,
           )
         : null}

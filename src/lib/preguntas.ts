@@ -1,3 +1,5 @@
+import { appUploadUrl } from "@/lib/storage/public-id";
+
 export const TIPOS_PREGUNTA = [
   "texto_corto",
   "texto_largo",
@@ -361,10 +363,8 @@ export function serializeValor(value: unknown): string {
   return JSON.stringify(value ?? "");
 }
 
-export function publicUploadUrl(file: StoredFile) {
-  if (file.url) return file.url;
-  if (/^https?:\/\//i.test(file.relativePath)) return file.relativePath;
-  return `/api/archivos/${encodeURIComponent(file.relativePath)}`;
+export function publicUploadUrl(file: StoredFile, options?: { width?: number }) {
+  return appUploadUrl(file, options);
 }
 
 export function tipoTieneOpciones(tipo: TipoPregunta): boolean {

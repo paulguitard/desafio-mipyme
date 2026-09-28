@@ -85,6 +85,7 @@ export function PerfilForm({
   const [docError, setDocError] = useState<string | null>(null);
 
   const esParticipante = Boolean(participante);
+  const [pestana, setPestana] = useState<"datos" | "formalizacion">("datos");
   const [rutDisplay, setRutDisplay] = useState(() =>
     participante?.rutPersonal ? formatearRut(participante.rutPersonal) : "",
   );
@@ -152,9 +153,49 @@ export function PerfilForm({
     router.refresh();
   }
 
+  const pestanas = [
+    { id: "datos" as const, label: "Datos personales" },
+    { id: "formalizacion" as const, label: "Formalización Empresa" },
+  ];
+
   return (
     <div className="grid gap-6">
-      <form className="card overflow-hidden" action={onSubmit}>
+      {esParticipante ? (
+        <div
+          className="flex flex-wrap gap-2"
+          role="tablist"
+          aria-label="Secciones de Mi perfil"
+        >
+          {pestanas.map((item) => {
+            const activa = pestana === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                id={`perfil-tab-${item.id}`}
+                aria-selected={activa}
+                aria-controls={`perfil-panel-${item.id}`}
+                tabIndex={activa ? 0 : -1}
+                className={`btn btn-sm ${activa ? "btn-navy" : "btn-secondary"}`}
+                onClick={() => setPestana(item.id)}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <form
+        className="card overflow-hidden"
+        data-tour="perfil-datos"
+        action={onSubmit}
+        hidden={esParticipante && pestana !== "datos"}
+        id="perfil-panel-datos"
+        role={esParticipante ? "tabpanel" : undefined}
+        aria-labelledby={esParticipante ? "perfil-tab-datos" : undefined}
+      >
         <div className="border-b border-border px-6 py-4">
           <p className="text-sm font-bold uppercase tracking-[0.12em] text-muted">Cuenta</p>
           <p className="mt-1 text-lg font-semibold text-navy">Datos personales</p>
@@ -263,20 +304,31 @@ export function PerfilForm({
             {error ? <p className="font-semibold text-danger">{error}</p> : null}
             {ok && !error ? <p className="font-semibold text-navy">Cambios guardados.</p> : null}
           </div>
-          <button className="btn btn-sm btn-primary" type="submit" disabled={saving}>
+          <button
+            className="btn btn-sm btn-primary"
+            type="submit"
+            disabled={saving}
+            data-tour="perfil-guardar"
+          >
             {saving ? "Guardando…" : "Guardar cambios"}
           </button>
         </div>
       </form>
 
       {esParticipante ? (
-        <section className="card overflow-hidden">
+        <section
+          className="card overflow-hidden"
+          hidden={pestana !== "formalizacion"}
+          id="perfil-panel-formalizacion"
+          role="tabpanel"
+          aria-labelledby="perfil-tab-formalizacion"
+        >
           <div className="border-b border-border px-6 py-4">
             <p className="text-sm font-bold uppercase tracking-[0.12em] text-muted">
               Formalización
             </p>
             <p className="mt-1 text-lg font-semibold text-navy">
-              Documentos Formalización Empresa
+              Formalización Empresa
             </p>
             <p className="mt-2 text-sm text-muted">
               Según las bases, para avanzar y postular al premio, tu empresa o emprendimiento debe

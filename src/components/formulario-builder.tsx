@@ -458,7 +458,7 @@ export function FormularioBuilder({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <BotonAtras href="/admin/formularios" />
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1" data-tour="formulario-titulo">
               <CampoEditable
                 editing={editandoTitulo}
                 guardando={guardandoCampo === "titulo"}
@@ -492,7 +492,13 @@ export function FormularioBuilder({
             </div>
           </div>
           {esNuevo ? (
-            <button className="btn btn-sm btn-primary shrink-0" type="button" disabled={guardando} onClick={onGuardarNuevo}>
+            <button
+              className="btn btn-sm btn-primary shrink-0"
+              type="button"
+              disabled={guardando}
+              onClick={onGuardarNuevo}
+              data-tour="formulario-guardar"
+            >
               {guardando ? "Guardando…" : "Guardar formulario"}
             </button>
           ) : null}
@@ -518,7 +524,7 @@ export function FormularioBuilder({
           </div>
           {!puedeCambiarModo ? (
             <p className="text-right text-sm text-muted">
-              El tipo queda fijo porque este formulario ya tiene convocatorias asociadas.
+              El tipo queda fijo porque este formulario ya tiene mentorías asociadas.
             </p>
           ) : null}
         </div>
@@ -625,6 +631,7 @@ export function FormularioBuilder({
           <button
             className="btn btn-secondary w-full"
             type="button"
+            data-tour="formulario-agregar"
             onClick={() => {
               setEditandoId(null);
               setError(null);

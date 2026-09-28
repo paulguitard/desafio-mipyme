@@ -1,9 +1,9 @@
 import { ConvocatoriasAdmin } from "@/components/convocatorias-admin";
 import { prisma } from "@/lib/db";
-import { parseImagenConvocatoria } from "@/lib/convocatoria";
+import { parseImagenConvocatoria, parseImagenPosicion } from "@/lib/convocatoria";
 import { publicUploadUrl } from "@/lib/preguntas";
 
-export default async function ConvocatoriasPage() {
+export default async function MentoriasPage() {
   const [convocatorias, formularios] = await Promise.all([
     prisma.convocatoria.findMany({
       orderBy: { createdAt: "desc" },
@@ -29,7 +29,8 @@ export default async function ConvocatoriasPage() {
           postulaciones: item._count.postulaciones,
           fechaInicio: item.fechaInicio?.toISOString() ?? null,
           fechaCierre: item.fechaCierre?.toISOString() ?? null,
-          imagenUrl: imagen ? publicUploadUrl(imagen) : null,
+          imagenUrl: imagen ? publicUploadUrl(imagen, { width: 400 }) : null,
+          imagenPos: parseImagenPosicion(item.imagen),
         };
       })}
       formularios={formularios.map((form) => ({ id: form.id, titulo: form.titulo }))}

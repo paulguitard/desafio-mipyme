@@ -13,6 +13,9 @@ export function Modal({
   compact,
   toned,
   headerExtra,
+  className: extraClassName,
+  tourContexto,
+  tourAnclaTitulo,
 }: {
   open: boolean;
   title: ReactNode;
@@ -23,6 +26,9 @@ export function Modal({
   compact?: boolean;
   toned?: boolean;
   headerExtra?: ReactNode;
+  className?: string;
+  tourContexto?: string;
+  tourAnclaTitulo?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const openRef = useRef(open);
@@ -35,6 +41,7 @@ export function Modal({
     tall ? "modal-tall" : "",
     compact ? "modal-compact" : "",
     toned ? "modal-toned" : "",
+    extraClassName ?? "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -56,6 +63,7 @@ export function Modal({
     <dialog
       ref={ref}
       className={className}
+      data-tour-contexto={tourContexto || undefined}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
@@ -76,7 +84,9 @@ export function Modal({
       <div className="modal-panel">
         <div className="modal-chrome">
           <div className="flex items-center justify-between gap-4">
-            <h2 className="modal-title text-2xl font-semibold text-navy">{title}</h2>
+            <h2 className="modal-title text-2xl font-semibold text-navy" data-tour={tourAnclaTitulo}>
+              {title}
+            </h2>
             <div className="flex shrink-0 items-center gap-3">
               {headerExtra}
               <button

@@ -74,7 +74,7 @@ export default async function EvaluacionDetallePage({
           {nombreCaso} · {asignacion.postulacion.convocatoria.titulo}
         </h1>
       }
-      headerEvaluacion={esGeneral ? "Tu observación general" : "Tu revisión por pregunta"}
+      headerEvaluacion={esGeneral ? "Tu revisión de la respuesta" : "Tu revisión por pregunta"}
       headerSupervision={
         asignacion.postulacion.supervision
           ? `Revisión de ${asignacion.postulacion.supervision.supervisor.name}`
@@ -84,7 +84,7 @@ export default async function EvaluacionDetallePage({
         <div className="space-y-2">
           <p className="text-muted">Participante: {asignacion.postulacion.postulante.name}</p>
           {!abierta ? (
-            <p className="font-semibold text-danger">Convocatoria cerrada. Solo lectura.</p>
+            <p className="font-semibold text-danger">Mentoría cerrada. Solo lectura.</p>
           ) : null}
           {asignacion.estado === "EN_SUPERVISION" ? (
             <p>Esperando que el supervisor revise esta evaluación.</p>

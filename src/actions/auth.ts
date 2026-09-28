@@ -3,7 +3,7 @@
 import { createHash, randomBytes } from "crypto";
 import { AuthError } from "next-auth";
 import { signIn, signOut } from "@/auth";
-import { loadConfigCorreoRecuperacionForMail } from "@/actions/config-admin";
+import { loadConfigCorreoRecuperacionForMail, imagenUrlForMail } from "@/lib/correo-config";
 import { getAppBaseUrl } from "@/lib/app-url";
 import { renderCorreoRecuperacion } from "@/lib/correo-recuperacion";
 import { prisma } from "@/lib/db";
@@ -13,6 +13,8 @@ import { validatePassword } from "@/lib/password-policy";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { homeForRole, isRole, normalizeRole, rolCoincideConIngreso, type Role } from "@/lib/roles";
 import { USER_ORIGEN } from "@/lib/user-origen";
+import { headers } from "next/headers";
+import { loginSchema } from "@/lib/validation";
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 const RESET_REQUEST_LIMIT = 5;
@@ -20,6 +22,9 @@ const RESET_REQUEST_WINDOW_MS = 15 * 60 * 1000;
 const RESET_CONFIRM_LIMIT = 10;
 const RESET_CONFIRM_WINDOW_MS = 15 * 60 * 1000;
 
+const LOGIN_GENERIC_ERROR = "Correo o contraseña incorrectos.";
+const LOGIN_LIMIT = 8;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const RESET_GENERIC_OK =
   "Si ese correo está registrado, te enviamos un enlace para restablecer la contraseña. Revisá tu bandeja (y spam).";
 
@@ -28,40 +33,41 @@ function hashResetToken(token: string) {
 }
 
 export async function loginAction(formData: FormData) {
-  const email = String(formData.get("email") ?? "")
-    .trim()
-    .toLowerCase();
-  const password = String(formData.get("password") ?? "");
-  const expectedRole = String(formData.get("expectedRole") ?? "");
-  if (!isRole(expectedRole)) {
-    return { error: "Rol de ingreso inválido." };
+  const parsed = loginSchema.safeParse({
+    email: String(formData.get("email") ?? ""),
+    password: String(formData.get("password") ?? ""),
+    expectedRole: String(formData.get("expectedRole") ?? ""),
+  });
+  if (!parsed.success) {
+    return { error: LOGIN_GENERIC_ERROR };
+  }
+  const { email, password, expectedRole } = parsed.data;
+
+  const headerList = await headers();
+  const ip = headerList.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!consumeRateLimit(`login:${ip}:${email}`, LOGIN_LIMIT, LOGIN_WINDOW_MS)) {
+    return { error: "Demasiados intentos. Esperá unos minutos e intentá de nuevo." };
   }
 
   if (!process.env.AUTH_SECRET && !process.env.NEXTAUTH_SECRET) {
-    return {
-      error:
-        "En Vercel falta AUTH_SECRET (Production). Guárdalo en Environment Variables y hacé Redeploy.",
-    };
+    return { error: "No se pudo iniciar sesión. Intentá de nuevo más tarde." };
   }
 
   try {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return { error: "No existe un usuario con ese correo en la base." };
+      return { error: LOGIN_GENERIC_ERROR };
     }
     const passwordOk = await verifyPassword(password, user.passwordHash);
     if (!passwordOk) {
-      return { error: "La contraseña no coincide." };
+      return { error: LOGIN_GENERIC_ERROR };
     }
     const role = normalizeRole(user.role);
     if (!role || !rolCoincideConIngreso(role, expectedRole as Role)) {
-      return { error: `Ese usuario tiene rol ${user.role}, no ${expectedRole}.` };
+      return { error: LOGIN_GENERIC_ERROR };
     }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Error de base de datos";
-    return {
-      error: `No se pudo leer la base (DATABASE_URL). ${message.slice(0, 180)}`,
-    };
+  } catch {
+    return { error: "No se pudo iniciar sesión. Intentá de nuevo más tarde." };
   }
 
   try {
@@ -79,14 +85,9 @@ export async function loginAction(formData: FormData) {
         kind === "MissingSecret" ||
         kind === "UntrustedHost"
       ) {
-        return {
-          error:
-            "Auth.js no tiene AUTH_SECRET/AUTH_URL en este deploy. Revisá Environment Variables (Production) y Redeploy.",
-        };
-      }
-      return {
-        error: `No pudimos abrir la sesión (${kind || "AuthError"}).`,
-      };
+      return { error: "No se pudo iniciar sesión. Intentá de nuevo más tarde." };
+    }
+    return { error: LOGIN_GENERIC_ERROR };
     }
     throw error;
   }
@@ -175,11 +176,8 @@ export async function registerEmprendedorAction(formData: FormData) {
         origen: "REGISTRO",
       },
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Error de base de datos";
-    return {
-      error: `No se pudo crear la cuenta. ${message.slice(0, 180)}`,
-    };
+  } catch {
+    return { error: "No se pudo crear la cuenta. Intentá de nuevo más tarde." };
   }
 
   try {
@@ -248,10 +246,14 @@ export async function requestPasswordResetAction(formData: FormData) {
 
     const resetUrl = `${getAppBaseUrl()}/restablecer-contrasena?token=${encodeURIComponent(rawToken)}`;
     const mailConfig = await loadConfigCorreoRecuperacionForMail();
-    const rendered = renderCorreoRecuperacion(mailConfig, {
-      nombre: user.name,
-      enlace: resetUrl,
-    });
+    const rendered = renderCorreoRecuperacion(
+      mailConfig,
+      {
+        nombre: user.name,
+        enlace: resetUrl,
+      },
+      imagenUrlForMail(mailConfig.imagen),
+    );
 
     const sent = await sendMail({
       to: user.email,
@@ -267,10 +269,7 @@ export async function requestPasswordResetAction(formData: FormData) {
 
     return { ok: true, message: RESET_GENERIC_OK };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Error";
-    return {
-      error: `No se pudo procesar el pedido. ${message.slice(0, 180)}`,
-    };
+    return { error: "No se pudo procesar el pedido. Intentá de nuevo más tarde." };
   }
 }
 
@@ -327,6 +326,7 @@ export async function confirmPasswordResetAction(formData: FormData) {
         data: {
           passwordHash,
           passwordAssigned: "",
+          passwordChangedAt: now,
         },
       }),
       prisma.passwordResetToken.update({
@@ -347,10 +347,7 @@ export async function confirmPasswordResetAction(formData: FormData) {
       message: "Contraseña actualizada. Ya podés ingresar con la nueva clave.",
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Error";
-    return {
-      error: `No se pudo actualizar la contraseña. ${message.slice(0, 180)}`,
-    };
+    return { error: "No se pudo actualizar la contraseña. Intentá de nuevo más tarde." };
   }
 }
 

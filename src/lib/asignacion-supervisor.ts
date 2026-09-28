@@ -1,3 +1,4 @@
+import { cupoAlcanzado } from "@/lib/cupo-asignacion";
 import { prisma } from "@/lib/db";
 
 export async function asignarSupervisoresAutomaticoEnConvocatoria(convocatoriaId: string) {
@@ -10,12 +11,12 @@ export async function asignarSupervisoresAutomaticoEnConvocatoria(convocatoriaId
       },
     },
   });
-  if (!convocatoria) return { error: "Convocatoria no encontrada." };
+  if (!convocatoria) return { error: "Mentoría no encontrada." };
   if (convocatoria.estado !== "ABIERTA") {
-    return { error: "La convocatoria está cerrada. No se puede asignar." };
+    return { error: "La mentoría está cerrada. No se puede asignar." };
   }
   if (convocatoria.supervisores.length === 0) {
-    return { error: "Agrega supervisores al pool de la convocatoria primero." };
+    return { error: "Agrega supervisores al pool de la mentoría primero." };
   }
 
   const cargas = new Map<string, number>();
@@ -39,7 +40,7 @@ export async function asignarSupervisoresAutomaticoEnConvocatoria(convocatoriaId
     const candidatos = convocatoria.supervisores
       .filter((item) => {
         const carga = cargas.get(item.supervisorId) ?? 0;
-        if (item.maxSupervisiones > 0 && carga >= item.maxSupervisiones) return false;
+        if (cupoAlcanzado(item.maxSupervisiones, carga)) return false;
         return true;
       })
       .sort((a, b) => {

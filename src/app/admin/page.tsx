@@ -34,10 +34,10 @@ export default async function AdminHomePage() {
         <h1 className="text-3xl font-extrabold text-navy">Configuración</h1>
       </div>
       <p className="text-muted">
-        Crea usuarios, formularios y convocatorias. Configura el pool de evaluadores y asígnalos a cada caso.
+        Crea usuarios, formularios y mentorías. Configura el pool de evaluadores y asígnalos a cada caso.
       </p>
       <div className="grid items-stretch gap-4 md:grid-cols-3">
-        <a className="card card-link flex h-full flex-col p-6" href="/admin/usuarios">
+        <a className="card card-link flex h-full flex-col p-6" href="/admin/usuarios" data-tour="admin-usuarios">
           <h2 className="text-2xl font-bold text-navy">Usuarios</h2>
           <p className="mt-2 text-muted">Alta de administradores, evaluadores y participantes.</p>
           <dl className="mt-auto grid grid-cols-3 gap-2 border-t border-[var(--border)] pt-4">
@@ -55,7 +55,7 @@ export default async function AdminHomePage() {
             </div>
           </dl>
         </a>
-        <a className="card card-link flex h-full flex-col p-6" href="/admin/formularios">
+        <a className="card card-link flex h-full flex-col p-6" href="/admin/formularios" data-tour="admin-formularios">
           <h2 className="text-2xl font-bold text-navy">Formularios</h2>
           <p className="mt-2 text-muted">Preguntas que responderán los participantes.</p>
           <dl className="mt-auto border-t border-[var(--border)] pt-4">
@@ -67,8 +67,8 @@ export default async function AdminHomePage() {
             </div>
           </dl>
         </a>
-        <a className="card card-link flex h-full flex-col p-6" href="/admin/convocatorias">
-          <h2 className="text-2xl font-bold text-navy">Convocatorias</h2>
+        <a className="card card-link flex h-full flex-col p-6" href="/admin/mentorias" data-tour="admin-mentorias">
+          <h2 className="text-2xl font-bold text-navy">Mentorías</h2>
           <p className="mt-2 text-muted">Abrir, cerrar y asignar evaluadores.</p>
           <dl className="mt-auto grid grid-cols-2 gap-2 border-t border-[var(--border)] pt-4">
             <div className="flex flex-col">

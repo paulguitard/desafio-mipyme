@@ -14,6 +14,8 @@ model User {
   email            String   @unique
   passwordHash     String
   passwordAssigned String
+  /// Bump this to invalidate JWTs after password or role changes.
+  passwordChangedAt DateTime @default(now())
   role             String
   /// Solo evaluadores/supervisores. Catálogo en src/lib/escuelas.ts
   escuela          String?
@@ -37,6 +39,8 @@ model User {
   convocatoriasPoolSupervisor ConvocatoriaSupervisor[]
   asignacionesSupervisor      AsignacionSupervisor[]
   passwordResetTokens PasswordResetToken[]
+
+  @@index([role])
 }
 
 model PasswordResetToken {
@@ -66,6 +70,17 @@ model ConfigCorreoRecuperacion {
   /// JSON StoredFile o vacío
   imagen          String   @default("")
   updatedAt       DateTime @updatedAt
+}
+
+/// Plantilla de texto de un aviso de novedad del caso (colores e imagen se toman de recuperación).
+model ConfigCorreoNotificacion {
+  id         String   @id
+  asunto     String
+  titulo     String
+  cuerpo     String
+  textoBoton String
+  pie        String
+  updatedAt  DateTime @updatedAt
 }
 
 model Formulario {
@@ -101,6 +116,8 @@ model Pregunta {
   respuestas Respuesta[]
   revisiones RevisionPregunta[]
   supervisiones SupervisionPregunta[]
+
+  @@index([formularioId])
 }
 
 model Convocatoria {
@@ -120,6 +137,9 @@ model Convocatoria {
   postulaciones Postulacion[]
   evaluadores   ConvocatoriaEvaluador[]
   supervisores  ConvocatoriaSupervisor[]
+
+  @@index([estado])
+  @@index([formularioId])
 }
 
 model ConvocatoriaEvaluador {
@@ -153,6 +173,7 @@ model Postulacion {
   postulanteId   String
   postulante     User      @relation(fields: [postulanteId], references: [id])
   estado         String    @default("BORRADOR")
+  nombreCaso     String    @default("")
   enviadaAt      DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -162,6 +183,7 @@ model Postulacion {
   supervision  AsignacionSupervisor?
 
   @@unique([convocatoriaId, postulanteId])
+  @@index([postulanteId])
 }
 
 model Respuesta {
@@ -177,6 +199,7 @@ model Respuesta {
   versiones RespuestaVersion[]
 
   @@unique([postulacionId, preguntaId])
+  @@index([postulacionId])
 }
 
 model RespuestaVersion {
@@ -186,6 +209,8 @@ model RespuestaVersion {
   valor       String
   archivos    String   @default("[]")
   createdAt   DateTime @default(now())
+
+  @@index([respuestaId])
 }
 
 model AsignacionEvaluador {
@@ -209,6 +234,7 @@ model AsignacionEvaluador {
   supervisionesGenerales  SupervisionGeneral[]
 
   @@unique([postulacionId, evaluadorId])
+  @@index([evaluadorId])
 }
 
 model AsignacionSupervisor {
@@ -219,6 +245,8 @@ model AsignacionSupervisor {
   supervisor    User        @relation(fields: [supervisorId], references: [id])
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+
+  @@index([supervisorId])
 }
 
 model RevisionPregunta {

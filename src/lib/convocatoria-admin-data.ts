@@ -1,5 +1,35 @@
 import { prisma } from "@/lib/db";
-import { asegurarPreguntaNombreCaso, extraerNombreCaso } from "@/lib/nombre-caso";
+import { esEvaluacionObservada } from "@/lib/cupo-asignacion";
+import { extraerNombreCaso } from "@/lib/nombre-caso";
+import { USER_PUBLIC_SELECT } from "@/lib/user-public";
+
+export type CasoPoolResumen = {
+  postulacionId: string;
+  nombreCaso: string;
+  emprendedorNombre: string;
+};
+
+type ResumenPool = {
+  asignadas: number;
+  revisadas: number;
+  finalizadas: number;
+  casosAsignados: CasoPoolResumen[];
+  casosObservados: CasoPoolResumen[];
+  casosFinalizados: CasoPoolResumen[];
+};
+
+function resumenVacio(): ResumenPool {
+  return {
+    asignadas: 0,
+    revisadas: 0,
+    finalizadas: 0,
+    casosAsignados: [],
+    casosObservados: [],
+    casosFinalizados: [],
+  };
+}
+
+export const PANEL_PAGE_SIZE = 40;
 
 export async function getRespuestasConvocatoria(id: string) {
   const convocatoria = await prisma.convocatoria.findUnique({
@@ -10,7 +40,7 @@ export async function getRespuestasConvocatoria(id: string) {
       },
       postulaciones: {
         include: {
-          postulante: true,
+          postulante: { select: USER_PUBLIC_SELECT },
           respuestas: true,
         },
         orderBy: { createdAt: "desc" },
@@ -48,74 +78,128 @@ export async function getRespuestasConvocatoria(id: string) {
   };
 }
 
-export async function getPanelEvaluacion(id: string) {
+export async function getPanelEvaluacion(id: string, page = 1) {
   const existente = await prisma.convocatoria.findUnique({
     where: { id },
-    select: { formularioId: true },
+    select: { id: true },
   });
   if (!existente) return null;
-  await asegurarPreguntaNombreCaso(existente.formularioId);
 
-  const [convocatoria, evaluadores, supervisores] = await Promise.all([
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const skip = (safePage - 1) * PANEL_PAGE_SIZE;
+
+  const [convocatoria, totalPostulaciones, evaluadores, supervisores, asignacionesStats, supervisionStats] =
+    await Promise.all([
     prisma.convocatoria.findUnique({
       where: { id },
       include: {
         formulario: {
           include: { preguntas: { orderBy: { orden: "asc" } } },
         },
-        evaluadores: { include: { evaluador: true }, orderBy: { evaluador: { name: "asc" } } },
-        supervisores: { include: { supervisor: true }, orderBy: { supervisor: { name: "asc" } } },
+        evaluadores: {
+          include: { evaluador: { select: USER_PUBLIC_SELECT } },
+          orderBy: { evaluador: { name: "asc" } },
+        },
+        supervisores: {
+          include: { supervisor: { select: USER_PUBLIC_SELECT } },
+          orderBy: { supervisor: { name: "asc" } },
+        },
         postulaciones: {
           include: {
-            postulante: true,
-            respuestas: true,
-            asignaciones: { include: { evaluador: true }, orderBy: { orden: "asc" } },
-            supervision: { include: { supervisor: true } },
+            postulante: { select: USER_PUBLIC_SELECT },
+            respuestas: { select: { preguntaId: true, valor: true } },
+            asignaciones: {
+              include: { evaluador: { select: USER_PUBLIC_SELECT } },
+              orderBy: { orden: "asc" },
+            },
+            supervision: { include: { supervisor: { select: USER_PUBLIC_SELECT } } },
           },
           orderBy: { createdAt: "desc" },
+          skip,
+          take: PANEL_PAGE_SIZE,
         },
       },
     }),
-    prisma.user.findMany({ where: { role: "EVALUADOR" }, orderBy: { name: "asc" } }),
-    prisma.user.findMany({ where: { role: "SUPERVISOR" }, orderBy: { name: "asc" } }),
+    prisma.postulacion.count({ where: { convocatoriaId: id } }),
+    prisma.user.findMany({
+      where: { role: "EVALUADOR" },
+      orderBy: { name: "asc" },
+      select: USER_PUBLIC_SELECT,
+    }),
+    prisma.user.findMany({
+      where: { role: "SUPERVISOR" },
+      orderBy: { name: "asc" },
+      select: USER_PUBLIC_SELECT,
+    }),
+    prisma.asignacionEvaluador.findMany({
+      where: { postulacion: { convocatoriaId: id } },
+      select: {
+        evaluadorId: true,
+        estado: true,
+        postulacion: {
+          select: {
+            id: true,
+            nombreCaso: true,
+            postulante: { select: { name: true } },
+          },
+        },
+      },
+    }),
+    prisma.asignacionSupervisor.findMany({
+      where: { postulacion: { convocatoriaId: id } },
+      select: {
+        supervisorId: true,
+        postulacion: {
+          select: {
+            id: true,
+            nombreCaso: true,
+            postulante: { select: { name: true } },
+            asignaciones: { select: { estado: true } },
+          },
+        },
+      },
+    }),
   ]);
   if (!convocatoria) return null;
 
-  const stats = new Map<string, { asignadas: number; revisadas: number; finalizadas: number }>();
-  for (const postulacion of convocatoria.postulaciones) {
-    for (const asignacion of postulacion.asignaciones) {
-      const actual = stats.get(asignacion.evaluadorId) ?? {
-        asignadas: 0,
-        revisadas: 0,
-        finalizadas: 0,
-      };
-      actual.asignadas += 1;
-      if (asignacion.estado === "FINALIZADA") {
-        actual.finalizadas += 1;
-      } else if (
-        asignacion.estado === "CON_OBSERVACIONES" ||
-        asignacion.estado === "REPARADA" ||
-        asignacion.estado === "DEVUELTA_SUPERVISOR"
-      ) {
-        actual.revisadas += 1;
-      }
-      stats.set(asignacion.evaluadorId, actual);
+  const stats = new Map<string, ResumenPool>();
+  for (const asignacion of asignacionesStats) {
+    const actual = stats.get(asignacion.evaluadorId) ?? resumenVacio();
+    const caso: CasoPoolResumen = {
+      postulacionId: asignacion.postulacion.id,
+      nombreCaso: asignacion.postulacion.nombreCaso,
+      emprendedorNombre: asignacion.postulacion.postulante.name,
+    };
+    actual.asignadas += 1;
+    actual.casosAsignados.push(caso);
+    if (asignacion.estado === "FINALIZADA") {
+      actual.finalizadas += 1;
+      actual.casosFinalizados.push(caso);
+    } else if (esEvaluacionObservada(asignacion.estado)) {
+      actual.revisadas += 1;
+      actual.casosObservados.push(caso);
     }
+    stats.set(asignacion.evaluadorId, actual);
   }
 
-  const statsSup = new Map<string, { asignadas: number; revisadas: number; finalizadas: number }>();
-  for (const postulacion of convocatoria.postulaciones) {
-    if (!postulacion.supervision) continue;
-    const sid = postulacion.supervision.supervisorId;
-    const actual = statsSup.get(sid) ?? { asignadas: 0, revisadas: 0, finalizadas: 0 };
+  const statsSup = new Map<string, ResumenPool>();
+  for (const item of supervisionStats) {
+    const sid = item.supervisorId;
+    const actual = statsSup.get(sid) ?? resumenVacio();
+    const caso: CasoPoolResumen = {
+      postulacionId: item.postulacion.id,
+      nombreCaso: item.postulacion.nombreCaso,
+      emprendedorNombre: item.postulacion.postulante.name,
+    };
     actual.asignadas += 1;
-    if (
-      postulacion.asignaciones.length > 0 &&
-      postulacion.asignaciones.every((a) => a.estado === "FINALIZADA")
-    ) {
+    actual.casosAsignados.push(caso);
+    const evals = item.postulacion.asignaciones;
+    if (evals.length > 0 && evals.every((a) => a.estado === "FINALIZADA")) {
       actual.finalizadas += 1;
-    } else if (postulacion.asignaciones.some((a) => a.estado === "DEVUELTA_SUPERVISOR")) {
+      actual.casosFinalizados.push(caso);
+    } else if (evals.some((a) => a.estado === "DEVUELTA_SUPERVISOR")) {
       actual.revisadas += 1;
+      actual.casosObservados.push(caso);
     }
     statsSup.set(sid, actual);
   }
@@ -125,6 +209,9 @@ export async function getPanelEvaluacion(id: string) {
     titulo: convocatoria.titulo,
     estado: convocatoria.estado,
     evaluacionesPorPostulacion: convocatoria.evaluacionesPorPostulacion,
+    page: safePage,
+    pageSize: PANEL_PAGE_SIZE,
+    totalPostulaciones,
     preguntas: convocatoria.formulario.preguntas.map((pregunta) => ({
       id: pregunta.id,
       enunciado: pregunta.enunciado,
@@ -132,11 +219,7 @@ export async function getPanelEvaluacion(id: string) {
       opciones: pregunta.opciones,
     })),
     pool: convocatoria.evaluadores.map((item) => {
-      const resumen = stats.get(item.evaluadorId) ?? {
-        asignadas: 0,
-        revisadas: 0,
-        finalizadas: 0,
-      };
+      const resumen = stats.get(item.evaluadorId) ?? resumenVacio();
       return {
         evaluadorId: item.evaluadorId,
         maxEvaluaciones: item.maxEvaluaciones,
@@ -144,24 +227,25 @@ export async function getPanelEvaluacion(id: string) {
           id: item.evaluador.id,
           name: item.evaluador.name,
           email: item.evaluador.email,
+          escuela: item.evaluador.escuela,
         },
         carga: resumen.asignadas,
         asignadas: resumen.asignadas,
         revisadas: resumen.revisadas,
         finalizadas: resumen.finalizadas,
+        casosAsignados: resumen.casosAsignados,
+        casosObservados: resumen.casosObservados,
+        casosFinalizados: resumen.casosFinalizados,
       };
     }),
     evaluadoresDisponibles: evaluadores.map((user) => ({
       id: user.id,
       name: user.name,
       email: user.email,
+      escuela: user.escuela,
     })),
     poolSupervisores: convocatoria.supervisores.map((item) => {
-      const resumen = statsSup.get(item.supervisorId) ?? {
-        asignadas: 0,
-        revisadas: 0,
-        finalizadas: 0,
-      };
+      const resumen = statsSup.get(item.supervisorId) ?? resumenVacio();
       return {
         evaluadorId: item.supervisorId,
         maxEvaluaciones: item.maxSupervisiones,
@@ -169,17 +253,22 @@ export async function getPanelEvaluacion(id: string) {
           id: item.supervisor.id,
           name: item.supervisor.name,
           email: item.supervisor.email,
+          escuela: item.supervisor.escuela,
         },
         carga: resumen.asignadas,
         asignadas: resumen.asignadas,
         revisadas: resumen.revisadas,
         finalizadas: resumen.finalizadas,
+        casosAsignados: resumen.casosAsignados,
+        casosObservados: resumen.casosObservados,
+        casosFinalizados: resumen.casosFinalizados,
       };
     }),
     supervisoresDisponibles: supervisores.map((user) => ({
       id: user.id,
       name: user.name,
       email: user.email,
+      escuela: user.escuela,
     })),
     postulaciones: convocatoria.postulaciones.map((postulacion) => ({
       id: postulacion.id,
@@ -191,7 +280,7 @@ export async function getPanelEvaluacion(id: string) {
         preguntaId: respuesta.preguntaId,
         valor: respuesta.valor,
       })),
-      nombreCaso: extraerNombreCaso(convocatoria.formulario.preguntas, postulacion.respuestas),
+      nombreCaso: postulacion.nombreCaso || extraerNombreCaso(convocatoria.formulario.preguntas, postulacion.respuestas),
       asignaciones: postulacion.asignaciones.map((asignacion) => ({
         evaluadorId: asignacion.evaluadorId,
         evaluadorNombre: asignacion.evaluador.name,
@@ -214,13 +303,13 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
   const postulacion = await prisma.postulacion.findUnique({
     where: { id: postulacionId },
     include: {
-      postulante: true,
+      postulante: { select: USER_PUBLIC_SELECT },
       respuestas: {
         include: { versiones: { orderBy: { createdAt: "desc" } } },
       },
       asignaciones: {
         include: {
-          evaluador: true,
+          evaluador: { select: USER_PUBLIC_SELECT },
           revisiones: { orderBy: [{ ronda: "asc" }, { createdAt: "asc" }] },
           revisionesGenerales: { orderBy: [{ ronda: "asc" }, { createdAt: "asc" }] },
           supervisionesPregunta: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
@@ -228,7 +317,7 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
         },
         orderBy: { orden: "asc" },
       },
-      supervision: { include: { supervisor: true } },
+      supervision: { include: { supervisor: { select: USER_PUBLIC_SELECT } } },
       convocatoria: {
         include: {
           formulario: { include: { preguntas: { orderBy: { orden: "asc" } } } },
@@ -246,11 +335,12 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
     enviadaAt: postulacion.enviadaAt?.toISOString() ?? null,
     emprendedorNombre: postulacion.postulante.name,
     emprendedorEmail: postulacion.postulante.email,
-    nombreCaso: extraerNombreCaso(preguntas, postulacion.respuestas),
+    nombreCaso: postulacion.nombreCaso || extraerNombreCaso(preguntas, postulacion.respuestas),
     convocatoriaTitulo: postulacion.convocatoria.titulo,
     convocatoriaEstado: postulacion.convocatoria.estado,
     modoEvaluacion: postulacion.convocatoria.formulario.modoEvaluacion,
     supervisorNombre: postulacion.supervision?.supervisor.name ?? null,
+    supervisorEmail: postulacion.supervision?.supervisor.email ?? null,
     preguntas: preguntas.map((pregunta) => ({
       id: pregunta.id,
       enunciado: pregunta.enunciado,
@@ -279,6 +369,7 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
       id: asignacion.id,
       evaluadorId: asignacion.evaluadorId,
       evaluadorNombre: asignacion.evaluador.name,
+      evaluadorEmail: asignacion.evaluador.email,
       estado: asignacion.estado,
       rondaActual: asignacion.rondaActual,
       cicloSupervision: asignacion.cicloSupervision,

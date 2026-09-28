@@ -5,7 +5,8 @@ import type { StoredFile } from "@/lib/preguntas";
 import { prepareUploadBuffer } from "@/lib/storage/compress";
 import { deleteLocalUpload } from "@/lib/storage/local";
 
-const FOLDER = "desafio-mipyme";
+const FOLDER = "desafio-aiep";
+const SIGNED_TTL_SECONDS = 5 * 60;
 
 function credentials() {
   const cloud_name = process.env.CLOUDINARY_CLOUD_NAME;
@@ -46,6 +47,7 @@ async function uploadBuffer(
   form.append("folder", FOLDER);
   form.append("public_id", options.publicId);
   form.append("overwrite", "false");
+  form.append("type", "authenticated");
 
   const response = await fetch(
     `https://api.cloudinary.com/v1_1/${cloud_name}/${options.resourceType}/upload`,
@@ -68,6 +70,67 @@ async function uploadBuffer(
   return parsed;
 }
 
+export function signedCloudinaryUrl(
+  publicId: string,
+  options?: {
+    resourceType?: "image" | "raw";
+    width?: number;
+    expiresInSeconds?: number;
+    type?: "authenticated" | "upload";
+  },
+) {
+  configured();
+  const resourceType = options?.resourceType ?? "image";
+  const type =
+    options?.type ?? (publicId.startsWith("desafio-aiep/") ? "authenticated" : "upload");
+  const expires_at = Math.floor(Date.now() / 1000) + (options?.expiresInSeconds ?? SIGNED_TTL_SECONDS);
+  const transformation =
+    resourceType === "image"
+      ? [{ width: options?.width ?? 1600, crop: "limit", fetch_format: "auto", quality: "auto" }]
+      : undefined;
+  return cloudinary.url(publicId, {
+    type,
+    resource_type: resourceType,
+    sign_url: true,
+    secure: true,
+    expires_at,
+    ...(transformation ? { transformation } : {}),
+  });
+}
+
+export function cloudinaryDeliveryUrl(
+  publicId: string,
+  options?: {
+    resourceType?: "image" | "raw";
+    width?: number;
+  },
+) {
+  configured();
+  const resourceType = options?.resourceType ?? "image";
+  const type = publicId.startsWith("desafio-aiep/") ? "authenticated" : "upload";
+  const transformation =
+    resourceType === "image"
+      ? [
+          {
+            width: options?.width ?? 1200,
+            crop: "limit",
+            fetch_format: "auto",
+            quality: "auto",
+          },
+        ]
+      : undefined;
+  return cloudinary.url(publicId, {
+    type,
+    resource_type: resourceType,
+    sign_url: type === "authenticated",
+    secure: true,
+    ...(type === "authenticated"
+      ? { expires_at: Math.floor(Date.now() / 1000) + 60 * 60 }
+      : {}),
+    ...(transformation ? { transformation } : {}),
+  });
+}
+
 export async function saveUpload(
   file: File,
   kind: "file" | "image",
@@ -88,7 +151,6 @@ export async function saveUpload(
     mimeType: prepared.mimeType,
     kind,
     relativePath: result.public_id,
-    url: result.secure_url,
   };
 }
 
@@ -98,14 +160,17 @@ export async function deleteUpload(relativePath: string) {
   if (process.env.CLOUDINARY_CLOUD_NAME && relativePath.includes("/")) {
     configured();
     for (const resource_type of ["image", "raw"] as const) {
-      try {
-        const result = await cloudinary.uploader.destroy(relativePath, {
-          resource_type,
-          invalidate: true,
-        });
-        if (result.result === "ok") return;
-      } catch {
-        /* probar el otro resource_type o el disco local */
+      for (const type of ["authenticated", "upload"] as const) {
+        try {
+          const result = await cloudinary.uploader.destroy(relativePath, {
+            resource_type,
+            type,
+            invalidate: true,
+          });
+          if (result.result === "ok") return;
+        } catch {
+          /* probar otra combinación o el disco local */
+        }
       }
     }
   }

@@ -1,5 +1,15 @@
 import type { StoredFile } from "@/lib/preguntas";
 
+export type PosicionImagen = { x: number; y: number };
+
+const POSICION_CENTRO: PosicionImagen = { x: 50, y: 50 };
+
+export function clampPorcentaje(value: unknown): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return 50;
+  return Math.min(100, Math.max(0, n));
+}
+
 export function parseImagenConvocatoria(raw: string): StoredFile | null {
   if (!raw) return null;
   try {
@@ -11,6 +21,36 @@ export function parseImagenConvocatoria(raw: string): StoredFile | null {
   } catch {
     return null;
   }
+}
+
+export function parseImagenPosicion(raw: string): PosicionImagen {
+  if (!raw) return POSICION_CENTRO;
+  try {
+    const parsed = JSON.parse(raw) as { posX?: unknown; posY?: unknown };
+    if (!parsed || typeof parsed !== "object") return POSICION_CENTRO;
+    return { x: clampPorcentaje(parsed.posX), y: clampPorcentaje(parsed.posY) };
+  } catch {
+    return POSICION_CENTRO;
+  }
+}
+
+export function aplicarPosicionImagen(json: string, pos: PosicionImagen): string {
+  if (!json) return json;
+  try {
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object") return json;
+    return JSON.stringify({
+      ...parsed,
+      posX: clampPorcentaje(pos.x),
+      posY: clampPorcentaje(pos.y),
+    });
+  } catch {
+    return json;
+  }
+}
+
+export function objectPositionCss(pos: PosicionImagen): string {
+  return `${pos.x}% ${pos.y}%`;
 }
 
 export function toDatetimeLocalValue(date: Date | string | null | undefined): string {

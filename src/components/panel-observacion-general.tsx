@@ -99,7 +99,6 @@ function SelectoresNotasGenerales({
 export function PanelSupervisionPendiente() {
   return (
     <div className="card space-y-2 p-4">
-      <h3 className="text-lg font-semibold text-navy">Supervisión general</h3>
       <p className="text-muted">Sin supervisión por el momento → a la espera de la evaluación</p>
     </div>
   );
@@ -147,17 +146,6 @@ export function PanelObservacionGeneral({
       {!canEdit || veredicto !== "OBSERVACION" ? (
         <input type="hidden" name={campoComentario} value={comentario} />
       ) : null}
-
-      <div>
-        <h3 className="text-lg font-semibold text-navy">
-          {esSupervision ? "Supervisión general" : "Observación general"}
-        </h3>
-        <p className="text-sm text-muted">
-          {esSupervision
-            ? "Comentario sobre la evaluación del evaluador."
-            : "Comentario sobre la respuesta completa del formulario."}
-        </p>
-      </div>
 
       {!esSupervision ? (
         <SelectoresNotasGenerales notas={notasPreguntas} canEdit={canEdit} namePrefix={namePrefix} />

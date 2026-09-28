@@ -15,14 +15,7 @@ function youtubeThumb(embedUrl: string) {
 export function VideoEmbed({ url }: { url: string }) {
   const resolved = resolveVideoEmbed(url);
   if (!resolved) {
-    return (
-      <p className="text-sm text-muted">
-        Link de video no válido:{" "}
-        <a className="text-accent underline" href={url} target="_blank" rel="noreferrer">
-          {url}
-        </a>
-      </p>
-    );
+    return <p className="text-sm text-muted">Link de video no válido.</p>;
   }
 
   return (
@@ -47,11 +40,7 @@ export function VideoEmbed({ url }: { url: string }) {
 export function VideoMiniatura({ url }: { url: string }) {
   const resolved = resolveVideoEmbed(url);
   if (!resolved) {
-    return (
-      <a className="text-accent underline" href={url} target="_blank" rel="noreferrer">
-        {url}
-      </a>
-    );
+    return <span className="text-muted">Video no válido</span>;
   }
 
   const thumb = resolved.provider === "youtube" ? youtubeThumb(resolved.embedUrl) : null;

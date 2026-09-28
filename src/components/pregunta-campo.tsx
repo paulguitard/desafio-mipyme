@@ -1,10 +1,23 @@
+"use client";
+
 import type { ReactNode } from "react";
-import { EditorTextoLargo, TextoLargoVista } from "@/components/editor-texto-largo";
-import {
-  CampoGantt,
-  CampoObjetivosIndicadores,
-  CampoPresupuesto,
-} from "@/components/pregunta-formatos";
+import dynamic from "next/dynamic";
+
+const EditorTextoLargo = dynamic(
+  () => import("@/components/editor-texto-largo").then((mod) => mod.EditorTextoLargo),
+);
+const TextoLargoVista = dynamic(
+  () => import("@/components/editor-texto-largo").then((mod) => mod.TextoLargoVista),
+);
+const CampoGantt = dynamic(
+  () => import("@/components/pregunta-formatos").then((mod) => mod.CampoGantt),
+);
+const CampoPresupuesto = dynamic(
+  () => import("@/components/pregunta-formatos").then((mod) => mod.CampoPresupuesto),
+);
+const CampoObjetivosIndicadores = dynamic(
+  () => import("@/components/pregunta-formatos").then((mod) => mod.CampoObjetivosIndicadores),
+);
 import { VideoEmbed, VideoMiniatura } from "@/components/video-embed";
 import {
   esTipoFormato,
@@ -115,7 +128,7 @@ function AdjuntoArchivo({ file }: { file: StoredFile }) {
         title={`Abrir ${file.originalName}`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={publicUploadUrl(file)} alt={file.originalName} className="pregunta-adjuntos-media" />
+        <img src={publicUploadUrl(file, { width: 1200 })} alt={file.originalName} className="pregunta-adjuntos-media" />
       </a>
     );
   }

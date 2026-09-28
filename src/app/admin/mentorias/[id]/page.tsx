@@ -1,50 +1,56 @@
 import { BotonAtras } from "@/components/boton-atras";
 import { ConvocatoriaEvaluacion } from "@/components/convocatoria-evaluacion";
 import { prisma } from "@/lib/db";
-import { formatoRangoFechas, parseImagenConvocatoria } from "@/lib/convocatoria";
+import { formatoRangoFechas, parseImagenConvocatoria, parseImagenPosicion } from "@/lib/convocatoria";
 import { getPanelEvaluacion } from "@/lib/convocatoria-admin-data";
 import { publicUploadUrl } from "@/lib/preguntas";
 import { notFound } from "next/navigation";
 
-export default async function ConvocatoriaDetallePage({
+export default async function MentoriaDetallePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ page?: string }>;
 }) {
   const { id } = await params;
-  const [convocatoria, panel] = await Promise.all([
+  const { page: pageRaw } = await searchParams;
+  const page = Number(pageRaw ?? "1");
+  const [mentoria, panel] = await Promise.all([
     prisma.convocatoria.findUnique({
       where: { id },
       include: { formulario: true },
     }),
-    getPanelEvaluacion(id),
+    getPanelEvaluacion(id, page),
   ]);
-  if (!convocatoria || !panel) notFound();
+  if (!mentoria || !panel) notFound();
 
-  const imagen = parseImagenConvocatoria(convocatoria.imagen);
-  const rango = formatoRangoFechas(convocatoria.fechaInicio, convocatoria.fechaCierre);
+  const imagen = parseImagenConvocatoria(mentoria.imagen);
+  const imagenPos = parseImagenPosicion(mentoria.imagen);
+  const rango = formatoRangoFechas(mentoria.fechaInicio, mentoria.fechaCierre);
 
   return (
     <div className="page-scroll h-full space-y-8 overflow-y-auto">
-      <header className="flex flex-wrap items-start gap-5">
+      <header className="flex flex-wrap items-start gap-5" data-tour="mentoria-ficha">
         {imagen ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={publicUploadUrl(imagen)}
+            src={publicUploadUrl(imagen, { width: 400 })}
             alt=""
             className="h-28 w-28 rounded-2xl object-cover"
+            style={{ objectPosition: `${imagenPos.x}% ${imagenPos.y}%` }}
           />
         ) : null}
         <div>
           <div className="flex items-center gap-2">
-            <BotonAtras href="/admin/convocatorias" />
-            <h1 className="text-3xl font-extrabold text-navy">{convocatoria.titulo}</h1>
+            <BotonAtras href="/admin/mentorias" />
+            <h1 className="text-3xl font-extrabold text-navy">{mentoria.titulo}</h1>
           </div>
           <p className="text-muted">
-            Formulario: {convocatoria.formulario.titulo} · Estado: {convocatoria.estado}
+            Formulario: {mentoria.formulario.titulo} · Estado: {mentoria.estado}
           </p>
           {rango ? <p className="text-muted">{rango}</p> : null}
-          <p>{convocatoria.descripcion}</p>
+          <p>{mentoria.descripcion}</p>
         </div>
       </header>
 
@@ -58,6 +64,9 @@ export default async function ConvocatoriaDetallePage({
         poolSupervisores={panel.poolSupervisores}
         supervisoresDisponibles={panel.supervisoresDisponibles}
         postulaciones={panel.postulaciones}
+        page={panel.page}
+        pageSize={panel.pageSize}
+        totalPostulaciones={panel.totalPostulaciones}
       />
     </div>
   );

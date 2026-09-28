@@ -12,7 +12,8 @@ export default async function ParticipanteLayout({ children }: { children: React
 
   return (
     <AppShell
-      maxWidthClass="max-w-4xl"
+      tourRole="EMPRENDEDOR"
+      maxWidthClass="max-w-none"
       header={
         <AppHeader
           title="Panel de participante"

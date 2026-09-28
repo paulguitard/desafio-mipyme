@@ -10,9 +10,19 @@ import {
 } from "@/actions/convocatorias";
 import { ConfirmForm } from "@/components/confirm-form";
 import { ConvocatoriaEvaluacion } from "@/components/convocatoria-evaluacion";
+import { ImagenMentoriaCover, ImagenMentoriaEncuadre } from "@/components/imagen-mentoria";
 import { Modal } from "@/components/modal";
 import type { PanelEvaluacion } from "@/lib/convocatoria-admin-data";
-import { formatoRangoFechas, toDatetimeLocalValue } from "@/lib/convocatoria";
+import { CONTEXTO_PANEL_MENTORIA } from "@/lib/tutoriales";
+import {
+  diasRestantesHasta,
+  etiquetaCierreAbierto,
+  etiquetaDiasRestantes,
+  formatoRangoFechas,
+  parseFechaForm,
+  toDatetimeLocalValue,
+  type PosicionImagen,
+} from "@/lib/convocatoria";
 
 export type ConvocatoriaListaItem = {
   id: string;
@@ -25,6 +35,7 @@ export type ConvocatoriaListaItem = {
   fechaInicio: string | null;
   fechaCierre: string | null;
   imagenUrl: string | null;
+  imagenPos: PosicionImagen;
 };
 
 export type FormularioOpcion = { id: string; titulo: string };
@@ -42,12 +53,20 @@ export function ConvocatoriasAdmin({
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const [imagenPreview, setImagenPreview] = useState<string | null>(null);
+  const [imagenPos, setImagenPos] = useState<PosicionImagen>({ x: 50, y: 50 });
+  const [vistaEmprendedor, setVistaEmprendedor] = useState(false);
+  const [vistaDatos, setVistaDatos] = useState<{
+    titulo: string;
+    descripcion: string;
+    fechaCierre: Date | null;
+  } | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const [evaluacionOpen, setEvaluacionOpen] = useState(false);
   const [evaluacionTitulo, setEvaluacionTitulo] = useState("");
   const [evaluacion, setEvaluacion] = useState<PanelEvaluacion | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
   const [panelLoading, setPanelLoading] = useState(false);
-  const tituloModal = editing ? "Editar convocatoria" : "Crear convocatoria";
+  const tituloModal = editing ? "Editar mentoría" : "Crear mentoría";
 
   useEffect(() => {
     return () => {
@@ -73,6 +92,9 @@ export function ConvocatoriasAdmin({
     setEditing(null);
     setError(null);
     setImagenPreview(null);
+    setImagenPos({ x: 50, y: 50 });
+    setVistaEmprendedor(false);
+    setVistaDatos(null);
     resetGuardado();
     setOpen(true);
   }
@@ -81,6 +103,9 @@ export function ConvocatoriasAdmin({
     setEditing(item);
     setError(null);
     setImagenPreview(null);
+    setImagenPos(item.imagenPos);
+    setVistaEmprendedor(false);
+    setVistaDatos(null);
     resetGuardado();
     setOpen(true);
   }
@@ -90,7 +115,25 @@ export function ConvocatoriasAdmin({
     setOpen(false);
     setError(null);
     setImagenPreview(null);
+    setVistaEmprendedor(false);
+    setVistaDatos(null);
     resetGuardado();
+  }
+
+  function abrirVistaEmprendedor() {
+    if (vistaEmprendedor) {
+      setVistaEmprendedor(false);
+      return;
+    }
+    const form = formRef.current;
+    if (!form) return;
+    const data = new FormData(form);
+    setVistaDatos({
+      titulo: String(data.get("titulo") ?? "").trim() || "Sin título",
+      descripcion: String(data.get("descripcion") ?? "").trim(),
+      fechaCierre: parseFechaForm(String(data.get("fechaCierre") ?? "")),
+    });
+    setVistaEmprendedor(true);
   }
 
   async function abrirEvaluacion(item: ConvocatoriaListaItem) {
@@ -119,25 +162,25 @@ export function ConvocatoriasAdmin({
   return (
     <div className="page-scroll h-full space-y-8 overflow-y-auto">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-extrabold text-navy">Convocatorias</h1>
+        <h1 className="text-3xl font-extrabold text-navy">Mentorías</h1>
         <button className="btn btn-sm btn-primary" type="button" onClick={abrirCrear}>
-          Crear convocatoria
+          Crear mentoría
         </button>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-3" data-tour="mentorias-lista">
         {convocatorias.length === 0 ? (
-          <p className="text-muted">Aún no hay convocatorias.</p>
+          <p className="text-muted">Aún no hay mentorías.</p>
         ) : null}
-        {convocatorias.map((item) => {
+        {convocatorias.map((item, index) => {
           const rango = formatoRangoFechas(item.fechaInicio, item.fechaCierre);
           return (
             <article key={item.id} className="card flex flex-wrap items-center justify-between gap-4 p-5">
               <div className="flex min-w-0 flex-1 items-start gap-4">
                 {item.imagenUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <ImagenMentoriaCover
                     src={item.imagenUrl}
+                    pos={item.imagenPos}
                     alt=""
                     className="h-16 w-16 shrink-0 rounded-xl object-cover"
                   />
@@ -162,11 +205,15 @@ export function ConvocatoriasAdmin({
                   message={
                     item.estado === "ABIERTA"
                       ? "Al cerrar, nadie podrá editar ni evaluar. ¿Continuar?"
-                      : "¿Reabrir esta convocatoria?"
+                      : "¿Reabrir esta mentoría?"
                   }
                 >
                   <input type="hidden" name="id" value={item.id} />
-                  <button className="btn btn-sm btn-secondary" type="submit">
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    type="submit"
+                    data-tour={index === 0 ? "mentoria-abrir-cerrar" : undefined}
+                  >
                     {item.estado === "ABIERTA" ? "Cerrar" : "Abrir"}
                   </button>
                 </ConfirmForm>
@@ -191,6 +238,8 @@ export function ConvocatoriasAdmin({
 
       <Modal
         open={evaluacionOpen}
+        tourContexto={CONTEXTO_PANEL_MENTORIA}
+        tourAnclaTitulo="mentoria-ficha"
         title={
           <>
             <span>{evaluacion?.titulo ?? evaluacionTitulo}</span>
@@ -238,6 +287,7 @@ export function ConvocatoriasAdmin({
 
       <Modal open={open} title={tituloModal} onClose={cerrarModal}>
         <form
+          ref={formRef}
           key={editing?.id ?? "nuevo"}
           className="grid gap-4"
           aria-busy={saving}
@@ -282,18 +332,41 @@ export function ConvocatoriasAdmin({
                   if (prev) URL.revokeObjectURL(prev);
                   return file ? URL.createObjectURL(file) : null;
                 });
+                if (file) setImagenPos({ x: 50, y: 50 });
               }}
             />
+            <input type="hidden" name="imagenPosX" value={imagenPos.x} />
+            <input type="hidden" name="imagenPosY" value={imagenPos.y} />
             {imagenPreview || editing?.imagenUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={imagenPreview ?? editing?.imagenUrl ?? ""}
-                alt="Vista previa"
-                className="mt-2 h-32 w-full rounded-xl object-cover"
-              />
+              <div className="card mt-2 p-6">
+                <ImagenMentoriaEncuadre
+                  src={imagenPreview ?? editing?.imagenUrl ?? ""}
+                  pos={imagenPos}
+                  onChange={setImagenPos}
+                />
+              </div>
             ) : (
               <p className="text-muted">Opcional. Si no eliges una, se mantiene la actual.</p>
             )}
+            <button
+              className="btn btn-sm btn-secondary mt-2 w-fit"
+              type="button"
+              onClick={abrirVistaEmprendedor}
+            >
+              {vistaEmprendedor ? "Ocultar vista del emprendedor" : "Ver como emprendedor"}
+            </button>
+            {vistaEmprendedor && vistaDatos ? (
+              <div className="mt-3">
+                <p className="mb-2 text-sm font-semibold text-navy">Así lo verán los emprendedores</p>
+                <VistaEmprendedorMentoria
+                  titulo={vistaDatos.titulo}
+                  descripcion={vistaDatos.descripcion}
+                  fechaCierre={vistaDatos.fechaCierre}
+                  imagenUrl={imagenPreview ?? editing?.imagenUrl ?? null}
+                  imagenPos={imagenPos}
+                />
+              </div>
+            ) : null}
           </div>
           <div className="field">
             <label htmlFor="titulo">Título</label>
@@ -363,10 +436,78 @@ export function ConvocatoriasAdmin({
             </div>
           </div>
           <button className="btn btn-primary" type="submit" disabled={saving}>
-            {saving ? "Guardando…" : editing ? "Guardar cambios" : "Crear convocatoria"}
+            {saving ? "Guardando…" : editing ? "Guardar cambios" : "Crear mentoría"}
           </button>
         </form>
       </Modal>
     </div>
+  );
+}
+
+function VistaEmprendedorMentoria({
+  titulo,
+  descripcion,
+  fechaCierre,
+  imagenUrl,
+  imagenPos,
+}: {
+  titulo: string;
+  descripcion: string;
+  fechaCierre: Date | null;
+  imagenUrl: string | null;
+  imagenPos: PosicionImagen;
+}) {
+  const cierre = etiquetaCierreAbierto(fechaCierre);
+  const restantes = etiquetaDiasRestantes(diasRestantesHasta(fechaCierre));
+  return (
+    <article className="card space-y-3 p-6">
+      {imagenUrl ? (
+        <ImagenMentoriaCover
+          src={imagenUrl}
+          pos={imagenPos}
+          alt=""
+          className="h-40 w-full rounded-xl object-cover"
+        />
+      ) : (
+        <div className="flex h-40 w-full items-center justify-center rounded-xl bg-navy-soft text-muted">
+          Sin imagen
+        </div>
+      )}
+      <h2 className="text-2xl font-bold text-navy">{titulo}</h2>
+      {descripcion ? <p>{descripcion}</p> : <p className="text-muted">Sin descripción</p>}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <button className="btn btn-primary" type="button" disabled>
+          Postular
+        </button>
+        <div className="ml-auto flex flex-col items-end gap-2 text-right">
+          {cierre ? (
+            <p className="flex items-center justify-end gap-2 text-muted">
+              <span className="inline-flex text-navy" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                  <path
+                    fill="currentColor"
+                    d="M7 2h2v2h6V2h2v2h3v18H4V4h3zm12 8H5v10h14zm-9 3h2v2H10zm4 0h2v2h-2zm-8 0h2v2H6zm0 4h2v2H6zm4 0h2v2h-2zm4 0h2v2h-2z"
+                  />
+                </svg>
+              </span>
+              {cierre}
+            </p>
+          ) : null}
+          {restantes ? (
+            <p className="inline-flex items-center gap-2 rounded-full bg-navy-soft px-3 py-1 text-sm font-bold text-navy">
+              <span className="inline-flex" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16">
+                  <path
+                    fill="currentColor"
+                    d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20m0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16m.75 3v5.19l3.53 2.04-.75 1.3L11.25 13V7z"
+                  />
+                </svg>
+              </span>
+              {restantes}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </article>
   );
 }

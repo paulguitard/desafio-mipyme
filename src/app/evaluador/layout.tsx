@@ -1,5 +1,4 @@
-import { AppHeader } from "@/components/app-header";
-import { AppShell } from "@/components/app-shell";
+import { EvaluadorAppShell } from "@/components/evaluador-app-shell";
 import { prisma } from "@/lib/db";
 import { requireCatalogoEvaluador } from "@/lib/session";
 
@@ -12,21 +11,12 @@ export default async function EvaluadorLayout({ children }: { children: React.Re
   const esSupervisor = sessionUser.role === "SUPERVISOR";
 
   return (
-    <AppShell
-      maxWidthClass="max-w-[110rem]"
-      header={
-        <AppHeader
-          title={esSupervisor ? "Panel de supervisor" : "Panel de evaluador"}
-          name={user?.name ?? sessionUser.name ?? (esSupervisor ? "Supervisor" : "Evaluador")}
-          links={[
-            { href: "/evaluador", label: "Panel" },
-            { href: "/evaluador/perfil", label: "Mi Perfil" },
-          ]}
-          maxWidthClass="max-w-[110rem]"
-        />
-      }
+    <EvaluadorAppShell
+      tourRole={esSupervisor ? "SUPERVISOR" : "EVALUADOR"}
+      title={esSupervisor ? "Panel de supervisor" : "Panel de evaluador"}
+      name={user?.name ?? sessionUser.name ?? (esSupervisor ? "Supervisor" : "Evaluador")}
     >
       {children}
-    </AppShell>
+    </EvaluadorAppShell>
   );
 }

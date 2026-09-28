@@ -5,10 +5,16 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
 import { deleteUpload, saveUpload } from "@/lib/storage";
-import { parseFechaForm, parseImagenConvocatoria } from "@/lib/convocatoria";
+import {
+  aplicarPosicionImagen,
+  clampPorcentaje,
+  parseFechaForm,
+  parseImagenConvocatoria,
+} from "@/lib/convocatoria";
 import { isStoredFile, parseArchivos } from "@/lib/preguntas";
 import { asignarEvaluadoresAutomaticoEnConvocatoria } from "@/lib/asignacion-automatica";
 import { asignarSupervisoresAutomaticoEnConvocatoria } from "@/lib/asignacion-supervisor";
+import { cupoAlcanzado, mensajeCupoPersona } from "@/lib/cupo-asignacion";
 import {
   getDetalleFichaAdmin,
   getPanelEvaluacion,
@@ -40,20 +46,27 @@ function leerFechas(formData: FormData) {
 }
 
 async function leerImagen(formData: FormData, actual: string) {
+  const pos = {
+    x: clampPorcentaje(formData.get("imagenPosX")),
+    y: clampPorcentaje(formData.get("imagenPosY")),
+  };
   const file = formData.get("imagen");
-  if (!(file instanceof File) || file.size === 0) return actual;
-  if (!file.type.startsWith("image/")) {
-    return { error: "La imagen debe ser un archivo de imagen." };
+  let json = actual;
+  if (file instanceof File && file.size > 0) {
+    if (!file.type.startsWith("image/")) {
+      return { error: "La imagen debe ser un archivo de imagen." };
+    }
+    const stored = await saveUpload(file, "image");
+    json = JSON.stringify(stored);
   }
-  const stored = await saveUpload(file, "image");
-  return JSON.stringify(stored);
+  return aplicarPosicionImagen(json, pos);
 }
 
 function revalidateConvocatorias(id?: string) {
-  revalidatePath("/admin/convocatorias");
+  revalidatePath("/admin/mentorias");
   revalidatePath("/admin");
   revalidatePath("/participante");
-  if (id) revalidatePath(`/admin/convocatorias/${id}`);
+  if (id) revalidatePath(`/admin/mentorias/${id}`);
 }
 
 export async function crearConvocatoria(formData: FormData) {
@@ -86,7 +99,7 @@ export async function crearConvocatoria(formData: FormData) {
   if (duplicadoReciente) {
     return {
       error:
-        "Ya se creó una convocatoria igual hace un momento. Revisa la lista antes de volver a intentar.",
+        "Ya se creó una mentoría igual hace un momento. Revisa la lista antes de volver a intentar.",
     };
   }
 
@@ -122,7 +135,7 @@ export async function actualizarConvocatoria(formData: FormData) {
     where: { id },
     include: { _count: { select: { postulaciones: true } } },
   });
-  if (!convocatoria) return { error: "Convocatoria no encontrada." };
+  if (!convocatoria) return { error: "Mentoría no encontrada." };
 
   const formIdFinal =
     convocatoria._count.postulaciones > 0 ? convocatoria.formularioId : formularioId;
@@ -156,7 +169,7 @@ export async function toggleConvocatoria(formData: FormData) {
   await requireUser("ADMIN");
   const id = String(formData.get("id") ?? "");
   const convocatoria = await prisma.convocatoria.findUnique({ where: { id } });
-  if (!convocatoria) return { error: "Convocatoria no encontrada." };
+  if (!convocatoria) return { error: "Mentoría no encontrada." };
 
   const nuevo = convocatoria.estado === "ABIERTA" ? "CERRADA" : "ABIERTA";
   await prisma.convocatoria.update({
@@ -171,7 +184,7 @@ export async function guardarConfigEvaluacion(formData: FormData) {
   await requireUser("ADMIN");
   const convocatoriaId = String(formData.get("convocatoriaId") ?? "");
   const n = Number.parseInt(String(formData.get("evaluacionesPorPostulacion") ?? "1"), 10);
-  if (!convocatoriaId) return { error: "Convocatoria no encontrada." };
+  if (!convocatoriaId) return { error: "Mentoría no encontrada." };
   if (!Number.isFinite(n) || n < 1) {
     return { error: "Las evaluaciones por caso deben ser al menos 1." };
   }
@@ -180,7 +193,7 @@ export async function guardarConfigEvaluacion(formData: FormData) {
     where: { id: convocatoriaId },
     include: { evaluadores: true, supervisores: true },
   });
-  if (!convocatoria) return { error: "Convocatoria no encontrada." };
+  if (!convocatoria) return { error: "Mentoría no encontrada." };
 
   await prisma.convocatoria.update({
     where: { id: convocatoriaId },
@@ -209,6 +222,35 @@ export async function guardarConfigEvaluacion(formData: FormData) {
 
   revalidateConvocatorias(convocatoriaId);
   return { ok: true };
+}
+
+export async function guardarCupoPool(formData: FormData) {
+  await requireUser("ADMIN");
+  const convocatoriaId = String(formData.get("convocatoriaId") ?? "");
+  const personaId = String(formData.get("evaluadorId") ?? formData.get("supervisorId") ?? "");
+  const rol = String(formData.get("rol") ?? "evaluador") === "supervisor" ? "supervisor" : "evaluador";
+  const max = Number.parseInt(String(formData.get("maxEvaluaciones") ?? "0"), 10);
+  if (!convocatoriaId || !personaId) return { error: "Datos incompletos." };
+  if (!Number.isFinite(max) || max < 0) {
+    return { error: "El cupo debe ser 0 (sin límite) o un número positivo." };
+  }
+
+  if (rol === "supervisor") {
+    const updated = await prisma.convocatoriaSupervisor.updateMany({
+      where: { convocatoriaId, supervisorId: personaId },
+      data: { maxSupervisiones: max },
+    });
+    if (updated.count === 0) return { error: "El supervisor no está en el pool de esta mentoría." };
+  } else {
+    const updated = await prisma.convocatoriaEvaluador.updateMany({
+      where: { convocatoriaId, evaluadorId: personaId },
+      data: { maxEvaluaciones: max },
+    });
+    if (updated.count === 0) return { error: "El evaluador no está en el pool de esta mentoría." };
+  }
+
+  revalidateConvocatorias(convocatoriaId);
+  return { ok: true, mensaje: "Cupo actualizado." };
 }
 
 export async function agregarEvaluadorAlPool(formData: FormData) {
@@ -288,17 +330,28 @@ export async function asignarEvaluadorAPostulacion(formData: FormData) {
   });
   if (!postulacion) return { error: "Caso no encontrado." };
   if (postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La convocatoria está cerrada. No se puede asignar." };
+    return { error: "La mentoría está cerrada. No se puede asignar." };
   }
   if (postulacion.estado === "FINALIZADA" || !postulacion.enviadaAt) {
     return { error: "Solo se asignan respuestas enviadas y no finalizadas." };
   }
 
   const enPool = postulacion.convocatoria.evaluadores.some((e) => e.evaluadorId === evaluadorId);
-  if (!enPool) return { error: "El evaluador no está en el pool de esta convocatoria." };
+  if (!enPool) return { error: "El evaluador no está en el pool de esta mentoría." };
 
   if (postulacion.asignaciones.some((a) => a.evaluadorId === evaluadorId)) {
     return { error: "Ese evaluador ya está asignado a esta respuesta." };
+  }
+
+  const poolItem = postulacion.convocatoria.evaluadores.find((e) => e.evaluadorId === evaluadorId);
+  const cupo = poolItem?.maxEvaluaciones ?? 0;
+  if (cupo > 0) {
+    const carga = await prisma.asignacionEvaluador.count({
+      where: { evaluadorId, postulacion: { convocatoriaId: postulacion.convocatoriaId } },
+    });
+    if (cupoAlcanzado(cupo, carga)) {
+      return { error: mensajeCupoPersona("evaluador", cupo) };
+    }
   }
 
   const max = Math.max(1, postulacion.convocatoria.evaluacionesPorPostulacion);
@@ -323,7 +376,7 @@ export async function asignarEvaluadorAPostulacion(formData: FormData) {
   });
 
   await sincronizarEstadoPostulacion(postulacionId);
-  revalidatePath(`/admin/convocatorias/${postulacion.convocatoriaId}`);
+  revalidatePath(`/admin/mentorias/${postulacion.convocatoriaId}`);
   revalidatePath("/evaluador");
   return { ok: true, mensaje: "Evaluador asignado." };
 }
@@ -342,7 +395,7 @@ export async function asignarEvaluadores(formData: FormData) {
   });
   if (!postulacion) return { error: "Caso no encontrado." };
   if (postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La convocatoria está cerrada. No se puede asignar." };
+    return { error: "La mentoría está cerrada. No se puede asignar." };
   }
   if (postulacion.estado === "FINALIZADA" || !postulacion.enviadaAt) {
     return { error: "Solo se asignan casos enviados y no finalizados." };
@@ -362,9 +415,19 @@ export async function asignarEvaluadores(formData: FormData) {
   });
   const existentes = new Set(restantes.map((a) => a.evaluadorId));
   let orden = restantes.reduce((max, a) => Math.max(max, a.orden), 0);
+  const cupos = new Map(postulacion.convocatoria.evaluadores.map((e) => [e.evaluadorId, e.maxEvaluaciones]));
+  const cargasRows = await prisma.asignacionEvaluador.groupBy({
+    by: ["evaluadorId"],
+    where: { postulacion: { convocatoriaId: postulacion.convocatoriaId } },
+    _count: { _all: true },
+  });
+  const cargas = new Map(cargasRows.map((row) => [row.evaluadorId, row._count._all]));
 
   for (const evaluadorId of deseados) {
     if (existentes.has(evaluadorId)) continue;
+    const cupo = cupos.get(evaluadorId) ?? 0;
+    const carga = cargas.get(evaluadorId) ?? 0;
+    if (cupoAlcanzado(cupo, carga)) continue;
     const user = await prisma.user.findUnique({ where: { id: evaluadorId } });
     if (!user || user.role !== "EVALUADOR") continue;
     orden += 1;
@@ -377,10 +440,11 @@ export async function asignarEvaluadores(formData: FormData) {
         rondaActual: 1,
       },
     });
+    cargas.set(evaluadorId, carga + 1);
   }
 
   await sincronizarEstadoPostulacion(postulacionId);
-  revalidatePath(`/admin/convocatorias/${postulacion.convocatoriaId}`);
+  revalidatePath(`/admin/mentorias/${postulacion.convocatoriaId}`);
   revalidatePath("/evaluador");
   return { ok: true };
 }
@@ -440,7 +504,7 @@ export async function eliminarConvocatoria(formData: FormData) {
       },
     },
   });
-  if (!convocatoria) return { error: "Convocatoria no encontrada." };
+  if (!convocatoria) return { error: "Mentoría no encontrada." };
 
   const adjuntos = new Set<string>();
   const imagen = parseImagenConvocatoria(convocatoria.imagen);
@@ -482,7 +546,7 @@ export async function eliminarConvocatoria(formData: FormData) {
 export async function asignarEvaluadoresAutomatico(formData: FormData) {
   await requireUser("ADMIN");
   const convocatoriaId = String(formData.get("convocatoriaId") ?? "");
-  if (!convocatoriaId) return { error: "Convocatoria no encontrada." };
+  if (!convocatoriaId) return { error: "Mentoría no encontrada." };
   const result = await asignarEvaluadoresAutomaticoEnConvocatoria(convocatoriaId);
   revalidateConvocatorias(convocatoriaId);
   revalidatePath("/evaluador");
@@ -572,17 +636,28 @@ export async function asignarSupervisorAPostulacion(formData: FormData) {
   });
   if (!postulacion) return { error: "Caso no encontrado." };
   if (postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La convocatoria está cerrada. No se puede asignar." };
+    return { error: "La mentoría está cerrada. No se puede asignar." };
   }
   if (postulacion.estado === "FINALIZADA" || !postulacion.enviadaAt) {
     return { error: "Solo se asignan respuestas enviadas y no finalizadas." };
   }
 
   const enPool = postulacion.convocatoria.supervisores.some((e) => e.supervisorId === supervisorId);
-  if (!enPool) return { error: "El supervisor no está en el pool de esta convocatoria." };
+  if (!enPool) return { error: "El supervisor no está en el pool de esta mentoría." };
 
   if (postulacion.supervision) {
     return { error: "Esta respuesta ya tiene un supervisor asignado." };
+  }
+
+  const poolItem = postulacion.convocatoria.supervisores.find((e) => e.supervisorId === supervisorId);
+  const cupo = poolItem?.maxSupervisiones ?? 0;
+  if (cupo > 0) {
+    const carga = await prisma.asignacionSupervisor.count({
+      where: { supervisorId, postulacion: { convocatoriaId: postulacion.convocatoriaId } },
+    });
+    if (cupoAlcanzado(cupo, carga)) {
+      return { error: mensajeCupoPersona("supervisor", cupo) };
+    }
   }
 
   const user = await prisma.user.findUnique({ where: { id: supervisorId } });
@@ -592,7 +667,7 @@ export async function asignarSupervisorAPostulacion(formData: FormData) {
     data: { postulacionId, supervisorId },
   });
 
-  revalidatePath(`/admin/convocatorias/${postulacion.convocatoriaId}`);
+  revalidatePath(`/admin/mentorias/${postulacion.convocatoriaId}`);
   revalidatePath("/evaluador");
   return { ok: true, mensaje: "Supervisor asignado." };
 }
@@ -600,7 +675,7 @@ export async function asignarSupervisorAPostulacion(formData: FormData) {
 export async function asignarSupervisoresAutomatico(formData: FormData) {
   await requireUser("ADMIN");
   const convocatoriaId = String(formData.get("convocatoriaId") ?? "");
-  if (!convocatoriaId) return { error: "Convocatoria no encontrada." };
+  if (!convocatoriaId) return { error: "Mentoría no encontrada." };
   const result = await asignarSupervisoresAutomaticoEnConvocatoria(convocatoriaId);
   revalidateConvocatorias(convocatoriaId);
   revalidatePath("/evaluador");
@@ -610,14 +685,14 @@ export async function asignarSupervisoresAutomatico(formData: FormData) {
 export async function cargarRespuestasConvocatoria(convocatoriaId: string) {
   await requireUser("ADMIN");
   const data = await getRespuestasConvocatoria(convocatoriaId);
-  if (!data) return { error: "Convocatoria no encontrada." };
+  if (!data) return { error: "Mentoría no encontrada." };
   return { data };
 }
 
-export async function cargarPanelEvaluacion(convocatoriaId: string) {
+export async function cargarPanelEvaluacion(convocatoriaId: string, page = 1) {
   await requireUser("ADMIN");
-  const data = await getPanelEvaluacion(convocatoriaId);
-  if (!data) return { error: "Convocatoria no encontrada." };
+  const data = await getPanelEvaluacion(convocatoriaId, page);
+  if (!data) return { error: "Mentoría no encontrada." };
   return { data };
 }
 

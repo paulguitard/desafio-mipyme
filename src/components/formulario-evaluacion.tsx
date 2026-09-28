@@ -8,6 +8,7 @@ import {
   procederSupervision,
 } from "@/actions/supervisiones";
 import { ConfirmacionEnvio } from "@/components/confirmacion-envio";
+import { EvalDetalleHead, useEvalPanelesColapsables } from "@/components/eval-detalle-head";
 import type { IntencionSupervision } from "@/lib/estado";
 import type { ModoEvaluacion } from "@/lib/modo-evaluacion";
 
@@ -60,6 +61,7 @@ export function FormularioEvaluacion({
   const [error, setError] = useState<string | null>(null);
   const [pendienteEnvio, setPendienteEnvio] = useState<PendienteEnvio | null>(null);
   const [confirmando, setConfirmando] = useState(false);
+  const paneles = useEvalPanelesColapsables();
   const esGeneral = modoEvaluacion === "GENERAL";
   const esSupervisor = rolAccion === "supervisor";
   const mostrarAcciones = canEdit && rolAccion !== "lectura";
@@ -188,7 +190,7 @@ export function FormularioEvaluacion({
       <div className="shrink-0 space-y-3 bg-background">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            {back}
+            <span data-tour="volver">{back}</span>
             <div className="min-w-0 flex-1">{title}</div>
           </div>
           {mostrarAcciones ? (
@@ -197,6 +199,7 @@ export function FormularioEvaluacion({
                 <>
                   <button
                     className="btn btn-sm btn-secondary"
+                    data-tour="guardar-revision"
                     type="submit"
                     disabled={confirmando}
                     formAction={async (formData) => {
@@ -215,6 +218,7 @@ export function FormularioEvaluacion({
                   </button>
                   <button
                     className="btn btn-sm btn-gold"
+                    data-tour="enviar-observaciones"
                     type="submit"
                     disabled={confirmando}
                     formAction={(formData) => {
@@ -225,6 +229,7 @@ export function FormularioEvaluacion({
                   </button>
                   <button
                     className="btn btn-sm btn-primary"
+                    data-tour="proceder"
                     type="submit"
                     disabled={confirmando}
                     formAction={(formData) => {
@@ -238,6 +243,7 @@ export function FormularioEvaluacion({
                 <>
                   <button
                     className="btn btn-sm btn-secondary"
+                    data-tour="guardar-revision"
                     type="submit"
                     disabled={confirmando}
                     formAction={async (formData) => {
@@ -255,6 +261,7 @@ export function FormularioEvaluacion({
                   </button>
                   <button
                     className="btn btn-sm btn-gold"
+                    data-tour="enviar-supervisor"
                     type="submit"
                     disabled={confirmando}
                     formAction={(formData) => {
@@ -284,27 +291,33 @@ export function FormularioEvaluacion({
       </div>
 
       <section className="eval-detalle-shell" aria-label="Caso, evaluación y supervisión">
-        <div className={`page-scroll eval-detalle-body is-tres${esGeneral ? " is-general" : ""}`}>
+        <div
+          className={`page-scroll eval-detalle-body is-tres${esGeneral ? " is-general" : ""}${paneles.bodyClassName ? ` ${paneles.bodyClassName}` : ""}`}
+        >
           <input type="hidden" name="asignacionId" value={asignacionId} />
           <div className="eval-detalle-headers">
-            <div className="eval-detalle-head is-caso">
-              <h2>Caso</h2>
-              <p>Respuestas del participante</p>
-            </div>
-            <div className="eval-detalle-head is-eval">
-              <h2>Evaluación</h2>
-              <p>
-                {headerEvaluacion ??
-                  (esGeneral ? "Observación general" : "Revisión por pregunta")}
-              </p>
-            </div>
-            <div className="eval-detalle-head is-sup">
-              <h2>Supervisión</h2>
-              <p>
-                {headerSupervision ??
-                  (esGeneral ? "Revisión general de la evaluación" : "Revisión de la evaluación por pregunta")}
-              </p>
-            </div>
+            <EvalDetalleHead panel="caso" title="Caso" subtitle="Respuestas del participante" />
+            <EvalDetalleHead
+              panel="eval"
+              title="Evaluación"
+              subtitle={
+                headerEvaluacion ?? (esGeneral ? "Revisión de la respuesta" : "Revisión por pregunta")
+              }
+              collapsed={paneles.evalColapsado}
+              onToggle={paneles.toggleEval}
+            />
+            <EvalDetalleHead
+              panel="sup"
+              title="Supervisión"
+              subtitle={
+                headerSupervision ??
+                (esGeneral
+                  ? "Revisión general de la evaluación"
+                  : "Revisión de la evaluación por pregunta")
+              }
+              collapsed={paneles.supColapsado}
+              onToggle={paneles.toggleSup}
+            />
           </div>
           {esGeneral ? (
             <>

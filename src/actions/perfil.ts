@@ -5,7 +5,7 @@ import { updateSession } from "@/auth";
 import { prisma } from "@/lib/db";
 import { parseArchivosSoloFiles, publicUploadUrl, type StoredFile } from "@/lib/preguntas";
 import { normalizarRutParaGuardar } from "@/lib/rut";
-import { requirePortalUser, requireUser } from "@/lib/session";
+import { requireUser } from "@/lib/session";
 import {
   deleteUpload,
   MAX_DOCUMENTOS_FORMALIZACION,
@@ -20,7 +20,7 @@ function serializeDocumentos(docs: StoredFile[]): string {
 }
 
 export async function actualizarPerfilPropio(formData: FormData) {
-  const sessionUser = await requirePortalUser();
+  const sessionUser = await requireUser("EMPRENDEDOR");
   const name = String(formData.get("name") ?? "").trim();
 
   if (!name) {
@@ -85,8 +85,6 @@ export async function actualizarPerfilPropio(formData: FormData) {
 
   revalidatePath("/participante");
   revalidatePath("/participante/perfil");
-  revalidatePath("/evaluador");
-  revalidatePath("/evaluador/perfil");
   return { ok: true };
 }
 

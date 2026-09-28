@@ -100,19 +100,20 @@ export function FormularioPostulante({
   return (
     <form
       ref={formRef}
-      className="page-workspace grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden"
+      className="page-workspace mx-auto grid h-full min-h-0 w-full max-w-4xl grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden"
       aria-busy={saving}
     >
       <div className="shrink-0 space-y-3 bg-background">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            {back}
+            <span data-tour="volver">{back}</span>
             <div className="min-w-0 flex-1">{title}</div>
           </div>
           {canEdit ? (
             <div className="flex shrink-0 flex-wrap justify-end gap-2">
               <button
                 className="btn btn-sm btn-secondary"
+                data-tour="guardar-borrador"
                 type="submit"
                 disabled={saving || confirmando}
                 formAction={async (formData) => {
@@ -123,6 +124,7 @@ export function FormularioPostulante({
               </button>
               <button
                 className="btn btn-sm btn-primary"
+                data-tour="enviar-caso"
                 type="submit"
                 disabled={saving || confirmando}
                 formAction={(formData) => {
@@ -143,7 +145,10 @@ export function FormularioPostulante({
         {mensaje ? <p className="text-emerald-800">{mensaje}</p> : null}
         {error ? <p className="text-danger">{error}</p> : null}
       </div>
-      <div className="page-scroll min-h-0 overflow-y-auto overscroll-contain space-y-6 pr-1">
+      <div
+        className="page-scroll min-h-0 overflow-y-auto overscroll-contain space-y-6 pr-1"
+        data-tour="formulario-caso"
+      >
         <input type="hidden" name="postulacionId" value={postulacionId} />
         {children}
       </div>

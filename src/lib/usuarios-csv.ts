@@ -1,5 +1,6 @@
 import { ROLE_LABELS, esRolCatalogoEvaluador, isRole, type Role } from "@/lib/roles";
 import { ESCUELAS, isEscuela, type Escuela } from "@/lib/escuelas";
+import { validatePassword } from "@/lib/password-policy";
 
 export type UsuarioCsv = {
   linea: number;
@@ -187,6 +188,20 @@ export function parseUsuariosCsv(text: string): ParseUsuariosCsvResult {
         linea,
         mensaje: "Completa nombre, correo, contraseña y un rol válido (Administración, Evaluador, Supervisor o Participante).",
       });
+      continue;
+    }
+
+    if (role === "ADMIN") {
+      errores.push({
+        linea,
+        mensaje: "El alta masiva no puede crear usuarios Administración.",
+      });
+      continue;
+    }
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      errores.push({ linea, mensaje: passwordError });
       continue;
     }
 

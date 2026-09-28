@@ -1,15 +1,24 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { EvalDetalleHead, useEvalPanelesColapsables } from "@/components/eval-detalle-head";
 import { HistorialVersionesRespuesta } from "@/components/historial-versiones-respuesta";
 import { PanelEvaluacionPregunta } from "@/components/panel-evaluacion-pregunta";
 import { PanelObservacionGeneral, PanelSupervisionPendiente } from "@/components/panel-observacion-general";
 import { PreguntaCampo } from "@/components/pregunta-campo";
 import type { DetalleFichaAdmin } from "@/lib/convocatoria-admin-data";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
-import { etiquetaNombreCaso } from "@/lib/nombre-caso";
 import { notasParaEvaluacionGeneral, parseEscalaNotas } from "@/lib/preguntas";
 import { historialSupervision } from "@/lib/supervision-ui";
+
+function lineaPersona(
+  nombre: string | null | undefined,
+  email: string | null | undefined,
+  vacio: string,
+) {
+  const partes = [nombre, email].filter(Boolean);
+  return partes.length > 0 ? partes.join(" · ") : vacio;
+}
 
 export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
   const [asignacionId, setAsignacionId] = useState(data.asignaciones[0]?.id ?? "");
@@ -19,23 +28,16 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
     [asignacionId, data.asignaciones],
   );
 
-  const nombreCaso = etiquetaNombreCaso(data.nombreCaso);
   const modoEvaluacion = parseModoEvaluacion(data.modoEvaluacion);
   const esGeneral = modoEvaluacion === "GENERAL";
   const ciclo = asignacion?.cicloSupervision ?? 1;
   const ronda = asignacion?.rondaActual ?? 1;
+  const paneles = useEvalPanelesColapsables();
 
   return (
     <div className="ficha-detalle-admin eval-shell-open">
-      <div className="ficha-detalle-admin-meta">
-        <div className="min-w-0">
-          <p className="ficha-detalle-admin-caso">{nombreCaso}</p>
-          <p className="text-muted">
-            {data.emprendedorNombre} · {data.emprendedorEmail}
-            {data.supervisorNombre ? ` · Supervisor: ${data.supervisorNombre}` : ""}
-          </p>
-        </div>
-        {data.asignaciones.length > 0 ? (
+      {data.asignaciones.length > 0 ? (
+        <div className="ficha-detalle-admin-meta">
           <div className="ficha-detalle-admin-eval">
             <label htmlFor="ficha-detalle-evaluador">Evaluación de</label>
             <select
@@ -60,34 +62,45 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
               ))}
             </select>
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       <section className="eval-detalle-shell" aria-label="Caso, evaluación y supervisión">
-        <div className={`page-scroll eval-detalle-body${esGeneral ? " is-general" : ""}`}>
+        <div
+          className={`page-scroll eval-detalle-body${esGeneral ? " is-general" : ""}${paneles.bodyClassName ? ` ${paneles.bodyClassName}` : ""}`}
+        >
           <div className="eval-detalle-headers">
-            <div className="eval-detalle-head is-caso">
-              <h2>Caso</h2>
-              <p>Respuestas del participante</p>
-            </div>
-            <div className="eval-detalle-head is-eval">
-              <h2>Evaluación</h2>
-              <p>
-                {asignacion
-                  ? esGeneral
-                    ? `Observación general de ${asignacion.evaluadorNombre}`
-                    : `Revisión de ${asignacion.evaluadorNombre}`
-                  : "Sin evaluadores asignados"}
-              </p>
-            </div>
-            <div className="eval-detalle-head is-sup">
-              <h2>Supervisión</h2>
-              <p>
-                {data.supervisorNombre
-                  ? `Revisión de ${data.supervisorNombre}`
-                  : "Sin supervisor asignado"}
-              </p>
-            </div>
+            <EvalDetalleHead
+              panel="caso"
+              title="Caso"
+              subtitle={lineaPersona(
+                data.emprendedorNombre,
+                data.emprendedorEmail,
+                "Sin participante",
+              )}
+            />
+            <EvalDetalleHead
+              panel="eval"
+              title="Evaluación"
+              subtitle={lineaPersona(
+                asignacion?.evaluadorNombre,
+                asignacion?.evaluadorEmail,
+                "Sin evaluadores asignados",
+              )}
+              collapsed={paneles.evalColapsado}
+              onToggle={paneles.toggleEval}
+            />
+            <EvalDetalleHead
+              panel="sup"
+              title="Supervisión"
+              subtitle={lineaPersona(
+                data.supervisorNombre,
+                data.supervisorEmail,
+                "Sin supervisor asignado",
+              )}
+              collapsed={paneles.supColapsado}
+              onToggle={paneles.toggleSup}
+            />
           </div>
 
           {esGeneral ? (

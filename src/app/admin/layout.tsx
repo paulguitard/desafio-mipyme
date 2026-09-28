@@ -1,13 +1,12 @@
+import { AdminAppShell } from "@/components/admin-app-shell";
 import { AdminConfigLauncher } from "@/components/admin-config-modal";
 import { AppHeader } from "@/components/app-header";
-import { AppShell } from "@/components/app-shell";
 import { requireUser } from "@/lib/session";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser("ADMIN");
   return (
-    <AppShell
-      maxWidthClass="max-w-6xl"
+    <AdminAppShell
       header={
         <AppHeader
           title="Administración"
@@ -16,13 +15,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             { href: "/admin", label: "Inicio" },
             { href: "/admin/usuarios", label: "Usuarios" },
             { href: "/admin/formularios", label: "Formularios" },
-            { href: "/admin/convocatorias", label: "Convocatorias" },
+            { href: "/admin/mentorias", label: "Mentorías" },
           ]}
           trailing={<AdminConfigLauncher />}
         />
       }
     >
       <div className="relative h-full min-h-0 overflow-hidden">{children}</div>
-    </AppShell>
+    </AdminAppShell>
   );
 }

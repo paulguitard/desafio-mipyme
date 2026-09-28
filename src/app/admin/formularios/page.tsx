@@ -11,12 +11,12 @@ export default async function FormulariosPage() {
     <div className="page-scroll h-full space-y-8 overflow-y-auto">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-extrabold text-navy">Formularios</h1>
-        <a className="btn btn-sm btn-primary" href="/admin/formularios/nuevo">
+        <a className="btn btn-sm btn-primary" href="/admin/formularios/nuevo" data-tour="formularios-nuevo">
           Crear nuevo formulario
         </a>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-3" data-tour="formularios-lista">
         {formularios.length === 0 ? <p className="text-muted">Aún no hay formularios.</p> : null}
         {formularios.map((form) => {
           const modo = parseModoEvaluacion(form.modoEvaluacion);
@@ -25,7 +25,7 @@ export default async function FormulariosPage() {
               <h2 className="text-xl font-semibold">{form.titulo}</h2>
               <p className="text-muted">
                 {MODO_EVALUACION_LABEL[modo]} · {form._count.preguntas} preguntas ·{" "}
-                {form._count.convocatorias} convocatorias
+                {form._count.convocatorias === 1 ? "1 mentoría" : `${form._count.convocatorias} mentorías`}
               </p>
             </a>
           );

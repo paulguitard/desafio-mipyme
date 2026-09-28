@@ -23,8 +23,10 @@ import {
 import { postulacionEditable, type EstadoPostulacion } from "@/lib/estado";
 import { convocatoriaAbiertaParaPostular } from "@/lib/convocatoria";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
-import { asegurarPreguntaNombreCaso } from "@/lib/nombre-caso";
+import { sanitizeRichText } from "@/lib/html";
+import { extraerNombreCaso } from "@/lib/nombre-caso";
 import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
+import { avisarEvaluadoresRespuestaReenviada } from "@/lib/correo-notificacion";
 import { randomUUID } from "node:crypto";
 
 async function cargaPostulacionDelUsuario(id: string, emprendedorId: string) {
@@ -90,9 +92,8 @@ export async function iniciarPostulacion(formData: FormData) {
     where: { id: convocatoriaId },
   });
   if (!convocatoria || !convocatoriaAbiertaParaPostular(convocatoria)) {
-    return { error: "La convocatoria no está abierta." };
+    return { error: "La mentoría no está abierta." };
   }
-  await asegurarPreguntaNombreCaso(convocatoria.formularioId);
 
   const existente = await prisma.postulacion.findUnique({
     where: {
@@ -203,6 +204,8 @@ async function persistirRespuestas(args: {
       continue;
     }
     const valor = leido === MANTENER_VALOR ? "" : leido;
+    const valorSanitizado =
+      pregunta.tipo === "texto_largo" ? sanitizeRichText(String(valor ?? "")) : valor;
 
     const archivos: StoredAttachment[] = existing
       ? parseArchivos(existing.archivos).filter(isStoredFile)
@@ -256,7 +259,7 @@ async function persistirRespuestas(args: {
 
     pendientes.push({
       preguntaId: pregunta.id,
-      valorStr: serializeValor(valor),
+      valorStr: serializeValor(valorSanitizado),
       archivosStr: JSON.stringify(archivos),
       existing,
     });
@@ -300,6 +303,25 @@ async function persistirRespuestas(args: {
       }
     }
   });
+
+  const actualizada = await prisma.postulacion.findUnique({
+    where: { id: args.postulacionId },
+    include: {
+      convocatoria: { include: { formulario: { include: { preguntas: { select: { id: true, opciones: true } } } } } },
+      respuestas: { select: { preguntaId: true, valor: true } },
+    },
+  });
+  if (actualizada) {
+    await prisma.postulacion.update({
+      where: { id: args.postulacionId },
+      data: {
+        nombreCaso: extraerNombreCaso(
+          actualizada.convocatoria.formulario.preguntas,
+          actualizada.respuestas,
+        ),
+      },
+    });
+  }
 }
 
 function respuestaVacia(valorRaw: string, archivosRaw: string, tipo: string, opciones = "[]") {
@@ -434,13 +456,21 @@ export async function enviarPostulacion(formData: FormData) {
   }
 
   if (estado === "CON_OBSERVACIONES") {
+    const observadasAsignaciones = actualizada.asignaciones.filter(
+      (asignacion) => asignacion.estado === "CON_OBSERVACIONES",
+    );
     await prisma.asignacionEvaluador.updateMany({
       where: { postulacionId: id, estado: "CON_OBSERVACIONES" },
       data: { estado: "REPARADA", rondaActual: { increment: 1 } },
     });
+    await sincronizarEstadoPostulacion(id);
+    await avisarEvaluadoresRespuestaReenviada({
+      asignacionIds: observadasAsignaciones.map((asignacion) => asignacion.id),
+      actorNombre: user.name ?? "El participante",
+    });
+  } else {
+    await sincronizarEstadoPostulacion(id);
   }
-
-  await sincronizarEstadoPostulacion(id);
   revalidatePath(`/participante/postulaciones/${id}`);
   revalidatePath("/participante");
   revalidatePath("/evaluador");

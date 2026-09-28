@@ -9,6 +9,13 @@ import {
   toConfigCorreoView,
   type ConfigCorreoRecuperacionData,
 } from "@/lib/correo-recuperacion";
+import {
+  DEFAULT_CORREO_NOTIFICACION,
+  TIPOS_CORREO_NOTIFICACION,
+  isTipoCorreoNotificacion,
+  type TextosCorreoNotificacion,
+  type TipoCorreoNotificacion,
+} from "@/lib/correo-notificacion";
 
 function isHexColor(value: string) {
   return /^#[0-9a-fA-F]{6}$/.test(value.trim());
@@ -80,28 +87,6 @@ export async function getConfigCorreoRecuperacion(): Promise<
   }
 }
 
-/** Para el envío de mails (sin exigir sesión admin). */
-export async function loadConfigCorreoRecuperacionForMail(): Promise<
-  Omit<ConfigCorreoRecuperacionData, "imagenUrl">
-> {
-  const row = await prisma.configCorreoRecuperacion.findUnique({
-    where: { id: "default" },
-  });
-  if (!row) return DEFAULT_CORREO_RECUPERACION;
-  return {
-    asunto: row.asunto,
-    titulo: row.titulo,
-    cuerpo: row.cuerpo,
-    textoBoton: row.textoBoton,
-    pie: row.pie,
-    colorFondo: row.colorFondo,
-    colorEncabezado: row.colorEncabezado,
-    colorBoton: row.colorBoton,
-    colorTexto: row.colorTexto,
-    imagen: row.imagen,
-  };
-}
-
 export async function guardarConfigCorreoRecuperacion(formData: FormData) {
   await requireUser("ADMIN");
 
@@ -160,4 +145,66 @@ export async function guardarConfigCorreoRecuperacion(formData: FormData) {
   const loaded = await getConfigCorreoRecuperacion();
   if (!loaded.ok) return { error: loaded.error };
   return { ok: true as const, config: loaded.config };
+}
+
+export async function getConfigCorreoNotificaciones(): Promise<{
+  ok: boolean;
+  error?: string;
+  textos: Record<TipoCorreoNotificacion, TextosCorreoNotificacion>;
+}> {
+  await requireUser("ADMIN");
+  const fallback = { ...DEFAULT_CORREO_NOTIFICACION };
+  try {
+    const rows = await prisma.configCorreoNotificacion.findMany({
+      where: { id: { in: [...TIPOS_CORREO_NOTIFICACION] } },
+    });
+    const textos = { ...fallback };
+    for (const row of rows) {
+      if (!isTipoCorreoNotificacion(row.id)) continue;
+      textos[row.id] = {
+        asunto: row.asunto,
+        titulo: row.titulo,
+        cuerpo: row.cuerpo,
+        textoBoton: row.textoBoton,
+        pie: row.pie,
+      };
+    }
+    return { ok: true, textos };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Error desconocido";
+    return {
+      ok: false,
+      error: `No se pudieron cargar los avisos. ${message.slice(0, 160)}`,
+      textos: fallback,
+    };
+  }
+}
+
+export async function guardarConfigCorreoNotificacion(formData: FormData) {
+  await requireUser("ADMIN");
+
+  const tipo = String(formData.get("tipo") ?? "").trim();
+  if (!isTipoCorreoNotificacion(tipo)) {
+    return { error: "Tipo de aviso no válido." };
+  }
+
+  const asunto = String(formData.get("asunto") ?? "").trim();
+  const titulo = String(formData.get("titulo") ?? "").trim();
+  const cuerpo = String(formData.get("cuerpo") ?? "").trim();
+  const textoBoton = String(formData.get("textoBoton") ?? "").trim();
+  const pie = String(formData.get("pie") ?? "").trim();
+
+  if (!asunto || !titulo || !cuerpo || !textoBoton) {
+    return { error: "Asunto, título, cuerpo y texto del botón son obligatorios." };
+  }
+
+  await prisma.configCorreoNotificacion.upsert({
+    where: { id: tipo },
+    create: { id: tipo, asunto, titulo, cuerpo, textoBoton, pie },
+    update: { asunto, titulo, cuerpo, textoBoton, pie },
+  });
+
+  const loaded = await getConfigCorreoNotificaciones();
+  if (!loaded.ok) return { error: loaded.error };
+  return { ok: true as const, textos: loaded.textos };
 }

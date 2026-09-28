@@ -7,6 +7,7 @@ import { parseEscalaNotas } from "@/lib/preguntas";
 import { requireUser } from "@/lib/session";
 import { evaluadorPuedeEditar } from "@/lib/estado";
 import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
+import { avisarSupervisorNuevaRevision } from "@/lib/correo-notificacion";
 
 async function cargaAsignacion(id: string, evaluadorId: string) {
   return prisma.asignacionEvaluador.findFirst({
@@ -101,7 +102,7 @@ export async function guardarRevision(formData: FormData) {
   const asignacion = await cargaAsignacion(asignacionId, user.id);
   if (!asignacion) return { error: "Evaluación no encontrada." };
   if (asignacion.postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La convocatoria está cerrada." };
+    return { error: "La mentoría está cerrada." };
   }
   if (asignacion.estado === "FINALIZADA") {
     return { error: "Esta evaluación ya está finalizada." };
@@ -158,7 +159,7 @@ export async function enviarObservaciones(formData: FormData) {
   const asignacion = await cargaAsignacion(asignacionId, user.id);
   if (!asignacion) return { error: "Evaluación no encontrada." };
   if (asignacion.postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La convocatoria está cerrada." };
+    return { error: "La mentoría está cerrada." };
   }
   if (!evaluadorPuedeEditar(asignacion.estado)) {
     return { error: "No puedes enviar observaciones en este estado." };
@@ -200,6 +201,10 @@ export async function enviarObservaciones(formData: FormData) {
     data: { estado: "EN_SUPERVISION", intencionPendiente: "OBSERVACIONES" },
   });
   await sincronizarEstadoPostulacion(asignacion.postulacionId);
+  await avisarSupervisorNuevaRevision({
+    postulacionId: asignacion.postulacionId,
+    actorNombre: user.name ?? "Un evaluador",
+  });
   revalidatePath(`/evaluador/evaluaciones/${asignacionId}`);
   revalidatePath("/evaluador");
   revalidatePath("/participante");
@@ -212,7 +217,7 @@ export async function finalizarEvaluacion(formData: FormData) {
   const asignacion = await cargaAsignacion(asignacionId, user.id);
   if (!asignacion) return { error: "Evaluación no encontrada." };
   if (asignacion.postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La convocatoria está cerrada." };
+    return { error: "La mentoría está cerrada." };
   }
   if (!evaluadorPuedeEditar(asignacion.estado)) {
     return { error: "No puedes finalizar en este estado." };
@@ -253,6 +258,10 @@ export async function finalizarEvaluacion(formData: FormData) {
     data: { estado: "EN_SUPERVISION", intencionPendiente: "FINALIZAR" },
   });
   await sincronizarEstadoPostulacion(asignacion.postulacionId);
+  await avisarSupervisorNuevaRevision({
+    postulacionId: asignacion.postulacionId,
+    actorNombre: user.name ?? "Un evaluador",
+  });
   revalidatePath(`/evaluador/evaluaciones/${asignacionId}`);
   revalidatePath("/evaluador");
   revalidatePath("/participante");

@@ -5,6 +5,10 @@ import { prisma } from "@/lib/db";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { requireUser } from "@/lib/session";
 import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
+import {
+  avisarEvaluadorDevolucionSupervisor,
+  avisarTrasAprobacionSupervisor,
+} from "@/lib/correo-notificacion";
 
 async function cargaAsignacionParaSupervisor(asignacionId: string, supervisorId: string) {
   return prisma.asignacionEvaluador.findFirst({
@@ -101,7 +105,7 @@ export async function guardarSupervision(formData: FormData) {
   const asignacion = await cargaAsignacionParaSupervisor(asignacionId, user.id);
   if (!asignacion) return { error: "Evaluación no encontrada." };
   if (asignacion.postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La convocatoria está cerrada." };
+    return { error: "La mentoría está cerrada." };
   }
   if (asignacion.estado !== "EN_SUPERVISION") {
     return { error: "Solo puedes supervisar evaluaciones enviadas al supervisor." };
@@ -128,7 +132,7 @@ export async function enviarObservacionesSupervision(formData: FormData) {
   const asignacion = await cargaAsignacionParaSupervisor(asignacionId, user.id);
   if (!asignacion) return { error: "Evaluación no encontrada." };
   if (asignacion.postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La convocatoria está cerrada." };
+    return { error: "La mentoría está cerrada." };
   }
   if (asignacion.estado !== "EN_SUPERVISION") {
     return { error: "Solo puedes devolver evaluaciones que están en supervisión." };
@@ -175,6 +179,10 @@ export async function enviarObservacionesSupervision(formData: FormData) {
     },
   });
   await sincronizarEstadoPostulacion(asignacion.postulacionId);
+  await avisarEvaluadorDevolucionSupervisor({
+    asignacionId,
+    actorNombre: user.name ?? "El supervisor",
+  });
   revalidateSupervision(asignacionId, asignacion.postulacionId);
   return { ok: true };
 }
@@ -185,7 +193,7 @@ export async function procederSupervision(formData: FormData) {
   const asignacion = await cargaAsignacionParaSupervisor(asignacionId, user.id);
   if (!asignacion) return { error: "Evaluación no encontrada." };
   if (asignacion.postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La convocatoria está cerrada." };
+    return { error: "La mentoría está cerrada." };
   }
   if (asignacion.estado !== "EN_SUPERVISION") {
     return { error: "Solo puedes proceder evaluaciones que están en supervisión." };
@@ -226,6 +234,11 @@ export async function procederSupervision(formData: FormData) {
     },
   });
   await sincronizarEstadoPostulacion(asignacion.postulacionId);
+  await avisarTrasAprobacionSupervisor({
+    asignacionId,
+    actorNombre: user.name ?? "El supervisor",
+    resultado: asignacion.intencionPendiente === "FINALIZAR" ? "finalizacion" : "observaciones",
+  });
   revalidateSupervision(asignacionId, asignacion.postulacionId);
   return { ok: true };
 }

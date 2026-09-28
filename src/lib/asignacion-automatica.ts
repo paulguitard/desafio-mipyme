@@ -1,3 +1,4 @@
+import { cupoAlcanzado } from "@/lib/cupo-asignacion";
 import { prisma } from "@/lib/db";
 import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
 
@@ -11,12 +12,12 @@ export async function asignarEvaluadoresAutomaticoEnConvocatoria(convocatoriaId:
       },
     },
   });
-  if (!convocatoria) return { error: "Convocatoria no encontrada." };
+  if (!convocatoria) return { error: "Mentoría no encontrada." };
   if (convocatoria.estado !== "ABIERTA") {
-    return { error: "La convocatoria está cerrada. No se puede asignar." };
+    return { error: "La mentoría está cerrada. No se puede asignar." };
   }
   if (convocatoria.evaluadores.length === 0) {
-    return { error: "Agrega evaluadores al pool de la convocatoria primero." };
+    return { error: "Agrega evaluadores al pool de la mentoría primero." };
   }
 
   const n = Math.max(1, convocatoria.evaluacionesPorPostulacion);
@@ -44,7 +45,7 @@ export async function asignarEvaluadoresAutomaticoEnConvocatoria(convocatoriaId:
       .filter((item) => {
         if (ya.has(item.evaluadorId)) return false;
         const carga = cargas.get(item.evaluadorId) ?? 0;
-        if (item.maxEvaluaciones > 0 && carga >= item.maxEvaluaciones) return false;
+        if (cupoAlcanzado(item.maxEvaluaciones, carga)) return false;
         return true;
       })
       .sort((a, b) => {

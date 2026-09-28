@@ -6,7 +6,6 @@ import { prisma } from "@/lib/db";
 import { postulacionEditable, type EstadoPostulacion } from "@/lib/estado";
 import { convocatoriaAbiertaParaPostular } from "@/lib/convocatoria";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
-import { asegurarPreguntaNombreCaso } from "@/lib/nombre-caso";
 import { requireUser } from "@/lib/session";
 import { notFound } from "next/navigation";
 
@@ -22,7 +21,6 @@ export default async function PostulacionPage({
     select: { postulanteId: true, convocatoria: { select: { formularioId: true } } },
   });
   if (!previa || previa.postulanteId !== user.id) notFound();
-  await asegurarPreguntaNombreCaso(previa.convocatoria.formularioId);
 
   const postulacion = await prisma.postulacion.findUnique({
     where: { id },
@@ -101,7 +99,7 @@ export default async function PostulacionPage({
           ) : null}
           <BadgePostulacion estado={postulacion.estado} />
           {!abierta ? (
-            <p className="font-semibold text-danger">La convocatoria está cerrada. Solo puedes consultar.</p>
+            <p className="font-semibold text-danger">La mentoría está cerrada. Solo puedes consultar.</p>
           ) : null}
           {esCorreccion ? (
             <p>

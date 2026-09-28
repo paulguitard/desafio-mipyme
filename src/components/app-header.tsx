@@ -25,7 +25,7 @@ export function AppHeader({
             <p className="text-white">Hola, {name}</p>
           </div>
         </div>
-        <nav className="flex flex-wrap items-center gap-2">
+        <nav className="flex flex-wrap items-center gap-2" data-tour="nav">
           {links.map((link) => (
             <a
               key={link.href}

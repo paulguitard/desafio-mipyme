@@ -53,10 +53,10 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#39;");
 }
 
-function applyPlaceholders(template: string, vars: { nombre: string; enlace: string }) {
-  return template
-    .replaceAll("{{nombre}}", vars.nombre)
-    .replaceAll("{{enlace}}", vars.enlace);
+export type CorreoPlaceholders = Record<string, string>;
+
+export function applyPlaceholders(template: string, vars: CorreoPlaceholders) {
+  return template.replaceAll(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key: string) => vars[key] ?? "");
 }
 
 function paragraphsToHtml(text: string) {
@@ -75,16 +75,15 @@ function paragraphsToHtml(text: string) {
 
 export function renderCorreoRecuperacion(
   config: Omit<ConfigCorreoRecuperacionData, "imagenUrl">,
-  vars: { nombre: string; enlace: string },
+  vars: CorreoPlaceholders,
+  imagenUrl = imagenUrlFromStored(config.imagen),
 ): { subject: string; html: string; text: string } {
-  const nombreSafe = vars.nombre;
-  const enlace = vars.enlace;
-  const subject = applyPlaceholders(config.asunto, { nombre: nombreSafe, enlace });
-  const titulo = applyPlaceholders(config.titulo, { nombre: nombreSafe, enlace });
-  const cuerpo = applyPlaceholders(config.cuerpo, { nombre: nombreSafe, enlace });
-  const textoBoton = applyPlaceholders(config.textoBoton, { nombre: nombreSafe, enlace });
-  const pie = applyPlaceholders(config.pie, { nombre: nombreSafe, enlace });
-  const imagenUrl = imagenUrlFromStored(config.imagen);
+  const enlace = vars.enlace ?? "";
+  const subject = applyPlaceholders(config.asunto, vars);
+  const titulo = applyPlaceholders(config.titulo, vars);
+  const cuerpo = applyPlaceholders(config.cuerpo, vars);
+  const textoBoton = applyPlaceholders(config.textoBoton, vars);
+  const pie = applyPlaceholders(config.pie, vars);
 
   const html = `
 <!DOCTYPE html>

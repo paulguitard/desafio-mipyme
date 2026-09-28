@@ -1,5 +1,6 @@
 import { Montserrat, Nunito_Sans } from "next/font/google";
 import type { Metadata } from "next";
+import { getAppBaseUrl } from "@/lib/app-url";
 import "./globals.css";
 
 const nunito = Nunito_Sans({
@@ -14,9 +15,28 @@ const montserrat = Montserrat({
   weight: ["600", "700", "800"],
 });
 
+const APP_NAME = "Desafío MiPyme";
+const APP_TITLE = "Desafío MiPyme | Portal de Mentorías";
+const APP_DESCRIPTION =
+  "Portal de mentorías del Desafío Nacional MiPyme AIEP";
+
 export const metadata: Metadata = {
-  title: "AIEP | Portal de casos",
-  description: "Casos, evaluaciones y correcciones",
+  metadataBase: new URL(getAppBaseUrl()),
+  applicationName: APP_NAME,
+  title: APP_TITLE,
+  description: APP_DESCRIPTION,
+  openGraph: {
+    title: APP_TITLE,
+    description: APP_DESCRIPTION,
+    siteName: APP_NAME,
+    locale: "es_CL",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: APP_TITLE,
+    description: APP_DESCRIPTION,
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

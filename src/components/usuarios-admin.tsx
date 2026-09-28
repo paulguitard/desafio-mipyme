@@ -8,6 +8,10 @@ import {
   eliminarUsuario,
 } from "@/actions/usuarios";
 import { Modal } from "@/components/modal";
+import {
+  PerfilesParticipantesAdmin,
+  type PerfilParticipanteRow,
+} from "@/components/perfiles-participantes-admin";
 import { ESCUELAS } from "@/lib/escuelas";
 import type { Role } from "@/lib/roles";
 import { ROLE_LABELS, esRolCatalogoEvaluador } from "@/lib/roles";
@@ -18,7 +22,6 @@ type UserRow = {
   id: string;
   name: string;
   email: string;
-  passwordAssigned: string;
   role: string;
   escuela: string | null;
   origen: string;
@@ -37,7 +40,8 @@ type Filtro =
 
 const FILTROS_ROL: { id: Role; roles: Role[] }[] = [
   { id: "EMPRENDEDOR", roles: ["EMPRENDEDOR"] },
-  { id: "EVALUADOR", roles: ["EVALUADOR", "SUPERVISOR"] },
+  { id: "EVALUADOR", roles: ["EVALUADOR"] },
+  { id: "SUPERVISOR", roles: ["SUPERVISOR"] },
   { id: "ADMIN", roles: ["ADMIN"] },
 ];
 
@@ -76,8 +80,16 @@ function EscuelaSelect({
   );
 }
 
-export function UsuariosAdmin({ users }: { users: UserRow[] }) {
+export function UsuariosAdmin({
+  users,
+  perfiles,
+}: {
+  users: UserRow[];
+  perfiles: PerfilParticipanteRow[];
+}) {
   const [error, setError] = useState<string | null>(null);
+  const [vista, setVista] = useState<"usuarios" | "perfiles">("usuarios");
+  const [passwordOnce, setPasswordOnce] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [eliminando, setEliminando] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -178,16 +190,24 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-3xl font-extrabold text-navy">Usuarios</h1>
             <div className="flex flex-wrap gap-2">
+              <button
+                className={`btn btn-sm ${vista === "perfiles" ? "btn-navy" : "btn-secondary"}`}
+                type="button"
+                onClick={() => setVista((actual) => (actual === "perfiles" ? "usuarios" : "perfiles"))}
+              >
+                Perfil de Participantes
+              </button>
               <button className="btn btn-sm btn-secondary" type="button" onClick={abrirCarga}>
                 Carga masiva
               </button>
-              <button className="btn btn-sm btn-primary" type="button" onClick={abrirCrear}>
+              <button className="btn btn-sm btn-primary" type="button" onClick={abrirCrear} data-tour="usuarios-crear">
                 Crear usuario
               </button>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar usuarios">
+          {vista === "usuarios" ? (
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar usuarios" data-tour="usuarios-filtros">
             <button
               type="button"
               className={`btn btn-sm ${filtro.kind === "todos" ? "btn-navy" : "btn-secondary"}`}
@@ -230,44 +250,50 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
               </button>
             ))}
           </div>
+          ) : null}
 
           {error && modal === null ? <p className="text-danger">{error}</p> : null}
+          {passwordOnce ? (
+            <p className="rounded-lg bg-navy-soft p-3 text-sm">
+              Contraseña para copiar ahora (no se vuelve a mostrar):{" "}
+              <span className="font-mono font-bold">{passwordOnce}</span>
+            </p>
+          ) : null}
         </div>
 
-        <div className="card min-h-0 overflow-auto overscroll-contain">
-          <table className="w-full min-w-[820px] text-left">
+        {vista === "perfiles" ? (
+          <PerfilesParticipantesAdmin perfiles={perfiles} />
+        ) : (
+        <div className="card min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain" data-tour="usuarios-tabla">
+          <table className="w-full text-left">
             <thead className="sticky top-0 z-10 bg-[var(--card)]">
               <tr className="border-b border-border">
-                <th className="p-3">Nombre</th>
-                <th className="p-3">Correo</th>
-                <th className="p-3">Contraseña</th>
-                <th className="p-3">Rol</th>
-                <th className="p-3">Escuela</th>
-                <th className="p-3">Origen</th>
-                <th className="p-3">Acciones</th>
+                <th className="whitespace-nowrap px-5 py-3.5">Nombre</th>
+                <th className="whitespace-nowrap px-5 py-3.5">Correo</th>
+                <th className="whitespace-nowrap px-5 py-3.5">Rol</th>
+                <th className="whitespace-nowrap px-5 py-3.5">Escuela</th>
+                <th className="whitespace-nowrap px-5 py-3.5">Origen</th>
+                <th className="whitespace-nowrap px-5 py-3.5">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {visibles.length === 0 ? (
                 <tr>
-                  <td className="p-6 text-muted" colSpan={7}>
+                    <td className="px-5 py-6 text-muted" colSpan={6}>
                     No hay usuarios en este filtro.
                   </td>
                 </tr>
               ) : null}
               {visibles.map((user) => (
                 <tr key={user.id} className="border-b border-border">
-                  <td className="p-3">{user.name}</td>
-                  <td className="p-3">{user.email}</td>
-                  <td className="p-3 font-mono">
-                    {user.passwordAssigned ? user.passwordAssigned : "—"}
-                  </td>
-                  <td className="p-3">{ROLE_LABELS[user.role as Role] ?? user.role}</td>
-                  <td className="p-3">{user.escuela ?? "—"}</td>
-                  <td className="p-3">
+                  <td className="whitespace-nowrap px-5 py-3.5">{user.name}</td>
+                  <td className="whitespace-nowrap px-5 py-3.5">{user.email}</td>
+                  <td className="whitespace-nowrap px-5 py-3.5">{ROLE_LABELS[user.role as Role] ?? user.role}</td>
+                  <td className="whitespace-nowrap px-5 py-3.5">{user.escuela ?? "—"}</td>
+                  <td className="whitespace-nowrap px-5 py-3.5">
                     {user.origen === USER_ORIGEN.REGISTRO ? "Registro propio" : "Admin"}
                   </td>
-                  <td className="p-3">
+                  <td className="whitespace-nowrap px-5 py-3.5">
                     <button className="btn btn-ghost" type="button" onClick={() => abrirEditar(user)}>
                       Editar
                     </button>
@@ -277,6 +303,7 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       <Modal open={modal === "crear"} title="Crear usuario" onClose={cerrarModal}>
@@ -291,6 +318,7 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
             }
             setError(null);
             setModal(null);
+            setPasswordOnce("passwordOnce" in result && result.passwordOnce ? result.passwordOnce : null);
           }}
         >
           <div className="field">
@@ -361,6 +389,7 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
               setError(null);
               setModal(null);
               setEditingUser(null);
+              setPasswordOnce("passwordOnce" in result && result.passwordOnce ? result.passwordOnce : null);
             }}
           >
             <input type="hidden" name="id" value={editingUser.id} />
@@ -457,8 +486,8 @@ export function UsuariosAdmin({ users }: { users: UserRow[] }) {
           }}
         >
           <p className="text-muted">
-            Sube un CSV con columnas nombre, correo, contraseña, rol y escuela. La escuela es
-            obligatoria para Evaluador y Supervisor; el resto de roles puede dejarla vacía.
+            Sube un CSV con columnas nombre, correo, contraseña, rol y escuela. No se pueden crear
+            usuarios Administración. La escuela es obligatoria para Evaluador y Supervisor.
           </p>
           <button className="btn btn-secondary w-fit" type="button" onClick={descargarPlantilla}>
             Descargar plantilla

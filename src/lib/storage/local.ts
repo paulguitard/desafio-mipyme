@@ -1,14 +1,31 @@
 import { unlink } from "node:fs/promises";
 import path from "node:path";
 import type { StoredFile } from "@/lib/preguntas";
+import { appUploadUrl } from "@/lib/storage/public-id";
 
 export { MAX_FILE_BYTES, MAX_IMAGE_BYTES, MAX_IMAGE_INPUT_BYTES } from "@/lib/storage/limits";
 
-const UPLOAD_ROOT = path.join(process.cwd(), "uploads");
+const UPLOAD_ROOT = path.resolve(process.cwd(), "uploads");
+
+export function uploadRoot() {
+  return UPLOAD_ROOT;
+}
+
+export function isSafeRelativeUploadPath(relativePath: string) {
+  if (!relativePath || relativePath.includes("\0")) return false;
+  const normalized = relativePath.replace(/\\/g, "/");
+  if (normalized.startsWith("/") || normalized.includes("://")) return false;
+  const segments = normalized.split("/");
+  return segments.every((segment) => segment !== "" && segment !== "." && segment !== "..");
+}
 
 export function uploadAbsolutePath(relativePath: string) {
-  const resolved = path.join(UPLOAD_ROOT, relativePath);
-  if (!resolved.startsWith(UPLOAD_ROOT)) {
+  if (!isSafeRelativeUploadPath(relativePath)) {
+    throw new Error("Ruta de archivo inválida");
+  }
+  const resolved = path.resolve(UPLOAD_ROOT, relativePath);
+  const rel = path.relative(UPLOAD_ROOT, resolved);
+  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
     throw new Error("Ruta de archivo inválida");
   }
   return resolved;
@@ -22,10 +39,8 @@ export async function deleteLocalUpload(relativePath: string) {
   }
 }
 
-export function publicUploadUrl(file: StoredFile) {
-  if (file.url) return file.url;
-  if (/^https?:\/\//i.test(file.relativePath)) return file.relativePath;
-  return `/api/archivos/${encodeURIComponent(file.relativePath)}`;
+export function publicUploadUrl(file: StoredFile, options?: { width?: number }) {
+  return appUploadUrl(file, options);
 }
 
 export function mimeFromFilename(relativePath: string): string {
@@ -36,7 +51,6 @@ export function mimeFromFilename(relativePath: string): string {
     ".jpeg": "image/jpeg",
     ".png": "image/png",
     ".gif": "image/gif",
-    ".svg": "image/svg+xml",
     ".pdf": "application/pdf",
     ".txt": "text/plain",
     ".csv": "text/csv",
@@ -44,7 +58,7 @@ export function mimeFromFilename(relativePath: string): string {
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".xls": "application/vnd.ms-excel",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ".ppt": "application/vnd.ms-powerpoint",
+    ".ppt": "application/ms-powerpoint",
     ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     ".zip": "application/zip",
     ".mp4": "video/mp4",
