@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 
 const EditorTextoLargo = dynamic(
@@ -19,6 +19,8 @@ const CampoObjetivosIndicadores = dynamic(
   () => import("@/components/pregunta-formatos").then((mod) => mod.CampoObjetivosIndicadores),
 );
 import { VideoEmbed, VideoMiniatura } from "@/components/video-embed";
+import { InputCorreo } from "@/components/input-correo";
+import { normalizarCorreo } from "@/lib/correo";
 import {
   esTipoFormato,
   formatearValorPregunta,
@@ -35,6 +37,68 @@ import {
   type StoredFile,
   type TipoPregunta,
 } from "@/lib/preguntas";
+
+function CampoAdjunto({
+  id,
+  name,
+  tipo,
+}: {
+  id: string;
+  name: string;
+  tipo: "imagen" | "archivo";
+}) {
+  const [nombre, setNombre] = useState("");
+  const esImagen = tipo === "imagen";
+
+  function alCambiar(files: FileList | null) {
+    setNombre(files?.[0]?.name ?? "");
+  }
+
+  function quitar() {
+    const input = document.getElementById(id);
+    if (input instanceof HTMLInputElement) {
+      input.value = "";
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    setNombre("");
+  }
+
+  return (
+    <div className="campo-adjunto">
+      <p className="campo-adjunto-titulo">{esImagen ? "Imagen" : "Archivo"}</p>
+      <input
+        className="sr-only"
+        id={id}
+        name={name}
+        type="file"
+        accept={esImagen ? "image/*" : undefined}
+        onChange={(event) => alCambiar(event.target.files)}
+      />
+      <div className="campo-adjunto-fila">
+        <label className="btn btn-sm btn-secondary cursor-pointer" htmlFor={id}>
+          {nombre ? (esImagen ? "Cambiar imagen" : "Cambiar archivo") : esImagen ? "Elegir imagen" : "Elegir archivo"}
+        </label>
+        {nombre ? (
+          <>
+            <span className="campo-adjunto-nombre">{nombre}</span>
+            <button className="btn btn-sm btn-ghost" type="button" onClick={quitar}>
+              Quitar
+            </button>
+          </>
+        ) : (
+          <span className="campo-adjunto-vacio">
+            {esImagen ? "Aún no elegiste una imagen." : "Aún no elegiste un archivo."}
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-muted">
+        {esImagen
+          ? "JPG, PNG o WebP. Al guardar se ajusta sola (máx. 250 KB)."
+          : "PDF u otro documento, máximo 2 MB. Al guardar podrás abrirlo en otra pestaña."}
+      </p>
+    </div>
+  );
+}
 
 function valorTexto(valor: unknown) {
   if (Array.isArray(valor)) return valor.join(", ");
@@ -291,9 +355,9 @@ export function PreguntaCampo({
   }
 
   const correosActuales = Array.isArray(valor)
-    ? valor.map(String)
+    ? valor.map((item) => normalizarCorreo(String(item)))
     : valor
-      ? [String(valor)]
+      ? [normalizarCorreo(String(valor))]
       : [];
   const fechaRango =
     valor && typeof valor === "object" && !Array.isArray(valor)
@@ -363,12 +427,10 @@ export function PreguntaCampo({
               <label htmlFor={`${name}-${index}`}>
                 Correo{cantidadCorreos > 1 ? ` ${index + 1}` : ""}
               </label>
-              <input
+              <InputCorreo
                 className="input w-full"
                 id={`${name}-${index}`}
                 name={name}
-                type="email"
-                inputMode="email"
                 autoComplete="email"
                 placeholder="nombre@correo.com"
                 defaultValue={correosActuales[index] ?? ""}
@@ -432,31 +494,10 @@ export function PreguntaCampo({
       <ArchivosLista archivos={archivos} />
 
       {pregunta.permiteArchivo ? (
-        <div className="field">
-          <label htmlFor={`archivo-${pregunta.id}`}>Adjuntar archivo</label>
-          <input
-            className="input"
-            id={`archivo-${pregunta.id}`}
-            name={`archivo-${pregunta.id}`}
-            type="file"
-          />
-          <p className="text-xs text-muted">Máximo 2 MB. Al guardarlo podrás abrirlo en una pestaña nueva.</p>
-        </div>
+        <CampoAdjunto id={`archivo-${pregunta.id}`} name={`archivo-${pregunta.id}`} tipo="archivo" />
       ) : null}
       {pregunta.permiteImagen ? (
-        <div className="field">
-          <label htmlFor={`imagen-${pregunta.id}`}>Adjuntar imagen</label>
-          <input
-            className="input"
-            id={`imagen-${pregunta.id}`}
-            name={`imagen-${pregunta.id}`}
-            type="file"
-            accept="image/*"
-          />
-          <p className="text-xs text-muted">
-            Se redimensiona y comprime automáticamente a un máximo de 250 KB.
-          </p>
-        </div>
+        <CampoAdjunto id={`imagen-${pregunta.id}`} name={`imagen-${pregunta.id}`} tipo="imagen" />
       ) : null}
       {pregunta.permiteVideoLink ? (
         <div className="field">

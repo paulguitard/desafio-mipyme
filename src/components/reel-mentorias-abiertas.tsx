@@ -96,7 +96,7 @@ function AccionPostular({
   } else if (!enfocada) {
     control = (
       <span className="btn btn-primary reel-postular-fuera" aria-hidden="true">
-        Postular
+        Participar
       </span>
     );
   } else {
@@ -104,7 +104,7 @@ function AccionPostular({
       <form action={iniciarPostulacionForm} onClick={(event) => event.stopPropagation()}>
         <input type="hidden" name="convocatoriaId" value={item.id} />
         <button className="btn btn-primary" type="submit">
-          Postular
+          Participar
         </button>
       </form>
     );
@@ -113,7 +113,13 @@ function AccionPostular({
   return <div className="reel-mentoria-accion">{control}</div>;
 }
 
-function FotoMentoria({ item }: { item: MentoriaAbiertaVista }) {
+function FotoMentoria({
+  item,
+  priority,
+}: {
+  item: MentoriaAbiertaVista;
+  priority?: boolean;
+}) {
   if (item.imagenUrl) {
     return (
       <ImagenMentoriaCover
@@ -121,6 +127,7 @@ function FotoMentoria({ item }: { item: MentoriaAbiertaVista }) {
         pos={item.imagenPos}
         alt=""
         className="reel-mentoria-foto"
+        priority={priority}
       />
     );
   }
@@ -133,12 +140,14 @@ function TarjetaMentoria({
   seleccionable,
   onElegir,
   onVerDetalles,
+  priority,
 }: {
   item: MentoriaAbiertaVista;
   enfocada: boolean;
   seleccionable: boolean;
   onElegir: () => void;
   onVerDetalles: () => void;
+  priority?: boolean;
 }) {
   return (
     <article
@@ -147,7 +156,7 @@ function TarjetaMentoria({
       onClick={seleccionable ? onElegir : undefined}
     >
       <div className="reel-mentoria-foto-wrap">
-        <FotoMentoria item={item} />
+        <FotoMentoria item={item} priority={priority} />
         <button
           className="reel-mentoria-ver-mas"
           type="button"
@@ -236,7 +245,7 @@ function ModalDetalleMentoria({
             {item.yaTieneCaso ? (
               <p className="mentoria-detalle-chip is-estado">Ya tienes un caso en esta mentoría</p>
             ) : (
-              <p className="mentoria-detalle-chip is-estado">Puedes postular a esta mentoría</p>
+              <p className="mentoria-detalle-chip is-estado">Puedes participar en esta mentoría</p>
             )}
           </div>
           <div className="mentoria-detalle-cuerpo">
@@ -343,6 +352,7 @@ export function ReelMentoriasAbiertas({ items }: { items: MentoriaAbiertaVista[]
                 seleccionable={visible && offset !== 0}
                 onElegir={() => irA(index)}
                 onVerDetalles={() => setDetalle(item)}
+                priority={visible}
               />
             </div>
           );
@@ -354,6 +364,7 @@ export function ReelMentoriasAbiertas({ items }: { items: MentoriaAbiertaVista[]
             seleccionable={false}
             onElegir={() => undefined}
             onVerDetalles={() => undefined}
+            priority={false}
           />
         </div>
       </div>

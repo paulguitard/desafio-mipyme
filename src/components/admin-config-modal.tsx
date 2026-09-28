@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { IndicadorGuardando } from "@/components/indicador-guardando";
 import { Modal } from "@/components/modal";
 import {
   getConfigCorreoNotificaciones,
@@ -19,6 +20,7 @@ import {
   type TextosCorreoNotificacion,
   type TipoCorreoNotificacion,
 } from "@/lib/correo-notificacion-ui";
+import { useAccionOptimista } from "@/lib/use-dato-optimista";
 
 type Seccion = "recuperacion" | TipoCorreoNotificacion;
 
@@ -191,9 +193,9 @@ export function AdminConfigLauncher() {
   const [open, setOpen] = useState(false);
   const [seccion, setSeccion] = useState<Seccion>("recuperacion");
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [okMsg, setOkMsg] = useState<string | null>(null);
+  const accion = useAccionOptimista();
+  const error = accion.error;
+  const okMsg = accion.mensaje;
   const [config, setConfig] = useState<ConfigCorreoRecuperacionData>(() => ({
     ...DEFAULT_CORREO_RECUPERACION,
     imagenUrl: null,
@@ -214,8 +216,8 @@ export function AdminConfigLauncher() {
     if (!open) return;
     let cancelled = false;
     setLoading(true);
-    setError(null);
-    setOkMsg(null);
+    accion.setError(null);
+    accion.setMensaje(null);
     void Promise.all([getConfigCorreoRecuperacion(), getConfigCorreoNotificaciones()])
       .then(([recuperacion, avisos]) => {
         if (cancelled) return;
@@ -229,12 +231,12 @@ export function AdminConfigLauncher() {
         const parts = [!recuperacion.ok ? recuperacion.error : null, !avisos.ok ? avisos.error : null].filter(
           Boolean,
         );
-        if (parts.length > 0) setError(parts.join(" "));
+        if (parts.length > 0) accion.setError(parts.join(" "));
       })
       .catch((err: unknown) => {
         if (cancelled) return;
         const detail = err instanceof Error ? err.message : "";
-        setError(
+        accion.setError(
           detail
             ? `No se pudo cargar la configuración. ${detail.slice(0, 160)}`
             : "No se pudo cargar la configuración.",
@@ -257,45 +259,35 @@ export function AdminConfigLauncher() {
     ? SECCIONES_CORREO_NOTIFICACION.find((item) => item.id === seccion)
     : null;
 
-  async function onSubmitRecuperacion(event: FormEvent<HTMLFormElement>) {
+  function onSubmitRecuperacion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSaving(true);
-    setError(null);
-    setOkMsg(null);
     const formData = new FormData(event.currentTarget);
     if (quitarImagen) formData.set("quitarImagen", "1");
-    const result = await guardarConfigCorreoRecuperacion(formData);
-    setSaving(false);
-    if (result && "error" in result && result.error) {
-      setError(result.error);
-      return;
-    }
-    if (result && "config" in result && result.config) {
-      setConfig(result.config);
-      setQuitarImagen(false);
-      setImagenPreview((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
-    }
-    setOkMsg("Configuración de correo guardada.");
+    accion.setMensaje("Configuración de correo guardada.");
+    void accion.ejecutar(() => guardarConfigCorreoRecuperacion(formData), {
+      onOk: (result) => {
+        if (result && "config" in result && result.config) {
+          setConfig(result.config);
+          setQuitarImagen(false);
+          setImagenPreview((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return null;
+          });
+        }
+      },
+    });
   }
 
-  async function onSubmitAviso(event: FormEvent<HTMLFormElement>) {
+  function onSubmitAviso(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSaving(true);
-    setError(null);
-    setOkMsg(null);
-    const result = await guardarConfigCorreoNotificacion(new FormData(event.currentTarget));
-    setSaving(false);
-    if (result && "error" in result && result.error) {
-      setError(result.error);
-      return;
-    }
-    if (result && "textos" in result && result.textos) {
-      setTextos(result.textos);
-    }
-    setOkMsg("Configuración de correo guardada.");
+    accion.setMensaje("Configuración de correo guardada.");
+    void accion.ejecutar(() => guardarConfigCorreoNotificacion(new FormData(event.currentTarget)), {
+      onOk: (result) => {
+        if (result && "textos" in result && result.textos) {
+          setTextos(result.textos);
+        }
+      },
+    });
   }
 
   return (
@@ -343,8 +335,8 @@ export function AdminConfigLauncher() {
                   className={`admin-config-nav-item${seccion === item.id ? " is-active" : ""}`}
                   onClick={() => {
                     setSeccion(item.id);
-                    setError(null);
-                    setOkMsg(null);
+                    accion.setError(null);
+                    accion.setMensaje(null);
                   }}
                 >
                   {item.label}
@@ -373,6 +365,7 @@ export function AdminConfigLauncher() {
 
                 {error ? <p className="text-danger">{error}</p> : null}
                 {okMsg ? <p className="font-semibold text-navy">{okMsg}</p> : null}
+                <IndicadorGuardando visible={accion.guardando} />
 
                 <CamposTextos prefix="recuperacion" value={config} onChange={(next) => setConfig((prev) => ({ ...prev, ...next }))} />
 
@@ -472,8 +465,8 @@ export function AdminConfigLauncher() {
                   >
                     Cancelar
                   </button>
-                  <button className="btn btn-primary" type="submit" disabled={saving}>
-                    {saving ? "Guardando…" : "Guardar"}
+                  <button className="btn btn-primary" type="submit">
+                    Guardar
                   </button>
                 </div>
               </form>
@@ -493,6 +486,7 @@ export function AdminConfigLauncher() {
 
                 {error ? <p className="text-danger">{error}</p> : null}
                 {okMsg ? <p className="font-semibold text-navy">{okMsg}</p> : null}
+                <IndicadorGuardando visible={accion.guardando} />
 
                 <CamposTextos
                   prefix={avisoActual.id}
@@ -522,8 +516,8 @@ export function AdminConfigLauncher() {
                   >
                     Cancelar
                   </button>
-                  <button className="btn btn-primary" type="submit" disabled={saving}>
-                    {saving ? "Guardando…" : "Guardar"}
+                  <button className="btn btn-primary" type="submit">
+                    Guardar
                   </button>
                 </div>
               </form>

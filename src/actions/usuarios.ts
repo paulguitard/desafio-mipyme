@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { findUserByEmail, whereEmailIgual } from "@/lib/correo-db";
+import { normalizarCorreo } from "@/lib/correo";
 import { hashPassword } from "@/lib/password";
 import { validatePassword } from "@/lib/password-policy";
 import { isStoredFile, parseArchivos } from "@/lib/preguntas";
@@ -57,7 +59,7 @@ export async function crearUsuario(formData: FormData) {
   });
   if (escuelaError) return { error: escuelaError };
 
-  const exists = await prisma.user.findUnique({ where: { email } });
+  const exists = await findUserByEmail(email);
   if (exists) return { error: "Ya existe un usuario con ese correo." };
 
   await prisma.user.create({
@@ -98,6 +100,12 @@ export async function actualizarUsuario(formData: FormData) {
 
   const actual = await prisma.user.findUnique({ where: { id }, select: { role: true } });
   if (!actual) return { error: "Usuario no encontrado." };
+
+  const otro = await prisma.user.findFirst({
+    where: { ...whereEmailIgual(email), NOT: { id } },
+    select: { id: true },
+  });
+  if (otro) return { error: "Ya existe un usuario con ese correo." };
 
   if (password) {
     const passwordError = validatePassword(password);
@@ -239,10 +247,12 @@ export async function cargarUsuariosMasivo(formData: FormData) {
 
   const emails = parsed.usuarios.map((usuario) => usuario.email);
   const existentes = await prisma.user.findMany({
-    where: { email: { in: emails } },
+    where: {
+      OR: emails.map((email) => whereEmailIgual(email)),
+    },
     select: { email: true },
   });
-  const existentesSet = new Set(existentes.map((usuario) => usuario.email));
+  const existentesSet = new Set(existentes.map((usuario) => normalizarCorreo(usuario.email)));
 
   const omitidos = [...parsed.errores];
   const aCrear = parsed.usuarios.filter((usuario) => {

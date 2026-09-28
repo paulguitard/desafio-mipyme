@@ -8,14 +8,11 @@ import {
   procederSupervision,
 } from "@/actions/supervisiones";
 import { ConfirmacionEnvio } from "@/components/confirmacion-envio";
-import { EvalDetalleHead, useEvalPanelesColapsables } from "@/components/eval-detalle-head";
+import { IndicadorGuardando } from "@/components/indicador-guardando";
+import { EvalDetalleColumnas } from "@/components/eval-detalle-head";
+import { useAccionOptimista } from "@/lib/use-dato-optimista";
 import type { IntencionSupervision } from "@/lib/estado";
 import type { ModoEvaluacion } from "@/lib/modo-evaluacion";
-
-function mensajeAccion(result: { error?: string } | { ok: boolean; error?: undefined } | void | null) {
-  if (result && "error" in result && result.error) return result.error;
-  return null;
-}
 
 type AccionEnvio =
   | "enviar-observaciones-supervisor"
@@ -37,9 +34,9 @@ export function FormularioEvaluacion({
   back,
   title,
   meta,
-  children,
-  observacionGeneral,
-  observacionGeneralSupervision,
+  caso,
+  evaluacion,
+  supervision,
   headerEvaluacion,
   headerSupervision,
 }: {
@@ -51,62 +48,71 @@ export function FormularioEvaluacion({
   back: React.ReactNode;
   title: React.ReactNode;
   meta?: React.ReactNode;
-  children: React.ReactNode;
-  observacionGeneral?: React.ReactNode;
-  observacionGeneralSupervision?: React.ReactNode;
+  caso: React.ReactNode;
+  evaluacion: React.ReactNode;
+  supervision: React.ReactNode;
   headerEvaluacion?: string;
   headerSupervision?: string;
 }) {
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendienteEnvio, setPendienteEnvio] = useState<PendienteEnvio | null>(null);
-  const [confirmando, setConfirmando] = useState(false);
-  const paneles = useEvalPanelesColapsables();
+  const [bloqueado, setBloqueado] = useState(false);
+  const accion = useAccionOptimista();
   const esGeneral = modoEvaluacion === "GENERAL";
   const esSupervisor = rolAccion === "supervisor";
-  const mostrarAcciones = canEdit && rolAccion !== "lectura";
+  const mostrarAcciones = canEdit && rolAccion !== "lectura" && !bloqueado;
   const finalizaAlProceder = intencionPendiente === "FINALIZAR";
 
-  function abrirConfirmacion(formData: FormData, accion: AccionEnvio) {
-    if (confirmando) return;
-    setPendienteEnvio({ formData, accion });
+  function abrirConfirmacion(formData: FormData, tipo: AccionEnvio) {
+    setPendienteEnvio({ formData, accion: tipo });
   }
 
-  async function confirmarEnvio() {
-    if (!pendienteEnvio || confirmando) return;
-    setConfirmando(true);
+  function confirmarEnvio() {
+    if (!pendienteEnvio) return;
+    const { formData, accion: tipo } = pendienteEnvio;
+    setPendienteEnvio(null);
     setError(null);
-    setMensaje(null);
-    try {
-      const { formData, accion } = pendienteEnvio;
-      let result: { error?: string } | { ok: boolean } | void | null = null;
-      let mensajeOk = "";
-
-      if (accion === "enviar-observaciones-supervisor") {
-        result = await enviarObservaciones(formData);
-        mensajeOk = "Observaciones enviadas al supervisor.";
-      } else if (accion === "finalizar-evaluacion") {
-        result = await finalizarEvaluacion(formData);
-        mensajeOk = "Finalización enviada al supervisor.";
-      } else if (accion === "enviar-observaciones-evaluador") {
-        result = await enviarObservacionesSupervision(formData);
-        mensajeOk = "Observaciones enviadas al evaluador.";
-      } else {
-        result = await procederSupervision(formData);
-        mensajeOk = "Supervisión procedida.";
-      }
-
-      const errorAccion = mensajeAccion(result);
-      if (errorAccion) {
-        setError(errorAccion);
-        setPendienteEnvio(null);
-        return;
-      }
-      setMensaje(mensajeOk);
-      setPendienteEnvio(null);
-    } finally {
-      setConfirmando(false);
+    let persistir: (data: FormData) => Promise<{ error?: string } | { ok: boolean } | void>;
+    let mensajeOk = "";
+    if (tipo === "enviar-observaciones-supervisor") {
+      persistir = enviarObservaciones;
+      mensajeOk = "Observaciones enviadas al supervisor.";
+    } else if (tipo === "finalizar-evaluacion") {
+      persistir = finalizarEvaluacion;
+      mensajeOk = "Finalización enviada al supervisor.";
+    } else if (tipo === "enviar-observaciones-evaluador") {
+      persistir = enviarObservacionesSupervision;
+      mensajeOk = "Observaciones enviadas al evaluador.";
+    } else {
+      persistir = procederSupervision;
+      mensajeOk = "Supervisión procedida.";
     }
+    setMensaje(mensajeOk);
+    setBloqueado(true);
+    void accion.ejecutar(() => persistir(formData), {
+      onError: (mensajeError) => {
+        setMensaje(null);
+        setError(mensajeError);
+        setBloqueado(false);
+      },
+    });
+  }
+
+  function guardarRevisionActual(
+    persistir: (data: FormData) => Promise<{ error?: string } | { ok: boolean } | void>,
+    mensajeOk: string,
+  ) {
+    return (formData: FormData) => {
+      setError(null);
+      setMensaje(mensajeOk);
+      void accion.ejecutar(() => persistir(formData), {
+        onError: (mensajeError) => {
+          setMensaje(null);
+          setError(mensajeError);
+        },
+      });
+    };
   }
 
   const modalConfirmacion = (() => {
@@ -201,18 +207,7 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-secondary"
                     data-tour="guardar-revision"
                     type="submit"
-                    disabled={confirmando}
-                    formAction={async (formData) => {
-                      const result = await guardarSupervision(formData);
-                      const errorAccion = mensajeAccion(result);
-                      if (errorAccion) {
-                        setError(errorAccion);
-                        setMensaje(null);
-                      } else {
-                        setError(null);
-                        setMensaje("Supervisión guardada.");
-                      }
-                    }}
+                    formAction={guardarRevisionActual(guardarSupervision, "Supervisión guardada.")}
                   >
                     Guardar revisión
                   </button>
@@ -220,7 +215,6 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-gold"
                     data-tour="enviar-observaciones"
                     type="submit"
-                    disabled={confirmando}
                     formAction={(formData) => {
                       abrirConfirmacion(formData, "enviar-observaciones-evaluador");
                     }}
@@ -231,7 +225,6 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-primary"
                     data-tour="proceder"
                     type="submit"
-                    disabled={confirmando}
                     formAction={(formData) => {
                       abrirConfirmacion(formData, "proceder");
                     }}
@@ -245,17 +238,7 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-secondary"
                     data-tour="guardar-revision"
                     type="submit"
-                    disabled={confirmando}
-                    formAction={async (formData) => {
-                      const result = await guardarRevision(formData);
-                      if (result?.error) {
-                        setError(result.error);
-                        setMensaje(null);
-                      } else {
-                        setError(null);
-                        setMensaje("Revisión guardada.");
-                      }
-                    }}
+                    formAction={guardarRevisionActual(guardarRevision, "Revisión guardada.")}
                   >
                     Guardar revisión
                   </button>
@@ -263,7 +246,6 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-gold"
                     data-tour="enviar-supervisor"
                     type="submit"
-                    disabled={confirmando}
                     formAction={(formData) => {
                       abrirConfirmacion(formData, "enviar-observaciones-supervisor");
                     }}
@@ -273,7 +255,6 @@ export function FormularioEvaluacion({
                   <button
                     className="btn btn-sm btn-primary"
                     type="submit"
-                    disabled={confirmando}
                     formAction={(formData) => {
                       abrirConfirmacion(formData, "finalizar-evaluacion");
                     }}
@@ -288,49 +269,30 @@ export function FormularioEvaluacion({
         {meta}
         {mensaje ? <p className="text-emerald-800">{mensaje}</p> : null}
         {error ? <p className="text-danger">{error}</p> : null}
+        <IndicadorGuardando visible={accion.guardando} />
       </div>
 
       <section className="eval-detalle-shell" aria-label="Caso, evaluación y supervisión">
-        <div
-          className={`page-scroll eval-detalle-body is-tres${esGeneral ? " is-general" : ""}${paneles.bodyClassName ? ` ${paneles.bodyClassName}` : ""}`}
-        >
-          <input type="hidden" name="asignacionId" value={asignacionId} />
-          <div className="eval-detalle-headers">
-            <EvalDetalleHead panel="caso" title="Caso" subtitle="Respuestas del participante" />
-            <EvalDetalleHead
-              panel="eval"
-              title="Evaluación"
-              subtitle={
-                headerEvaluacion ?? (esGeneral ? "Revisión de la respuesta" : "Revisión por pregunta")
-              }
-              collapsed={paneles.evalColapsado}
-              onToggle={paneles.toggleEval}
-            />
-            <EvalDetalleHead
-              panel="sup"
-              title="Supervisión"
-              subtitle={
-                headerSupervision ??
-                (esGeneral
-                  ? "Revisión general de la evaluación"
-                  : "Revisión de la evaluación por pregunta")
-              }
-              collapsed={paneles.supColapsado}
-              onToggle={paneles.toggleSup}
-            />
-          </div>
-          {esGeneral ? (
-            <>
-              <div className="eval-detalle-cell is-eval is-general-panel">{observacionGeneral}</div>
-              <div className="eval-detalle-cell is-sup is-general-panel">
-                {observacionGeneralSupervision}
-              </div>
-              <div className="eval-detalle-caso-stack">{children}</div>
-            </>
-          ) : (
-            children
-          )}
-        </div>
+        <input type="hidden" name="asignacionId" value={asignacionId} />
+        <EvalDetalleColumnas
+          bloqueado={bloqueado}
+          casoTitle="Caso"
+          casoSubtitle="Respuestas del participante"
+          caso={caso}
+          evalTitle="Evaluación"
+          evalSubtitle={
+            headerEvaluacion ?? (esGeneral ? "Revisión de la respuesta" : "Revisión por pregunta")
+          }
+          evaluacion={evaluacion}
+          supTitle="Supervisión"
+          supSubtitle={
+            headerSupervision ??
+            (esGeneral
+              ? "Revisión general de la evaluación"
+              : "Revisión de la evaluación por pregunta")
+          }
+          supervision={supervision}
+        />
       </section>
 
       {modalConfirmacion ? (
@@ -338,10 +300,8 @@ export function FormularioEvaluacion({
           open
           title={modalConfirmacion.title}
           confirmLabel={modalConfirmacion.confirmLabel}
-          confirming={confirmando}
-          onCancel={() => {
-            if (!confirmando) setPendienteEnvio(null);
-          }}
+          confirming={false}
+          onCancel={() => setPendienteEnvio(null)}
           onConfirm={confirmarEnvio}
         >
           {modalConfirmacion.body}

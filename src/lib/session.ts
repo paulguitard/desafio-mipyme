@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { normalizarCorreo } from "@/lib/correo";
 import type { Role } from "@/lib/roles";
 import { esRolCatalogoEvaluador, loginPathForRole, normalizeRole } from "@/lib/roles";
 import { deniedUrl } from "@/auth.config";
@@ -25,7 +26,7 @@ async function loadActor(): Promise<SessionUser | null> {
   if (tokenStamp && tokenStamp !== dbStamp) return null;
   const role = normalizeRole(dbUser.role);
   if (!role) return null;
-  return { id: dbUser.id, role, name: dbUser.name, email: dbUser.email };
+  return { id: dbUser.id, role, name: dbUser.name, email: normalizarCorreo(dbUser.email) };
 }
 
 export async function requireUser(expected: Role) {

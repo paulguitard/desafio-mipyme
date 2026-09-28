@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import type { NotaPreguntaGeneral, PeldanoEscala } from "@/lib/preguntas";
+import { ordenHistorialRevision, textoEsperaRevision } from "@/lib/revision-ciclo";
 
 type ItemHistorial = {
   id: string;
   ronda: number;
+  ciclo?: number;
   veredicto: string;
   comentario: string;
   createdAt?: string | null;
@@ -18,7 +20,15 @@ function etiquetaNota(nota: number | null, escala: PeldanoEscala[]) {
   return peldano?.etiqueta ? `Nota: ${nota} · ${peldano.etiqueta}` : `Nota: ${nota}`;
 }
 
-function ContenidoRevisionGeneralLectura({ item }: { item: ItemHistorial }) {
+function ContenidoRevisionGeneralLectura({
+  item,
+  tipo,
+  nombreResponsable,
+}: {
+  item: ItemHistorial;
+  tipo: "evaluacion" | "supervision";
+  nombreResponsable?: string | null;
+}) {
   if (item.veredicto === "OBSERVACION") {
     return (
       <div className="historial-feed-valor space-y-1">
@@ -29,7 +39,7 @@ function ContenidoRevisionGeneralLectura({ item }: { item: ItemHistorial }) {
 
   return (
     <div className="historial-feed-valor space-y-1">
-      <p>{item.veredicto === "OK" ? "Sin observaciones" : "Sin veredicto"}</p>
+      <p>{item.veredicto === "OK" ? "Sin observaciones" : textoEsperaRevision(tipo, nombreResponsable)}</p>
     </div>
   );
 }
@@ -107,33 +117,40 @@ export function PanelSupervisionPendiente() {
 export function PanelObservacionGeneral({
   canEdit,
   ronda,
+  cicloActual,
   veredictoInicial,
   comentarioInicial,
   historial,
   namePrefix = "",
   tipo = "evaluacion",
   notasPreguntas = [],
+  nombreResponsable,
 }: {
   canEdit: boolean;
   ronda: number;
+  cicloActual?: number;
   veredictoInicial?: string;
   comentarioInicial?: string;
   historial: ItemHistorial[];
   namePrefix?: string;
   tipo?: "evaluacion" | "supervision";
   notasPreguntas?: NotaPreguntaGeneral[];
+  nombreResponsable?: string | null;
 }) {
   const [veredicto, setVeredicto] = useState(veredictoInicial ?? "");
   const [comentario, setComentario] = useState(comentarioInicial ?? "");
   const campoVeredicto = `${namePrefix}veredicto-general`;
   const campoComentario = `${namePrefix}comentario-general`;
   const esSupervision = tipo === "supervision";
+  const esItemActual = (item: ItemHistorial) =>
+    item.ronda === ronda && (cicloActual == null || (item.ciclo ?? cicloActual) === cicloActual);
 
-  const items: ItemHistorial[] = [...historial].sort((a, b) => b.ronda - a.ronda);
-  if (!items.some((item) => item.ronda === ronda)) {
+  const items: ItemHistorial[] = [...historial].sort(ordenHistorialRevision);
+  if (!items.some(esItemActual)) {
     items.unshift({
-      id: `pendiente-general-${ronda}`,
+      id: `pendiente-general-${ronda}-${cicloActual ?? "x"}`,
       ronda,
+      ciclo: cicloActual,
       veredicto: veredictoInicial ?? "",
       comentario: comentarioInicial ?? "",
       createdAt: null,
@@ -142,9 +159,13 @@ export function PanelObservacionGeneral({
 
   return (
     <div className="card space-y-3 p-4">
-      <input type="hidden" name={campoVeredicto} value={veredicto} />
-      {!canEdit || veredicto !== "OBSERVACION" ? (
-        <input type="hidden" name={campoComentario} value={comentario} />
+      {canEdit ? (
+        <>
+          <input type="hidden" name={campoVeredicto} value={veredicto} />
+          {veredicto !== "OBSERVACION" ? (
+            <input type="hidden" name={campoComentario} value={comentario} />
+          ) : null}
+        </>
       ) : null}
 
       {!esSupervision ? (
@@ -153,7 +174,7 @@ export function PanelObservacionGeneral({
 
       <ol className="historial-feed">
         {items.map((item, index) => {
-          const esActual = item.ronda === ronda;
+          const esActual = esItemActual(item);
           const editable = canEdit && esActual;
 
           return (
@@ -170,10 +191,10 @@ export function PanelObservacionGeneral({
                       : editable
                         ? esSupervision
                           ? `Tu supervisión (ciclo ${item.ronda})`
-                          : `Tu evaluación (ronda ${item.ronda})`
+                          : `Tu evaluación (ronda ${item.ronda}${item.ciclo != null ? ` · ciclo ${item.ciclo}` : ""})`
                         : esSupervision
                           ? `Supervisión (ciclo ${item.ronda})`
-                          : `Evaluación (ronda ${item.ronda})`}
+                          : `Evaluación (ronda ${item.ronda}${item.ciclo != null ? ` · ciclo ${item.ciclo}` : ""})`}
                   </strong>
                   {index === 0 ? <span className="historial-feed-badge">Más reciente</span> : null}
                 </div>
@@ -215,7 +236,11 @@ export function PanelObservacionGeneral({
                     ) : null}
                   </div>
                 ) : (
-                  <ContenidoRevisionGeneralLectura item={item} />
+                  <ContenidoRevisionGeneralLectura
+                    item={item}
+                    tipo={tipo}
+                    nombreResponsable={nombreResponsable}
+                  />
                 )}
               </div>
             </li>

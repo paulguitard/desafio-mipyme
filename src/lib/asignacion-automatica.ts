@@ -13,9 +13,6 @@ export async function asignarEvaluadoresAutomaticoEnConvocatoria(convocatoriaId:
     },
   });
   if (!convocatoria) return { error: "Mentoría no encontrada." };
-  if (convocatoria.estado !== "ABIERTA") {
-    return { error: "La mentoría está cerrada. No se puede asignar." };
-  }
   if (convocatoria.evaluadores.length === 0) {
     return { error: "Agrega evaluadores al pool de la mentoría primero." };
   }

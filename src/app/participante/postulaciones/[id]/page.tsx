@@ -2,10 +2,12 @@ import { BadgePostulacion } from "@/components/badges";
 import { BotonAtras } from "@/components/boton-atras";
 import { FormularioPostulante } from "@/components/formulario-postulante";
 import { PreguntaCampo } from "@/components/pregunta-campo";
+import { VistaCorreccionParticipante } from "@/components/vista-correccion-participante";
 import { prisma } from "@/lib/db";
 import { postulacionEditable, type EstadoPostulacion } from "@/lib/estado";
 import { convocatoriaAbiertaParaPostular } from "@/lib/convocatoria";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
+import { coincideRevisionCiclo, revisionesParaParticipante } from "@/lib/revision-ciclo";
 import { requireUser } from "@/lib/session";
 import { notFound } from "next/navigation";
 
@@ -28,7 +30,9 @@ export default async function PostulacionPage({
       convocatoria: {
         include: { formulario: { include: { preguntas: { orderBy: { orden: "asc" } } } } },
       },
-      respuestas: true,
+      respuestas: {
+        include: { versiones: { orderBy: { createdAt: "desc" } } },
+      },
       asignaciones: {
         include: { evaluador: true, revisiones: true, revisionesGenerales: true },
         orderBy: { orden: "asc" },
@@ -45,106 +49,108 @@ export default async function PostulacionPage({
   const esGeneral = modoEvaluacion === "GENERAL";
 
   const observadas = new Set<string>();
-  const comentariosPorPregunta = new Map<
-    string,
-    { evaluacion: number; nombre: string; comentario: string }[]
-  >();
-  const comentariosGenerales: { evaluacion: number; nombre: string; comentario: string }[] = [];
-
   if (esCorreccion) {
     for (const asignacion of postulacion.asignaciones) {
       if (asignacion.estado !== "CON_OBSERVACIONES") continue;
-
-      if (esGeneral) {
-        const general = asignacion.revisionesGenerales.find(
-          (revision) =>
-            revision.ronda === asignacion.rondaActual && revision.veredicto === "OBSERVACION",
-        );
-        if (general?.comentario) {
-          comentariosGenerales.push({
-            evaluacion: asignacion.orden,
-            nombre: asignacion.evaluador.name,
-            comentario: general.comentario,
-          });
-        }
-        continue;
-      }
-
+      if (esGeneral) continue;
       for (const revision of asignacion.revisiones) {
-        if (revision.ronda !== asignacion.rondaActual || revision.veredicto !== "OBSERVACION") continue;
+        if (
+          !coincideRevisionCiclo(revision, asignacion.rondaActual, asignacion.cicloSupervision) ||
+          revision.veredicto !== "OBSERVACION"
+        )
+          continue;
         observadas.add(revision.preguntaId);
-        const list = comentariosPorPregunta.get(revision.preguntaId) ?? [];
-        list.push({
-          evaluacion: asignacion.orden,
-          nombre: asignacion.evaluador.name,
-          comentario: revision.comentario,
-        });
-        comentariosPorPregunta.set(revision.preguntaId, list);
       }
     }
   }
+
+  const asignacionesVista = postulacion.asignaciones
+    .map((asignacion) => ({
+      id: asignacion.id,
+      orden: asignacion.orden,
+      estado: asignacion.estado,
+      evaluadorNombre: asignacion.evaluador.name,
+      rondaActual: asignacion.rondaActual,
+      cicloSupervision: asignacion.cicloSupervision,
+      revisiones: revisionesParaParticipante(asignacion.revisiones, asignacion).map((revision) => ({
+        id: revision.id,
+        preguntaId: revision.preguntaId,
+        ronda: revision.ronda,
+        ciclo: revision.ciclo,
+        veredicto: revision.veredicto,
+        comentario: revision.comentario,
+        nota: revision.nota,
+        createdAt: revision.createdAt.toISOString(),
+      })),
+      revisionesGenerales: revisionesParaParticipante(asignacion.revisionesGenerales, asignacion).map(
+        (revision) => ({
+          id: revision.id,
+          ronda: revision.ronda,
+          ciclo: revision.ciclo,
+          veredicto: revision.veredicto,
+          comentario: revision.comentario,
+          createdAt: revision.createdAt.toISOString(),
+        }),
+      ),
+    }))
+    .filter(
+      (asignacion) =>
+        asignacion.revisiones.length > 0 || asignacion.revisionesGenerales.length > 0,
+    );
 
   return (
     <FormularioPostulante
       postulacionId={postulacion.id}
       canEdit={canEdit}
       esCorreccion={esCorreccion}
+      layout={esCorreccion ? "paneles" : "formulario"}
       back={<BotonAtras href="/participante" />}
       title={<h1 className="text-3xl font-extrabold text-navy">{postulacion.convocatoria.formulario.titulo}</h1>}
       meta={
         <div className="space-y-2">
           <p className="text-muted">{postulacion.convocatoria.titulo}</p>
-          {postulacion.convocatoria.formulario.descripcion ? (
+          {!esCorreccion && postulacion.convocatoria.formulario.descripcion ? (
             <p>{postulacion.convocatoria.formulario.descripcion}</p>
           ) : null}
           <BadgePostulacion estado={postulacion.estado} />
-          {!abierta ? (
+          {!canEdit && !abierta ? (
             <p className="font-semibold text-danger">La mentoría está cerrada. Solo puedes consultar.</p>
-          ) : null}
-          {esCorreccion ? (
-            <p>
-              {esGeneral
-                ? "Hay una observación general. Puedes corregir el formulario completo y volver a enviar."
-                : "Hay observaciones. Corrige solo las preguntas marcadas y vuelve a enviar."}
-            </p>
           ) : null}
         </div>
       }
     >
-      {esCorreccion && comentariosGenerales.length > 0 ? (
-        <div className="space-y-2">
-          {comentariosGenerales.map((item) => (
-            <p key={`${item.evaluacion}-${item.comentario}`} className="rounded-lg bg-orange-50 p-3">
-              <strong>
-                Evaluación {item.evaluacion} ({item.nombre}):
-              </strong>{" "}
-              {item.comentario}
-            </p>
-          ))}
-        </div>
-      ) : null}
-      {postulacion.convocatoria.formulario.preguntas.map((pregunta) => {
-        const respuesta = postulacion.respuestas.find((r) => r.preguntaId === pregunta.id);
-        const locked = !esGeneral && esCorreccion && observadas.size > 0 && !observadas.has(pregunta.id);
-        const comentarios = comentariosPorPregunta.get(pregunta.id) ?? [];
-        return (
-          <div key={pregunta.id} className="space-y-2">
+      {esCorreccion ? (
+        <VistaCorreccionParticipante
+          preguntas={postulacion.convocatoria.formulario.preguntas}
+          respuestas={postulacion.respuestas.map((respuesta) => ({
+            preguntaId: respuesta.preguntaId,
+            valor: respuesta.valor,
+            archivos: respuesta.archivos,
+            versiones: respuesta.versiones.map((version) => ({
+              id: version.id,
+              valor: version.valor,
+              archivos: version.archivos,
+              createdAt: version.createdAt.toISOString(),
+            })),
+          }))}
+          asignaciones={asignacionesVista}
+          observadas={[...observadas]}
+          esGeneral={esGeneral}
+          canEdit={canEdit}
+        />
+      ) : (
+        postulacion.convocatoria.formulario.preguntas.map((pregunta) => {
+          const respuesta = postulacion.respuestas.find((item) => item.preguntaId === pregunta.id);
+          return (
             <PreguntaCampo
+              key={pregunta.id}
               pregunta={pregunta}
               respuesta={respuesta}
-              disabled={!canEdit || locked}
+              disabled={!canEdit}
             />
-            {comentarios.map((item) => (
-              <p key={`${item.evaluacion}-${item.comentario}`} className="rounded-lg bg-orange-50 p-3">
-                <strong>
-                  Evaluación {item.evaluacion} ({item.nombre}):
-                </strong>{" "}
-                {item.comentario}
-              </p>
-            ))}
-          </div>
-        );
-      })}
+          );
+        })
+      )}
     </FormularioPostulante>
   );
 }

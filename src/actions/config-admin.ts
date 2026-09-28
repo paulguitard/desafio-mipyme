@@ -6,13 +6,15 @@ import { deleteUpload, saveUpload } from "@/lib/storage";
 import { parseImagenConvocatoria } from "@/lib/convocatoria";
 import {
   DEFAULT_CORREO_RECUPERACION,
+  destosearTextoCorreo,
   toConfigCorreoView,
   type ConfigCorreoRecuperacionData,
 } from "@/lib/correo-recuperacion";
 import {
   DEFAULT_CORREO_NOTIFICACION,
-  TIPOS_CORREO_NOTIFICACION,
+  guardarFilaCorreoNotificacion,
   isTipoCorreoNotificacion,
+  listarConfigCorreoNotificacion,
   type TextosCorreoNotificacion,
   type TipoCorreoNotificacion,
 } from "@/lib/correo-notificacion";
@@ -90,11 +92,11 @@ export async function getConfigCorreoRecuperacion(): Promise<
 export async function guardarConfigCorreoRecuperacion(formData: FormData) {
   await requireUser("ADMIN");
 
-  const asunto = String(formData.get("asunto") ?? "").trim();
-  const titulo = String(formData.get("titulo") ?? "").trim();
-  const cuerpo = String(formData.get("cuerpo") ?? "").trim();
-  const textoBoton = String(formData.get("textoBoton") ?? "").trim();
-  const pie = String(formData.get("pie") ?? "").trim();
+  const asunto = destosearTextoCorreo(String(formData.get("asunto") ?? "").trim());
+  const titulo = destosearTextoCorreo(String(formData.get("titulo") ?? "").trim());
+  const cuerpo = destosearTextoCorreo(String(formData.get("cuerpo") ?? "").trim());
+  const textoBoton = destosearTextoCorreo(String(formData.get("textoBoton") ?? "").trim());
+  const pie = destosearTextoCorreo(String(formData.get("pie") ?? "").trim());
   const colorFondo = String(formData.get("colorFondo") ?? "").trim();
   const colorEncabezado = String(formData.get("colorEncabezado") ?? "").trim();
   const colorBoton = String(formData.get("colorBoton") ?? "").trim();
@@ -155,18 +157,16 @@ export async function getConfigCorreoNotificaciones(): Promise<{
   await requireUser("ADMIN");
   const fallback = { ...DEFAULT_CORREO_NOTIFICACION };
   try {
-    const rows = await prisma.configCorreoNotificacion.findMany({
-      where: { id: { in: [...TIPOS_CORREO_NOTIFICACION] } },
-    });
+    const rows = await listarConfigCorreoNotificacion();
     const textos = { ...fallback };
     for (const row of rows) {
       if (!isTipoCorreoNotificacion(row.id)) continue;
       textos[row.id] = {
-        asunto: row.asunto,
-        titulo: row.titulo,
-        cuerpo: row.cuerpo,
-        textoBoton: row.textoBoton,
-        pie: row.pie,
+        asunto: destosearTextoCorreo(row.asunto),
+        titulo: destosearTextoCorreo(row.titulo),
+        cuerpo: destosearTextoCorreo(row.cuerpo),
+        textoBoton: destosearTextoCorreo(row.textoBoton),
+        pie: destosearTextoCorreo(row.pie),
       };
     }
     return { ok: true, textos };
@@ -188,21 +188,17 @@ export async function guardarConfigCorreoNotificacion(formData: FormData) {
     return { error: "Tipo de aviso no válido." };
   }
 
-  const asunto = String(formData.get("asunto") ?? "").trim();
-  const titulo = String(formData.get("titulo") ?? "").trim();
-  const cuerpo = String(formData.get("cuerpo") ?? "").trim();
-  const textoBoton = String(formData.get("textoBoton") ?? "").trim();
-  const pie = String(formData.get("pie") ?? "").trim();
+  const asunto = destosearTextoCorreo(String(formData.get("asunto") ?? "").trim());
+  const titulo = destosearTextoCorreo(String(formData.get("titulo") ?? "").trim());
+  const cuerpo = destosearTextoCorreo(String(formData.get("cuerpo") ?? "").trim());
+  const textoBoton = destosearTextoCorreo(String(formData.get("textoBoton") ?? "").trim());
+  const pie = destosearTextoCorreo(String(formData.get("pie") ?? "").trim());
 
   if (!asunto || !titulo || !cuerpo || !textoBoton) {
     return { error: "Asunto, título, cuerpo y texto del botón son obligatorios." };
   }
 
-  await prisma.configCorreoNotificacion.upsert({
-    where: { id: tipo },
-    create: { id: tipo, asunto, titulo, cuerpo, textoBoton, pie },
-    update: { asunto, titulo, cuerpo, textoBoton, pie },
-  });
+  await guardarFilaCorreoNotificacion(tipo, { asunto, titulo, cuerpo, textoBoton, pie });
 
   const loaded = await getConfigCorreoNotificaciones();
   if (!loaded.ok) return { error: loaded.error };

@@ -9,11 +9,13 @@ export function ImagenMentoriaCover({
   pos,
   className,
   alt = "",
+  priority = false,
 }: {
   src: string;
   pos: PosicionImagen;
   className?: string;
   alt?: string;
+  priority?: boolean;
 }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -23,7 +25,8 @@ export function ImagenMentoriaCover({
       className={className}
       style={{ objectPosition: objectPositionCss(pos) }}
       decoding="async"
-      loading="lazy"
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : "auto"}
     />
   );
 }

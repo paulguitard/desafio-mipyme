@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import type { PeldanoEscala } from "@/lib/preguntas";
+import { ordenHistorialRevision, textoEsperaRevision } from "@/lib/revision-ciclo";
 
 type ItemHistorial = {
   id: string;
   ronda: number;
+  ciclo?: number;
   veredicto: string;
   comentario: string;
   nota: number | null;
@@ -22,9 +24,13 @@ function etiquetaNota(nota: number | null, escala: PeldanoEscala[]) {
 function ContenidoRevisionLectura({
   item,
   escala,
+  tipo,
+  nombreResponsable,
 }: {
   item: ItemHistorial;
   escala: PeldanoEscala[];
+  tipo: "evaluacion" | "supervision";
+  nombreResponsable?: string | null;
 }) {
   const notaTexto = etiquetaNota(item.nota, escala);
 
@@ -39,7 +45,11 @@ function ContenidoRevisionLectura({
 
   return (
     <div className="historial-feed-valor space-y-1">
-      <p>{item.veredicto === "OK" ? "Sin observaciones" : "Sin veredicto"}</p>
+      <p>
+        {item.veredicto === "OK"
+          ? "Sin observaciones"
+          : textoEsperaRevision(tipo, nombreResponsable)}
+      </p>
       {notaTexto ? <p>{notaTexto}</p> : null}
     </div>
   );
@@ -49,6 +59,7 @@ export function PanelEvaluacionPregunta({
   preguntaId,
   canEdit,
   ronda,
+  cicloActual,
   veredictoInicial,
   comentarioInicial,
   notaInicial,
@@ -56,10 +67,12 @@ export function PanelEvaluacionPregunta({
   historial,
   namePrefix = "",
   tipo = "evaluacion",
+  nombreResponsable,
 }: {
   preguntaId: string;
   canEdit: boolean;
   ronda: number;
+  cicloActual?: number;
   veredictoInicial?: string;
   comentarioInicial?: string;
   notaInicial?: number | null;
@@ -67,6 +80,7 @@ export function PanelEvaluacionPregunta({
   historial: ItemHistorial[];
   namePrefix?: string;
   tipo?: "evaluacion" | "supervision";
+  nombreResponsable?: string | null;
 }) {
   const [veredicto, setVeredicto] = useState(veredictoInicial ?? "");
   const [nota, setNota] = useState<number | null>(notaInicial ?? null);
@@ -76,12 +90,15 @@ export function PanelEvaluacionPregunta({
   const campoNota = `${namePrefix}nota-${preguntaId}`;
   const campoComentario = `${namePrefix}comentario-${preguntaId}`;
   const esSupervision = tipo === "supervision";
+  const esItemActual = (item: ItemHistorial) =>
+    item.ronda === ronda && (cicloActual == null || (item.ciclo ?? cicloActual) === cicloActual);
 
-  const items: ItemHistorial[] = [...historial].sort((a, b) => b.ronda - a.ronda);
-  if (!items.some((item) => item.ronda === ronda)) {
+  const items: ItemHistorial[] = [...historial].sort(ordenHistorialRevision);
+  if (!items.some(esItemActual)) {
     items.unshift({
-      id: `pendiente-${preguntaId}-${ronda}`,
+      id: `pendiente-${preguntaId}-${ronda}-${cicloActual ?? "x"}`,
       ronda,
+      ciclo: cicloActual,
       veredicto: veredictoInicial ?? "",
       comentario: comentarioInicial ?? "",
       nota: notaInicial ?? null,
@@ -91,17 +108,21 @@ export function PanelEvaluacionPregunta({
 
   return (
     <div className="card space-y-3 p-4">
-      <input type="hidden" name={campoVeredicto} value={veredicto} />
-      {escala.length > 0 && !esSupervision ? (
-        <input type="hidden" name={campoNota} value={nota ?? ""} />
-      ) : null}
-      {!canEdit || veredicto !== "OBSERVACION" ? (
-        <input type="hidden" name={campoComentario} value={comentario} />
+      {canEdit ? (
+        <>
+          <input type="hidden" name={campoVeredicto} value={veredicto} />
+          {escala.length > 0 && !esSupervision ? (
+            <input type="hidden" name={campoNota} value={nota ?? ""} />
+          ) : null}
+          {veredicto !== "OBSERVACION" ? (
+            <input type="hidden" name={campoComentario} value={comentario} />
+          ) : null}
+        </>
       ) : null}
 
       <ol className="historial-feed">
         {items.map((item, index) => {
-          const esActual = item.ronda === ronda;
+          const esActual = esItemActual(item);
           const editable = canEdit && esActual;
 
           return (
@@ -118,10 +139,10 @@ export function PanelEvaluacionPregunta({
                       : editable
                         ? esSupervision
                           ? `Tu supervisión (ciclo ${item.ronda})`
-                          : `Tu evaluación (ronda ${item.ronda})`
+                          : `Tu evaluación (ronda ${item.ronda}${item.ciclo != null ? ` · ciclo ${item.ciclo}` : ""})`
                         : esSupervision
                           ? `Supervisión (ciclo ${item.ronda})`
-                          : `Evaluación (ronda ${item.ronda})`}
+                          : `Evaluación (ronda ${item.ronda}${item.ciclo != null ? ` · ciclo ${item.ciclo}` : ""})`}
                   </strong>
                   {index === 0 ? <span className="historial-feed-badge">Más reciente</span> : null}
                 </div>
@@ -184,7 +205,12 @@ export function PanelEvaluacionPregunta({
                     ) : null}
                   </div>
                 ) : (
-                  <ContenidoRevisionLectura item={item} escala={escala} />
+                  <ContenidoRevisionLectura
+                    item={item}
+                    escala={escala}
+                    tipo={tipo}
+                    nombreResponsable={nombreResponsable}
+                  />
                 )}
               </div>
             </li>

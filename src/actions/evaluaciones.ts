@@ -35,6 +35,7 @@ async function guardarRevisionPorPregunta(
   formData: FormData,
   asignacionId: string,
   ronda: number,
+  ciclo: number,
   preguntas: { id: string; conNotas: boolean }[],
   opciones?: { forzarOkSinComentario?: boolean },
 ) {
@@ -55,10 +56,11 @@ async function guardarRevisionPorPregunta(
 
     await prisma.revisionPregunta.upsert({
       where: {
-        asignacionId_preguntaId_ronda: {
+        asignacionId_preguntaId_ronda_ciclo: {
           asignacionId,
           preguntaId: pregunta.id,
           ronda,
+          ciclo,
         },
       },
       update: { veredicto, comentario, nota },
@@ -66,6 +68,7 @@ async function guardarRevisionPorPregunta(
         asignacionId,
         preguntaId: pregunta.id,
         ronda,
+        ciclo,
         veredicto,
         comentario,
         nota,
@@ -78,18 +81,20 @@ async function guardarRevisionGeneral(
   formData: FormData,
   asignacionId: string,
   ronda: number,
+  ciclo: number,
 ) {
   const { veredicto, comentario } = leerVeredictoGeneral(formData);
   if (veredicto !== "OK" && veredicto !== "OBSERVACION") return;
 
   await prisma.revisionGeneral.upsert({
     where: {
-      asignacionId_ronda: { asignacionId, ronda },
+      asignacionId_ronda_ciclo: { asignacionId, ronda, ciclo },
     },
     update: { veredicto, comentario: veredicto === "OBSERVACION" ? comentario : "" },
     create: {
       asignacionId,
       ronda,
+      ciclo,
       veredicto,
       comentario: veredicto === "OBSERVACION" ? comentario : "",
     },
@@ -101,9 +106,6 @@ export async function guardarRevision(formData: FormData) {
   const asignacionId = String(formData.get("asignacionId") ?? "");
   const asignacion = await cargaAsignacion(asignacionId, user.id);
   if (!asignacion) return { error: "Evaluación no encontrada." };
-  if (asignacion.postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La mentoría está cerrada." };
-  }
   if (asignacion.estado === "FINALIZADA") {
     return { error: "Esta evaluación ya está finalizada." };
   }
@@ -126,16 +128,17 @@ export async function guardarRevision(formData: FormData) {
   }
 
   const ronda = asignacion.rondaActual;
+  const ciclo = asignacion.cicloSupervision;
   const preguntas = asignacion.postulacion.convocatoria.formulario.preguntas;
   const modo = parseModoEvaluacion(asignacion.postulacion.convocatoria.formulario.modoEvaluacion);
 
   if (modo === "GENERAL") {
-    await guardarRevisionGeneral(formData, asignacionId, ronda);
-    await guardarRevisionPorPregunta(formData, asignacionId, ronda, preguntas, {
+    await guardarRevisionGeneral(formData, asignacionId, ronda, ciclo);
+    await guardarRevisionPorPregunta(formData, asignacionId, ronda, ciclo, preguntas, {
       forzarOkSinComentario: true,
     });
   } else {
-    await guardarRevisionPorPregunta(formData, asignacionId, ronda, preguntas);
+    await guardarRevisionPorPregunta(formData, asignacionId, ronda, ciclo, preguntas);
   }
 
   await sincronizarEstadoPostulacion(asignacion.postulacionId);
@@ -158,9 +161,6 @@ export async function enviarObservaciones(formData: FormData) {
   const asignacionId = String(formData.get("asignacionId") ?? "");
   const asignacion = await cargaAsignacion(asignacionId, user.id);
   if (!asignacion) return { error: "Evaluación no encontrada." };
-  if (asignacion.postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La mentoría está cerrada." };
-  }
   if (!evaluadorPuedeEditar(asignacion.estado)) {
     return { error: "No puedes enviar observaciones en este estado." };
   }
@@ -216,9 +216,6 @@ export async function finalizarEvaluacion(formData: FormData) {
   const asignacionId = String(formData.get("asignacionId") ?? "");
   const asignacion = await cargaAsignacion(asignacionId, user.id);
   if (!asignacion) return { error: "Evaluación no encontrada." };
-  if (asignacion.postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La mentoría está cerrada." };
-  }
   if (!evaluadorPuedeEditar(asignacion.estado)) {
     return { error: "No puedes finalizar en este estado." };
   }

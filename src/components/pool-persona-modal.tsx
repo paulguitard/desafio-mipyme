@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { guardarCupoPool } from "@/actions/convocatorias";
 import { Modal } from "@/components/modal";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
+import { normalizarCorreo } from "@/lib/correo";
 
 export type CasoPoolResumenUi = {
   postulacionId: string;
@@ -58,22 +58,21 @@ function ListaCasos({
 export function PoolPersonaModal({
   open,
   item,
-  convocatoriaId,
+  convocatoriaId: _convocatoriaId,
   esSupervisor,
   onClose,
-  onSaved,
+  onGuardarCupo,
 }: {
   open: boolean;
   item: PoolPersonaModalItem | null;
   convocatoriaId: string;
   esSupervisor: boolean;
   onClose: () => void;
-  onSaved?: () => Promise<void> | void;
+  onGuardarCupo?: (cupo: number, esSupervisor: boolean) => void;
 }) {
   const [cupo, setCupo] = useState("0");
   const [error, setError] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
-  const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
     if (!item) return;
@@ -82,7 +81,7 @@ export function PoolPersonaModal({
     setMensaje(null);
   }, [item]);
 
-  async function guardar() {
+  function guardar() {
     if (!item) return;
     const n = Number.parseInt(cupo, 10);
     if (!Number.isFinite(n) || n < 0) {
@@ -90,22 +89,8 @@ export function PoolPersonaModal({
       return;
     }
     setError(null);
-    setMensaje(null);
-    setGuardando(true);
-    const formData = new FormData();
-    formData.set("convocatoriaId", convocatoriaId);
-    formData.set("evaluadorId", item.evaluadorId);
-    formData.set("supervisorId", item.evaluadorId);
-    formData.set("rol", esSupervisor ? "supervisor" : "evaluador");
-    formData.set("maxEvaluaciones", String(n));
-    const result = await guardarCupoPool(formData);
-    setGuardando(false);
-    if (result?.error) {
-      setError(result.error);
-      return;
-    }
-    setMensaje(result?.mensaje ?? "Cupo actualizado.");
-    await onSaved?.();
+    setMensaje("Cupo actualizado.");
+    onGuardarCupo?.(n, esSupervisor);
   }
 
   const unidad = esSupervisor ? "supervisiones" : "evaluaciones";
@@ -115,7 +100,7 @@ export function PoolPersonaModal({
     <Modal open={open} title={titulo} compact className="modal-cupo" onClose={onClose}>
       {item ? (
         <div className="pool-cupo">
-          <p className="pool-cupo-email text-muted">{item.evaluador.email}</p>
+          <p className="pool-cupo-email text-muted">{normalizarCorreo(item.evaluador.email)}</p>
 
           <label className="pool-cupo-label" htmlFor="cupo-persona">
             Máximo de {unidad} que puede tomar
@@ -127,7 +112,6 @@ export function PoolPersonaModal({
               type="number"
               min={0}
               value={cupo}
-              disabled={guardando}
               onChange={(event) => setCupo(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -136,8 +120,8 @@ export function PoolPersonaModal({
                 }
               }}
             />
-            <button className="btn btn-sm btn-navy" type="button" disabled={guardando} onClick={() => void guardar()}>
-              {guardando ? "Guardando…" : "Guardar"}
+            <button className="btn btn-sm btn-navy" type="button" onClick={() => void guardar()}>
+              Guardar
             </button>
           </div>
           <p className="pool-cupo-hint">

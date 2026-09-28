@@ -3,7 +3,7 @@ import { ConvocatoriaEvaluacion } from "@/components/convocatoria-evaluacion";
 import { prisma } from "@/lib/db";
 import { formatoRangoFechas, parseImagenConvocatoria, parseImagenPosicion } from "@/lib/convocatoria";
 import { getPanelEvaluacion } from "@/lib/convocatoria-admin-data";
-import { publicUploadUrl } from "@/lib/preguntas";
+import { directStoredImageUrl } from "@/lib/storage/image-url";
 import { notFound } from "next/navigation";
 
 export default async function MentoriaDetallePage({
@@ -35,7 +35,7 @@ export default async function MentoriaDetallePage({
         {imagen ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={publicUploadUrl(imagen, { width: 400 })}
+            src={directStoredImageUrl(imagen)}
             alt=""
             className="h-28 w-28 rounded-2xl object-cover"
             style={{ objectPosition: `${imagenPos.x}% ${imagenPos.y}%` }}

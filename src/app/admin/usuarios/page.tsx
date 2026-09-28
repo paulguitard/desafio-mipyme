@@ -1,5 +1,6 @@
 import { UsuariosAdmin } from "@/components/usuarios-admin";
 import { prisma } from "@/lib/db";
+import { normalizarCorreo } from "@/lib/correo";
 import { parseArchivosSoloFiles } from "@/lib/preguntas";
 
 export default async function UsuariosPage() {
@@ -23,7 +24,7 @@ export default async function UsuariosPage() {
   const filas = users.map((user) => ({
     id: user.id,
     name: user.name,
-    email: user.email,
+    email: normalizarCorreo(user.email),
     role: user.role,
     escuela: user.escuela,
     origen: user.origen,
@@ -34,7 +35,7 @@ export default async function UsuariosPage() {
     .map((user) => ({
       id: user.id,
       name: user.name,
-      email: user.email,
+      email: normalizarCorreo(user.email),
       rutPersonal: user.rutPersonal,
       direccionPersonal: user.direccionPersonal,
       telefonoMovil: user.telefonoMovil,

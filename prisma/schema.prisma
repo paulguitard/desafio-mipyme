@@ -256,12 +256,13 @@ model RevisionPregunta {
   preguntaId   String
   pregunta     Pregunta @relation(fields: [preguntaId], references: [id])
   ronda        Int
+  ciclo        Int      @default(1)
   veredicto    String
   comentario   String   @default("")
   nota         Int?
   createdAt    DateTime @default(now())
 
-  @@unique([asignacionId, preguntaId, ronda])
+  @@unique([asignacionId, preguntaId, ronda, ciclo])
 }
 
 model RevisionGeneral {
@@ -269,11 +270,12 @@ model RevisionGeneral {
   asignacionId String
   asignacion   AsignacionEvaluador @relation(fields: [asignacionId], references: [id], onDelete: Cascade)
   ronda        Int
+  ciclo        Int      @default(1)
   veredicto    String
   comentario   String   @default("")
   createdAt    DateTime @default(now())
 
-  @@unique([asignacionId, ronda])
+  @@unique([asignacionId, ronda, ciclo])
 }
 
 model SupervisionPregunta {

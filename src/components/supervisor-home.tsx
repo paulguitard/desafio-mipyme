@@ -51,13 +51,13 @@ export async function SupervisorHome({
 
   return (
     <CasosPanel
-      titulo="Postulaciones a supervisar"
+      titulo="Participaciones a supervisar"
       filtros={FILTROS_SUPERVISOR}
       filtroInicial={activo.id}
       casos={casos}
       tourFiltros="filtros-supervision"
       tourLista="lista-supervision"
-      emptyLabel="Aún no tienes postulaciones asignadas."
+      emptyLabel="Aún no tienes participaciones asignadas."
     />
   );
 }

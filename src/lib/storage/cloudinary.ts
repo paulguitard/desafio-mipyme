@@ -3,6 +3,10 @@ import { randomUUID } from "node:crypto";
 import { v2 as cloudinary } from "cloudinary";
 import type { StoredFile } from "@/lib/preguntas";
 import { prepareUploadBuffer } from "@/lib/storage/compress";
+import {
+  cloudinaryDeliveryType,
+  cloudinaryImageTransformation,
+} from "@/lib/storage/delivery";
 import { deleteLocalUpload } from "@/lib/storage/local";
 
 const FOLDER = "desafio-aiep";
@@ -81,13 +85,9 @@ export function signedCloudinaryUrl(
 ) {
   configured();
   const resourceType = options?.resourceType ?? "image";
-  const type =
-    options?.type ?? (publicId.startsWith("desafio-aiep/") ? "authenticated" : "upload");
+  const type = options?.type ?? cloudinaryDeliveryType(publicId);
   const expires_at = Math.floor(Date.now() / 1000) + (options?.expiresInSeconds ?? SIGNED_TTL_SECONDS);
-  const transformation =
-    resourceType === "image"
-      ? [{ width: options?.width ?? 1600, crop: "limit", fetch_format: "auto", quality: "auto" }]
-      : undefined;
+  const transformation = cloudinaryImageTransformation(type, resourceType, options?.width);
   return cloudinary.url(publicId, {
     type,
     resource_type: resourceType,
@@ -107,26 +107,13 @@ export function cloudinaryDeliveryUrl(
 ) {
   configured();
   const resourceType = options?.resourceType ?? "image";
-  const type = publicId.startsWith("desafio-aiep/") ? "authenticated" : "upload";
-  const transformation =
-    resourceType === "image"
-      ? [
-          {
-            width: options?.width ?? 1200,
-            crop: "limit",
-            fetch_format: "auto",
-            quality: "auto",
-          },
-        ]
-      : undefined;
+  const type = cloudinaryDeliveryType(publicId);
+  const transformation = cloudinaryImageTransformation(type, resourceType, options?.width);
   return cloudinary.url(publicId, {
     type,
     resource_type: resourceType,
     sign_url: type === "authenticated",
     secure: true,
-    ...(type === "authenticated"
-      ? { expires_at: Math.floor(Date.now() / 1000) + 60 * 60 }
-      : {}),
     ...(transformation ? { transformation } : {}),
   });
 }

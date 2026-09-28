@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { normalizarCorreo } from "@/lib/correo";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { saveUpload } from "@/lib/storage";
@@ -23,6 +24,7 @@ import {
 import { postulacionEditable, type EstadoPostulacion } from "@/lib/estado";
 import { convocatoriaAbiertaParaPostular } from "@/lib/convocatoria";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
+import { coincideRevisionCiclo } from "@/lib/revision-ciclo";
 import { sanitizeRichText } from "@/lib/html";
 import { extraerNombreCaso } from "@/lib/nombre-caso";
 import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
@@ -51,8 +53,9 @@ function preguntasObservadas(postulacion: {
   asignaciones: {
     estado: string;
     rondaActual: number;
-    revisiones: { preguntaId: string; ronda: number; veredicto: string }[];
-    revisionesGenerales: { ronda: number; veredicto: string }[];
+    cicloSupervision: number;
+    revisiones: { preguntaId: string; ronda: number; ciclo?: number; veredicto: string }[];
+    revisionesGenerales: { ronda: number; ciclo?: number; veredicto: string }[];
   }[];
 }) {
   const ids = new Set<string>();
@@ -63,7 +66,8 @@ function preguntasObservadas(postulacion: {
       if (asignacion.estado !== "CON_OBSERVACIONES") return false;
       return asignacion.revisionesGenerales.some(
         (revision) =>
-          revision.ronda === asignacion.rondaActual && revision.veredicto === "OBSERVACION",
+          coincideRevisionCiclo(revision, asignacion.rondaActual, asignacion.cicloSupervision) &&
+          revision.veredicto === "OBSERVACION",
       );
     });
     // En evaluación general todas las preguntas quedan editables al corregir.
@@ -73,7 +77,10 @@ function preguntasObservadas(postulacion: {
   for (const asignacion of postulacion.asignaciones) {
     if (asignacion.estado !== "CON_OBSERVACIONES") continue;
     for (const revision of asignacion.revisiones) {
-      if (revision.ronda === asignacion.rondaActual && revision.veredicto === "OBSERVACION") {
+      if (
+        coincideRevisionCiclo(revision, asignacion.rondaActual, asignacion.cicloSupervision) &&
+        revision.veredicto === "OBSERVACION"
+      ) {
         ids.add(revision.preguntaId);
       }
     }
@@ -129,7 +136,7 @@ function leerValorDesdeFormulario(
     const cantidad = parseConfigCorreo(pregunta.opciones);
     const valor = formData
       .getAll(key)
-      .map((item) => String(item).trim())
+      .map((item) => normalizarCorreo(String(item)))
       .slice(0, cantidad);
     while (valor.length < cantidad) valor.push("");
     return valor.every((item) => !item) ? [] : valor;

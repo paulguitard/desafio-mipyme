@@ -1,16 +1,18 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import {
   actualizarPerfilPropio,
   eliminarDocumentoFormalizacion,
   subirDocumentoFormalizacion,
 } from "@/actions/perfil";
+import { IndicadorGuardando } from "@/components/indicador-guardando";
 import { formatearRut, limpiarRut } from "@/lib/rut";
+import { normalizarCorreo } from "@/lib/correo";
 import { MAX_DOCUMENTOS_FORMALIZACION } from "@/lib/storage/limits";
 import type { StoredFile } from "@/lib/preguntas";
 import { publicUploadUrl } from "@/lib/preguntas";
+import { errorDeResultado, useAccionOptimista, useDatoOptimista } from "@/lib/use-dato-optimista";
 
 export type DocumentoPerfil = StoredFile & { url?: string };
 
@@ -75,13 +77,12 @@ export function PerfilForm({
   email: string;
   participante?: PerfilParticipante;
 }) {
-  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const accion = useAccionOptimista();
+  const docs = useDatoOptimista(participante?.documentos ?? []);
+  const documentos = docs.dato;
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [removingId, setRemovingId] = useState<string | null>(null);
   const [docError, setDocError] = useState<string | null>(null);
 
   const esParticipante = Boolean(participante);
@@ -91,66 +92,75 @@ export function PerfilForm({
   );
   const [rutEditing, setRutEditing] = useState(false);
   const [whatsapp, setWhatsapp] = useState(participante?.contactoWhatsapp ?? false);
-  const [documentos, setDocumentos] = useState<DocumentoPerfil[]>(
-    () => participante?.documentos ?? [],
-  );
 
-  async function onSubmit(formData: FormData) {
-    setSaving(true);
-    setOk(false);
+  function onSubmit(formData: FormData) {
+    setOk(true);
     setError(null);
     if (esParticipante) {
       formData.set("rutPersonal", limpiarRut(String(formData.get("rutPersonal") ?? "")));
       formData.set("contactoWhatsapp", whatsapp ? "true" : "false");
-    }
-    const result = await actualizarPerfilPropio(formData);
-    setSaving(false);
-    if (result?.error) {
-      setError(result.error);
-      return;
-    }
-    if (esParticipante) {
       const limpio = limpiarRut(String(formData.get("rutPersonal") ?? ""));
       setRutDisplay(limpio ? formatearRut(limpio) : "");
       setRutEditing(false);
     }
-    setOk(true);
-    router.refresh();
+    void accion.ejecutar(() => actualizarPerfilPropio(formData), {
+      mensajeOk: "Cambios guardados.",
+      onError: (mensaje) => {
+        setOk(false);
+        setError(mensaje);
+      },
+    });
   }
 
-  async function onUpload(fileList: FileList | null) {
+  function onUpload(fileList: FileList | null) {
     const file = fileList?.[0];
     if (!file) return;
     setDocError(null);
-    setUploading(true);
+    const tempId = `tmp-${crypto.randomUUID()}`;
     const fd = new FormData();
     fd.set("documento", file);
-    const result = await subirDocumentoFormalizacion(fd);
-    setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    if (result?.error) {
-      setDocError(result.error);
-      return;
-    }
-    if (result?.documentos) {
-      setDocumentos(result.documentos);
-    }
-    router.refresh();
+    void docs
+      .aplicar(
+        (prev) => [
+          ...prev,
+          {
+            id: tempId,
+            originalName: file.name,
+            relativePath: "",
+            mimeType: file.type || "application/pdf",
+            kind: "file",
+          },
+        ],
+        () => subirDocumentoFormalizacion(fd),
+        {
+          reconciliar: (result, actual) => {
+            if (!result || !("documentos" in result) || !result.documentos) return actual;
+            return result.documentos;
+          },
+        },
+      )
+      .then((result) => {
+        if (errorDeResultado(result)) setDocError(errorDeResultado(result));
+      });
   }
 
-  async function onRemove(id: string) {
+  function onRemove(id: string) {
     setDocError(null);
-    setRemovingId(id);
-    const result = await eliminarDocumentoFormalizacion(id);
-    setRemovingId(null);
-    if (result?.error) {
-      setDocError(result.error);
-      return;
-    }
-    if (result?.documentos) {
-      setDocumentos(result.documentos);
-    }
-    router.refresh();
+    void docs
+      .aplicar(
+        (prev) => prev.filter((doc) => doc.id !== id),
+        () => eliminarDocumentoFormalizacion(id),
+        {
+          reconciliar: (result, actual) => {
+            if (!result || !("documentos" in result) || !result.documentos) return actual;
+            return result.documentos;
+          },
+        },
+      )
+      .then((result) => {
+        if (errorDeResultado(result)) setDocError(errorDeResultado(result));
+      });
   }
 
   const pestanas = [
@@ -197,8 +207,9 @@ export function PerfilForm({
         aria-labelledby={esParticipante ? "perfil-tab-datos" : undefined}
       >
         <div className="border-b border-border px-6 py-4">
-          <p className="text-sm font-bold uppercase tracking-[0.12em] text-muted">Cuenta</p>
-          <p className="mt-1 text-lg font-semibold text-navy">Datos personales</p>
+          <p className="text-sm font-bold uppercase tracking-[0.12em] text-muted">
+            Datos personales
+          </p>
         </div>
 
         <div className="grid gap-5 px-6 py-5 md:grid-cols-2">
@@ -213,7 +224,7 @@ export function PerfilForm({
               required
               autoComplete="name"
             />
-            <p className="text-sm text-muted">Así te verán en el panel y en tus postulaciones.</p>
+            <p className="text-sm text-muted">Así te verán en el panel y en tus participaciones.</p>
           </div>
 
           <div className="field">
@@ -222,8 +233,9 @@ export function PerfilForm({
               className="input bg-[var(--navy-soft)] text-navy"
               id="perfil-email"
               type="email"
-              value={email}
+              value={normalizarCorreo(email)}
               readOnly
+              autoCapitalize="none"
               tabIndex={-1}
               aria-readonly="true"
               aria-describedby="perfil-email-ayuda"
@@ -303,14 +315,14 @@ export function PerfilForm({
           <div className="min-h-5 text-sm" aria-live="polite">
             {error ? <p className="font-semibold text-danger">{error}</p> : null}
             {ok && !error ? <p className="font-semibold text-navy">Cambios guardados.</p> : null}
+            <IndicadorGuardando visible={accion.guardando} />
           </div>
           <button
             className="btn btn-sm btn-primary"
             type="submit"
-            disabled={saving}
             data-tour="perfil-guardar"
           >
-            {saving ? "Guardando…" : "Guardar cambios"}
+            Guardar cambios
           </button>
         </div>
       </form>
@@ -325,9 +337,6 @@ export function PerfilForm({
         >
           <div className="border-b border-border px-6 py-4">
             <p className="text-sm font-bold uppercase tracking-[0.12em] text-muted">
-              Formalización
-            </p>
-            <p className="mt-1 text-lg font-semibold text-navy">
               Formalización Empresa
             </p>
             <p className="mt-2 text-sm text-muted">
@@ -344,19 +353,20 @@ export function PerfilForm({
                 accept="application/pdf,.pdf"
                 className="sr-only"
                 id="perfil-documento"
-                disabled={uploading || documentos.length >= MAX_DOCUMENTOS_FORMALIZACION}
+                disabled={documentos.length >= MAX_DOCUMENTOS_FORMALIZACION}
                 onChange={(event) => void onUpload(event.target.files)}
               />
               <label
                 htmlFor="perfil-documento"
                 className={`btn btn-sm btn-secondary ${
-                  uploading || documentos.length >= MAX_DOCUMENTOS_FORMALIZACION
+                  documentos.length >= MAX_DOCUMENTOS_FORMALIZACION
                     ? "pointer-events-none opacity-50"
                     : "cursor-pointer"
                 }`}
               >
-                {uploading ? "Subiendo…" : "Subir PDF"}
+                Subir PDF
               </label>
+              <IndicadorGuardando visible={docs.guardando} />
               <p className="text-xs text-muted">PDF, máximo 5 MB. Hasta 5 archivos.</p>
             </div>
 
@@ -375,21 +385,26 @@ export function PerfilForm({
                     key={doc.id}
                     className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-[var(--navy-soft)]/30 px-3 py-2"
                   >
-                    <a
-                      className="min-w-0 flex-1 truncate text-sm font-semibold text-navy underline-offset-2 hover:underline"
-                      href={publicUploadUrl(doc)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {doc.originalName}
-                    </a>
+                    {doc.relativePath ? (
+                      <a
+                        className="min-w-0 flex-1 truncate text-sm font-semibold text-navy underline-offset-2 hover:underline"
+                        href={publicUploadUrl(doc)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {doc.originalName}
+                      </a>
+                    ) : (
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-navy">
+                        {doc.originalName}
+                      </span>
+                    )}
                     <button
                       type="button"
                       className="btn btn-sm btn-ghost text-danger"
-                      disabled={removingId === doc.id}
                       onClick={() => void onRemove(doc.id)}
                     >
-                      {removingId === doc.id ? "Quitando…" : "Quitar"}
+                      Quitar
                     </button>
                   </li>
                 ))}

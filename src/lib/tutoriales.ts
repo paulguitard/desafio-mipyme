@@ -113,12 +113,12 @@ export function resolverTutorial(
           ancla: "mentorias-abiertas",
           titulo: "Mentorías abiertas",
           descripcion:
-            "Desplaza el carrusel para ver las convocatorias vigentes y entra a una para postular.",
+            "Desplaza el carrusel para ver las convocatorias vigentes y entra a una para participar.",
         },
         {
           ancla: "mis-casos",
           titulo: "Mis casos",
-          descripcion: "Aquí están tus postulaciones. Entra a un caso para completar o corregir el formulario.",
+          descripcion: "Aquí están tus participaciones. Entra a un caso para completar o corregir el formulario.",
         },
       ];
     }
@@ -133,7 +133,14 @@ export function resolverTutorial(
         {
           ancla: "formulario-caso",
           titulo: "Formulario del caso",
-          descripcion: "Responde cada pregunta. Puedes adjuntar archivos donde el enunciado lo pida.",
+          descripcion:
+            "Responde cada pregunta. Si hay observaciones, ves tu caso a la izquierda y la evaluación a la derecha, sin el panel de supervisión.",
+        },
+        {
+          ancla: "observacion-pregunta",
+          titulo: "Evaluación",
+          descripcion:
+            "Lee las observaciones y el histórico por ronda. Solo aparece la última versión de cada ciclo evaluación-supervisión.",
         },
         {
           ancla: "guardar-borrador",
@@ -296,7 +303,7 @@ export function resolverTutorial(
       {
         ancla: "formularios-nuevo",
         titulo: "Nuevo formulario",
-        descripcion: "Crea un formulario con las preguntas de la postulación.",
+        descripcion: "Crea un formulario con las preguntas de la participación.",
       },
       {
         ancla: "formularios-lista",
@@ -337,7 +344,8 @@ export function resolverTutorial(
       {
         ancla: "mentoria-abrir-cerrar",
         titulo: "Abrir o cerrar",
-        descripcion: "Una mentoría abierta admite postulaciones y evaluaciones. Al cerrarla, queda en solo lectura.",
+        descripcion:
+          "Cerrar una mentoría deja de admitir respuestas nuevas. Las evaluaciones y supervisiones de los casos ya enviados siguen igual.",
       },
     ];
   }

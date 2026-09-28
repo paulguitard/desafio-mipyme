@@ -1,4 +1,5 @@
 import { BotonAtras } from "@/components/boton-atras";
+import { EvalDetalleCelda } from "@/components/eval-detalle-head";
 import { FormularioEvaluacion } from "@/components/formulario-evaluacion";
 import { HistorialVersionesRespuesta } from "@/components/historial-versiones-respuesta";
 import { PanelEvaluacionPregunta } from "@/components/panel-evaluacion-pregunta";
@@ -9,6 +10,7 @@ import { evaluadorPuedeEditar } from "@/lib/estado";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { etiquetaNombreCaso, extraerNombreCaso } from "@/lib/nombre-caso";
 import { notasParaEvaluacionGeneral, parseEscalaNotas } from "@/lib/preguntas";
+import { historialEvaluacion, revisionParaEditar } from "@/lib/revision-ciclo";
 import { requireUser } from "@/lib/session";
 import { historialSupervision } from "@/lib/supervision-ui";
 import { notFound } from "next/navigation";
@@ -24,8 +26,8 @@ export default async function EvaluacionDetallePage({
     where: { id, evaluadorId: user.id },
     include: {
       evaluador: true,
-      revisiones: { orderBy: [{ ronda: "asc" }, { createdAt: "asc" }] },
-      revisionesGenerales: { orderBy: [{ ronda: "asc" }, { createdAt: "asc" }] },
+      revisiones: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
+      revisionesGenerales: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
       supervisionesPregunta: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
       supervisionesGenerales: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
       postulacion: {
@@ -44,8 +46,7 @@ export default async function EvaluacionDetallePage({
   });
   if (!asignacion) notFound();
 
-  const abierta = asignacion.postulacion.convocatoria.estado === "ABIERTA";
-  const canEdit = abierta && evaluadorPuedeEditar(asignacion.estado);
+  const canEdit = evaluadorPuedeEditar(asignacion.estado);
   const ronda = asignacion.rondaActual;
   const ciclo = asignacion.cicloSupervision;
   const modoEvaluacion = parseModoEvaluacion(
@@ -58,7 +59,7 @@ export default async function EvaluacionDetallePage({
       asignacion.postulacion.respuestas,
     ),
   );
-  const revisionGeneralActual = asignacion.revisionesGenerales.find((item) => item.ronda === ronda);
+  const revisionGeneralActual = revisionParaEditar(asignacion.revisionesGenerales, ronda, ciclo);
   const supervisionGeneralActual = asignacion.supervisionesGenerales.find(
     (item) => item.ronda === ronda && item.ciclo === ciclo,
   );
@@ -83,9 +84,6 @@ export default async function EvaluacionDetallePage({
       meta={
         <div className="space-y-2">
           <p className="text-muted">Participante: {asignacion.postulacion.postulante.name}</p>
-          {!abierta ? (
-            <p className="font-semibold text-danger">Mentoría cerrada. Solo lectura.</p>
-          ) : null}
           {asignacion.estado === "EN_SUPERVISION" ? (
             <p>Esperando que el supervisor revise esta evaluación.</p>
           ) : null}
@@ -100,110 +98,121 @@ export default async function EvaluacionDetallePage({
           ) : null}
         </div>
       }
-      observacionGeneral={
+      caso={asignacion.postulacion.convocatoria.formulario.preguntas.map((pregunta) => {
+        const respuesta = asignacion.postulacion.respuestas.find((r) => r.preguntaId === pregunta.id);
+        return (
+          <EvalDetalleCelda key={pregunta.id} panel="caso">
+            <PreguntaCampo
+              pregunta={pregunta}
+              respuesta={respuesta}
+              disabled
+              acciones={
+                respuesta?.versiones && respuesta.versiones.length > 0 ? (
+                  <HistorialVersionesRespuesta
+                    tipo={pregunta.tipo}
+                    opciones={pregunta.opciones}
+                    versiones={respuesta.versiones.map((version, index) => ({
+                      id: version.id,
+                      valor: version.valor,
+                      archivos: version.archivos,
+                      createdAt: version.createdAt.toISOString(),
+                      numero: respuesta.versiones.length - index,
+                    }))}
+                  />
+                ) : null
+              }
+            />
+          </EvalDetalleCelda>
+        );
+      })}
+      evaluacion={
         esGeneral ? (
-          <PanelObservacionGeneral
-            canEdit={canEdit}
-            ronda={ronda}
-            veredictoInicial={revisionGeneralActual?.veredicto}
-            comentarioInicial={revisionGeneralActual?.comentario}
-            notasPreguntas={notasParaEvaluacionGeneral(
-              asignacion.postulacion.convocatoria.formulario.preguntas,
-              asignacion.revisiones,
-              ronda,
-            )}
-            historial={asignacion.revisionesGenerales.map((item) => ({
-              id: item.id,
-              ronda: item.ronda,
-              veredicto: item.veredicto,
-              comentario: item.comentario,
-              createdAt: item.createdAt.toISOString(),
-            }))}
-          />
-        ) : null
-      }
-      observacionGeneralSupervision={
-        esGeneral ? (
-          asignacion.supervisionesGenerales.length === 0 ? (
-            <PanelSupervisionPendiente />
-          ) : (
+          <EvalDetalleCelda panel="eval">
             <PanelObservacionGeneral
-              canEdit={false}
-              ronda={ciclo}
-              tipo="supervision"
-              namePrefix="sup-"
-              veredictoInicial={supervisionGeneralActual?.veredicto}
-              comentarioInicial={supervisionGeneralActual?.comentario}
-              historial={historialSupervision(
-                asignacion.supervisionesGenerales.map((item) => ({
+              canEdit={canEdit}
+              ronda={ronda}
+              cicloActual={ciclo}
+              veredictoInicial={revisionGeneralActual?.veredicto}
+              comentarioInicial={revisionGeneralActual?.comentario}
+              notasPreguntas={notasParaEvaluacionGeneral(
+                asignacion.postulacion.convocatoria.formulario.preguntas,
+                asignacion.revisiones,
+                ronda,
+                ciclo,
+              )}
+              nombreResponsable={asignacion.evaluador.name}
+              historial={historialEvaluacion(
+                asignacion.revisionesGenerales.map((item) => ({
                   ...item,
                   createdAt: item.createdAt.toISOString(),
                 })),
               )}
             />
-          )
-        ) : null
-      }
-    >
-      {asignacion.postulacion.convocatoria.formulario.preguntas.map((pregunta) => {
-        const respuesta = asignacion.postulacion.respuestas.find((r) => r.preguntaId === pregunta.id);
-        const actual = asignacion.revisiones.find(
-          (r) => r.preguntaId === pregunta.id && r.ronda === ronda,
-        );
-        const historialRevisiones = asignacion.revisiones.filter((r) => r.preguntaId === pregunta.id);
-        const escala = pregunta.conNotas ? parseEscalaNotas(pregunta.escalaNotas) : [];
-        const supervisiones = asignacion.supervisionesPregunta.filter(
-          (item) => item.preguntaId === pregunta.id,
-        );
-        const actualSup = supervisiones.find((item) => item.ronda === ronda && item.ciclo === ciclo);
-
-        return (
-          <article key={pregunta.id} className="eval-detalle-row">
-            <div className="eval-detalle-cell is-caso">
-              <PreguntaCampo
-                pregunta={pregunta}
-                respuesta={respuesta}
-                disabled
-                acciones={
-                  respuesta?.versiones && respuesta.versiones.length > 0 ? (
-                    <HistorialVersionesRespuesta
-                      tipo={pregunta.tipo}
-                      opciones={pregunta.opciones}
-                      versiones={respuesta.versiones.map((version, index) => ({
-                        id: version.id,
-                        valor: version.valor,
-                        archivos: version.archivos,
-                        createdAt: version.createdAt.toISOString(),
-                        numero: respuesta.versiones.length - index,
-                      }))}
-                    />
-                  ) : null
-                }
-              />
-            </div>
-            <div className="eval-detalle-cell is-eval">
-              {esGeneral ? null : (
+          </EvalDetalleCelda>
+        ) : (
+          asignacion.postulacion.convocatoria.formulario.preguntas.map((pregunta) => {
+            const actual = revisionParaEditar(
+              asignacion.revisiones.filter((r) => r.preguntaId === pregunta.id),
+              ronda,
+              ciclo,
+            );
+            const historialRevisiones = asignacion.revisiones.filter((r) => r.preguntaId === pregunta.id);
+            const escala = pregunta.conNotas ? parseEscalaNotas(pregunta.escalaNotas) : [];
+            return (
+              <EvalDetalleCelda key={pregunta.id} panel="eval">
                 <PanelEvaluacionPregunta
                   preguntaId={pregunta.id}
                   canEdit={canEdit}
                   ronda={ronda}
+                  cicloActual={ciclo}
                   veredictoInicial={actual?.veredicto}
                   comentarioInicial={actual?.comentario}
                   notaInicial={actual?.nota}
                   escala={escala}
-                  historial={historialRevisiones.map((item) => ({
-                    id: item.id,
-                    ronda: item.ronda,
-                    veredicto: item.veredicto,
-                    comentario: item.comentario,
-                    nota: item.nota,
-                    createdAt: item.createdAt.toISOString(),
-                  }))}
+                  nombreResponsable={asignacion.evaluador.name}
+                  historial={historialEvaluacion(
+                    historialRevisiones.map((item) => ({
+                      ...item,
+                      createdAt: item.createdAt.toISOString(),
+                    })),
+                  )}
                 />
-              )}
-            </div>
-            <div className="eval-detalle-cell is-sup">
-              {esGeneral ? null : (
+              </EvalDetalleCelda>
+            );
+          })
+        )
+      }
+      supervision={
+        esGeneral ? (
+          <EvalDetalleCelda panel="sup">
+            {asignacion.supervisionesGenerales.length === 0 ? (
+              <PanelSupervisionPendiente />
+            ) : (
+              <PanelObservacionGeneral
+                canEdit={false}
+                ronda={ciclo}
+                tipo="supervision"
+                namePrefix="sup-"
+                nombreResponsable={asignacion.postulacion.supervision?.supervisor.name}
+                veredictoInicial={supervisionGeneralActual?.veredicto}
+                comentarioInicial={supervisionGeneralActual?.comentario}
+                historial={historialSupervision(
+                  asignacion.supervisionesGenerales.map((item) => ({
+                    ...item,
+                    createdAt: item.createdAt.toISOString(),
+                  })),
+                )}
+              />
+            )}
+          </EvalDetalleCelda>
+        ) : (
+          asignacion.postulacion.convocatoria.formulario.preguntas.map((pregunta) => {
+            const supervisiones = asignacion.supervisionesPregunta.filter(
+              (item) => item.preguntaId === pregunta.id,
+            );
+            const actualSup = supervisiones.find((item) => item.ronda === ronda && item.ciclo === ciclo);
+            return (
+              <EvalDetalleCelda key={pregunta.id} panel="sup">
                 <PanelEvaluacionPregunta
                   preguntaId={pregunta.id}
                   canEdit={false}
@@ -213,6 +222,7 @@ export default async function EvaluacionDetallePage({
                   escala={[]}
                   tipo="supervision"
                   namePrefix="sup-"
+                  nombreResponsable={asignacion.postulacion.supervision?.supervisor.name}
                   historial={historialSupervision(
                     supervisiones.map((item) => ({
                       ...item,
@@ -220,11 +230,11 @@ export default async function EvaluacionDetallePage({
                     })),
                   )}
                 />
-              )}
-            </div>
-          </article>
-        );
-      })}
-    </FormularioEvaluacion>
+              </EvalDetalleCelda>
+            );
+          })
+        )
+      }
+    />
   );
 }

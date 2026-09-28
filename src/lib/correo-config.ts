@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { parseImagenConvocatoria } from "@/lib/convocatoria";
 import {
   DEFAULT_CORREO_RECUPERACION,
+  destosearTextoCorreo,
   imagenUrlFromStored,
   type ConfigCorreoRecuperacionData,
 } from "@/lib/correo-recuperacion";
@@ -31,11 +32,11 @@ export async function loadConfigCorreoRecuperacionForMail(): Promise<
   });
   if (!row) return DEFAULT_CORREO_RECUPERACION;
   return {
-    asunto: row.asunto,
-    titulo: row.titulo,
-    cuerpo: row.cuerpo,
-    textoBoton: row.textoBoton,
-    pie: row.pie,
+    asunto: destosearTextoCorreo(row.asunto),
+    titulo: destosearTextoCorreo(row.titulo),
+    cuerpo: destosearTextoCorreo(row.cuerpo),
+    textoBoton: destosearTextoCorreo(row.textoBoton),
+    pie: destosearTextoCorreo(row.pie),
     colorFondo: row.colorFondo,
     colorEncabezado: row.colorEncabezado,
     colorBoton: row.colorBoton,

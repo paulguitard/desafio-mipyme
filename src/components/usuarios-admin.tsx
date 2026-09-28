@@ -1,13 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   actualizarUsuario,
   cargarUsuariosMasivo,
   crearUsuario,
   eliminarUsuario,
 } from "@/actions/usuarios";
+import { IndicadorGuardando } from "@/components/indicador-guardando";
 import { Modal } from "@/components/modal";
+import { InputCorreo } from "@/components/input-correo";
+import { normalizarCorreo } from "@/lib/correo";
 import {
   PerfilesParticipantesAdmin,
   type PerfilParticipanteRow,
@@ -16,6 +20,7 @@ import { ESCUELAS } from "@/lib/escuelas";
 import type { Role } from "@/lib/roles";
 import { ROLE_LABELS, esRolCatalogoEvaluador } from "@/lib/roles";
 import { USER_ORIGEN, type UserOrigen } from "@/lib/user-origen";
+import { errorDeResultado, useDatoOptimista } from "@/lib/use-dato-optimista";
 import { PLANTILLA_USUARIOS_CSV } from "@/lib/usuarios-csv";
 
 type UserRow = {
@@ -87,11 +92,13 @@ export function UsuariosAdmin({
   users: UserRow[];
   perfiles: PerfilParticipanteRow[];
 }) {
+  const router = useRouter();
+  const lista = useDatoOptimista(users);
+  const filas = lista.dato;
   const [error, setError] = useState<string | null>(null);
   const [vista, setVista] = useState<"usuarios" | "perfiles">("usuarios");
   const [passwordOnce, setPasswordOnce] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
-  const [eliminando, setEliminando] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [modal, setModal] = useState<ModalActivo>(null);
@@ -102,25 +109,25 @@ export function UsuariosAdmin({
   const [editEscuela, setEditEscuela] = useState("");
 
   const visibles = useMemo(() => {
-    if (filtro.kind === "todos") return users;
+    if (filtro.kind === "todos") return filas;
     if (filtro.kind === "origen") {
-      return users.filter((user) => user.origen === filtro.value);
+      return filas.filter((user) => user.origen === filtro.value);
     }
     const grupo = FILTROS_ROL.find((item) => item.id === filtro.value);
     const roles = grupo?.roles ?? [filtro.value];
-    return users.filter((user) => roles.includes(user.role as Role));
-  }, [users, filtro]);
+    return filas.filter((user) => roles.includes(user.role as Role));
+  }, [filas, filtro]);
 
-  const conteoOrigenAdmin = users.filter((u) => u.origen === USER_ORIGEN.ADMIN).length;
-  const conteoRegistro = users.filter((u) => u.origen === USER_ORIGEN.REGISTRO).length;
+  const conteoOrigenAdmin = filas.filter((u) => u.origen === USER_ORIGEN.ADMIN).length;
+  const conteoRegistro = filas.filter((u) => u.origen === USER_ORIGEN.REGISTRO).length;
   const conteoPorRol = useMemo(() => {
     const counts = Object.fromEntries(FILTROS_ROL.map((item) => [item.id, 0])) as Record<Role, number>;
-    for (const user of users) {
+    for (const user of filas) {
       const grupo = FILTROS_ROL.find((item) => item.roles.includes(user.role as Role));
       if (grupo) counts[grupo.id] += 1;
     }
     return counts;
-  }, [users]);
+  }, [filas]);
 
   function abrirCrear() {
     setError(null);
@@ -146,31 +153,32 @@ export function UsuariosAdmin({
   }
 
   function cerrarModal() {
-    if (importing || eliminando) return;
+    if (importing) return;
     setModal(null);
     setEditingUser(null);
     setError(null);
   }
 
-  async function onEliminar() {
+  function onEliminar() {
     if (!editingUser) return;
     const confirmar = window.confirm(
-      `¿Eliminar a ${editingUser.name} (${editingUser.email})?\n\nSe borrarán sus postulaciones, asignaciones y tokens de recuperación asociados. Esta acción no se puede deshacer.`,
+      `¿Eliminar a ${editingUser.name} (${normalizarCorreo(editingUser.email)})?\n\nSe borrarán sus participaciones, asignaciones y tokens de recuperación asociados. Esta acción no se puede deshacer.`,
     );
     if (!confirmar) return;
-
-    setError(null);
-    setEliminando(true);
+    const id = editingUser.id;
     const formData = new FormData();
-    formData.set("id", editingUser.id);
-    const result = await eliminarUsuario(formData);
-    setEliminando(false);
-    if (result?.error) {
-      setError(result.error);
-      return;
-    }
+    formData.set("id", id);
     setModal(null);
     setEditingUser(null);
+    setError(null);
+    void lista
+      .aplicar(
+        (prev) => prev.filter((user) => user.id !== id),
+        () => eliminarUsuario(formData),
+      )
+      .then((result) => {
+        if (!errorDeResultado(result)) router.refresh();
+      });
   }
 
   function descargarPlantilla() {
@@ -205,6 +213,8 @@ export function UsuariosAdmin({
               </button>
             </div>
           </div>
+          <IndicadorGuardando visible={lista.guardando} />
+          {lista.error ? <p className="text-danger">{lista.error}</p> : null}
 
           {vista === "usuarios" ? (
           <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar usuarios" data-tour="usuarios-filtros">
@@ -213,7 +223,7 @@ export function UsuariosAdmin({
               className={`btn btn-sm ${filtro.kind === "todos" ? "btn-navy" : "btn-secondary"}`}
               onClick={() => setFiltro({ kind: "todos" })}
             >
-              Todos ({users.length})
+              Todos ({filas.length})
             </button>
             <button
               type="button"
@@ -287,7 +297,7 @@ export function UsuariosAdmin({
               {visibles.map((user) => (
                 <tr key={user.id} className="border-b border-border">
                   <td className="whitespace-nowrap px-5 py-3.5">{user.name}</td>
-                  <td className="whitespace-nowrap px-5 py-3.5">{user.email}</td>
+                  <td className="whitespace-nowrap px-5 py-3.5">{normalizarCorreo(user.email)}</td>
                   <td className="whitespace-nowrap px-5 py-3.5">{ROLE_LABELS[user.role as Role] ?? user.role}</td>
                   <td className="whitespace-nowrap px-5 py-3.5">{user.escuela ?? "—"}</td>
                   <td className="whitespace-nowrap px-5 py-3.5">
@@ -310,15 +320,36 @@ export function UsuariosAdmin({
         {error ? <p className="text-danger">{error}</p> : null}
         <form
           className="grid gap-4 md:grid-cols-2"
-          action={async (formData) => {
-            const result = await crearUsuario(formData);
-            if (result?.error) {
-              setError(result.error);
-              return;
-            }
-            setError(null);
+          action={(formData) => {
+            const name = String(formData.get("name") ?? "").trim();
+            const email = normalizarCorreo(String(formData.get("email") ?? ""));
+            const role = String(formData.get("role") ?? crearRole);
+            const escuelaRaw = String(formData.get("escuela") ?? crearEscuela).trim();
+            const tempId = `tmp-${crypto.randomUUID()}`;
             setModal(null);
-            setPasswordOnce("passwordOnce" in result && result.passwordOnce ? result.passwordOnce : null);
+            setError(null);
+            void lista
+              .aplicar(
+                (prev) => [
+                  ...prev,
+                  {
+                    id: tempId,
+                    name,
+                    email,
+                    role,
+                    escuela: esRolCatalogoEvaluador(role as Role) ? escuelaRaw || null : null,
+                    origen: USER_ORIGEN.ADMIN,
+                  },
+                ],
+                () => crearUsuario(formData),
+              )
+              .then((result) => {
+                if (errorDeResultado(result)) return;
+                setPasswordOnce(
+                  result && "passwordOnce" in result && result.passwordOnce ? result.passwordOnce : null,
+                );
+                router.refresh();
+              });
           }}
         >
           <div className="field">
@@ -327,7 +358,7 @@ export function UsuariosAdmin({
           </div>
           <div className="field">
             <label htmlFor="email">Correo</label>
-            <input className="input" id="email" name="email" type="email" required />
+            <InputCorreo className="input" id="email" name="email" required />
           </div>
           <div className="field">
             <label htmlFor="password">Contraseña</label>
@@ -380,16 +411,42 @@ export function UsuariosAdmin({
           <form
             key={editingUser.id}
             className="grid gap-4 md:grid-cols-2"
-            action={async (formData) => {
-              const result = await actualizarUsuario(formData);
-              if (result?.error) {
-                setError(result.error);
-                return;
-              }
-              setError(null);
+            action={(formData) => {
+              const id = editingUser.id;
+              const name = String(formData.get("name") ?? "").trim();
+              const email = normalizarCorreo(String(formData.get("email") ?? ""));
+              const role = String(formData.get("role") ?? editRole);
+              const escuelaRaw = String(formData.get("escuela") ?? editEscuela).trim();
+              const passwordOnce =
+                String(formData.get("password") ?? "") || null;
               setModal(null);
               setEditingUser(null);
-              setPasswordOnce("passwordOnce" in result && result.passwordOnce ? result.passwordOnce : null);
+              setError(null);
+              void lista
+                .aplicar(
+                  (prev) =>
+                    prev.map((user) =>
+                      user.id === id
+                        ? {
+                            ...user,
+                            name,
+                            email,
+                            role,
+                            escuela: esRolCatalogoEvaluador(role as Role) ? escuelaRaw || null : null,
+                          }
+                        : user,
+                    ),
+                  () => actualizarUsuario(formData),
+                )
+                .then((result) => {
+                  if (errorDeResultado(result)) return;
+                  setPasswordOnce(
+                    result && "passwordOnce" in result && result.passwordOnce
+                      ? result.passwordOnce
+                      : passwordOnce,
+                  );
+                  router.refresh();
+                });
             }}
           >
             <input type="hidden" name="id" value={editingUser.id} />
@@ -405,11 +462,10 @@ export function UsuariosAdmin({
             </div>
             <div className="field">
               <label htmlFor="edit-email">Correo</label>
-              <input
+              <InputCorreo
                 className="input"
                 id="edit-email"
                 name="email"
-                type="email"
                 defaultValue={editingUser.email}
                 required
               />
@@ -449,16 +505,15 @@ export function UsuariosAdmin({
               </div>
             ) : null}
             <div className="flex flex-wrap items-center justify-between gap-3 md:col-span-2">
-              <button className="btn btn-primary" type="submit" disabled={eliminando}>
+              <button className="btn btn-primary" type="submit">
                 Guardar cambios
               </button>
               <button
                 className="btn btn-ghost text-danger"
                 type="button"
-                disabled={eliminando}
                 onClick={() => void onEliminar()}
               >
-                {eliminando ? "Eliminando…" : "Eliminar usuario"}
+                Eliminar usuario
               </button>
             </div>
           </form>

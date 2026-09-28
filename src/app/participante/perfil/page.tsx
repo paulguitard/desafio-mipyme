@@ -1,5 +1,6 @@
 import { PerfilForm } from "@/components/perfil-form";
 import { prisma } from "@/lib/db";
+import { normalizarCorreo } from "@/lib/correo";
 import { parseArchivosSoloFiles, publicUploadUrl } from "@/lib/preguntas";
 import { requireUser } from "@/lib/session";
 import { notFound } from "next/navigation";
@@ -36,7 +37,7 @@ export default async function ParticipantePerfilPage() {
       <div className="page-scroll min-h-0 overflow-y-auto pr-1">
         <PerfilForm
           name={user.name}
-          email={user.email}
+          email={normalizarCorreo(user.email)}
           participante={{
             rutPersonal: user.rutPersonal,
             direccionPersonal: user.direccionPersonal,

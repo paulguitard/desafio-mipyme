@@ -1,5 +1,6 @@
 import "@/lib/env";
 import nodemailer from "nodemailer";
+import { normalizarCorreo } from "@/lib/correo";
 
 export type SendMailInput = {
   to: string;
@@ -51,7 +52,7 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
 
     await transporter.sendMail({
       from: `"${fromName.replaceAll('"', "")}" <${from}>`,
-      to: input.to,
+      to: normalizarCorreo(input.to),
       subject: input.subject,
       html: input.html,
       text: input.text ?? stripHtml(input.html),

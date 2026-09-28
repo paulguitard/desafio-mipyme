@@ -59,8 +59,12 @@ export function CasosPanel({
             <div key={banda.id} className="casos-filtros-slot">
               {indice > 0 ? <span className="casos-filtros-sep" aria-hidden="true" /> : null}
               <div className={`casos-filtros-banda${banda.id === "todas" ? " is-todas" : ""}`}>
-                {banda.label ? <p className="casos-filtros-banda-label">{banda.label}</p> : null}
-                <div className="casos-filtros-banda-chips">
+                <p className="casos-filtros-banda-label" aria-hidden={banda.label ? undefined : true}>
+                  {banda.label || "\u00a0"}
+                </p>
+                <div
+                  className={`casos-filtros-banda-chips${banda.filtros.length > 1 ? " is-apilada" : ""}`}
+                >
                   {banda.filtros.map((item) => {
                     const n = counts[item.id] ?? 0;
                     const activo = item.id === activoId;

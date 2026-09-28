@@ -1,19 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   actualizarConvocatoria,
   cargarPanelEvaluacion,
   crearConvocatoria,
-  eliminarConvocatoriaForm,
-  toggleConvocatoriaForm,
+  eliminarConvocatoria,
+  toggleConvocatoria,
 } from "@/actions/convocatorias";
-import { ConfirmForm } from "@/components/confirm-form";
 import { ConvocatoriaEvaluacion } from "@/components/convocatoria-evaluacion";
 import { ImagenMentoriaCover, ImagenMentoriaEncuadre } from "@/components/imagen-mentoria";
+import { IndicadorGuardando } from "@/components/indicador-guardando";
 import { Modal } from "@/components/modal";
 import type { PanelEvaluacion } from "@/lib/convocatoria-admin-data";
 import { CONTEXTO_PANEL_MENTORIA } from "@/lib/tutoriales";
+import { errorDeResultado, useDatoOptimista } from "@/lib/use-dato-optimista";
 import {
   diasRestantesHasta,
   etiquetaCierreAbierto,
@@ -47,11 +49,11 @@ export function ConvocatoriasAdmin({
   convocatorias: ConvocatoriaListaItem[];
   formularios: FormularioOpcion[];
 }) {
+  const router = useRouter();
+  const lista = useDatoOptimista(convocatorias);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ConvocatoriaListaItem | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const savingRef = useRef(false);
   const [imagenPreview, setImagenPreview] = useState<string | null>(null);
   const [imagenPos, setImagenPos] = useState<PosicionImagen>({ x: 50, y: 50 });
   const [vistaEmprendedor, setVistaEmprendedor] = useState(false);
@@ -83,11 +85,6 @@ export function ConvocatoriasAdmin({
     [editing],
   );
 
-  function resetGuardado() {
-    savingRef.current = false;
-    setSaving(false);
-  }
-
   function abrirCrear() {
     setEditing(null);
     setError(null);
@@ -95,7 +92,6 @@ export function ConvocatoriasAdmin({
     setImagenPos({ x: 50, y: 50 });
     setVistaEmprendedor(false);
     setVistaDatos(null);
-    resetGuardado();
     setOpen(true);
   }
 
@@ -106,18 +102,15 @@ export function ConvocatoriasAdmin({
     setImagenPos(item.imagenPos);
     setVistaEmprendedor(false);
     setVistaDatos(null);
-    resetGuardado();
     setOpen(true);
   }
 
   function cerrarModal() {
-    if (savingRef.current) return;
     setOpen(false);
     setError(null);
     setImagenPreview(null);
     setVistaEmprendedor(false);
     setVistaDatos(null);
-    resetGuardado();
   }
 
   function abrirVistaEmprendedor() {
@@ -159,6 +152,39 @@ export function ConvocatoriasAdmin({
     }
   }
 
+  function itemDesdeFormulario(
+    formData: FormData,
+    actual: ConvocatoriaListaItem | null,
+    tempId: string,
+  ): ConvocatoriaListaItem {
+    const formularioId = String(formData.get("formularioId") ?? actual?.formularioId ?? "");
+    const inicio = parseFechaForm(String(formData.get("fechaInicio") ?? ""));
+    const cierre = parseFechaForm(String(formData.get("fechaCierre") ?? ""));
+    return {
+      id: actual?.id ?? tempId,
+      titulo: String(formData.get("titulo") ?? "").trim(),
+      descripcion: String(formData.get("descripcion") ?? "").trim(),
+      estado: actual?.estado ?? "ABIERTA",
+      formularioId,
+      formularioTitulo:
+        formularios.find((form) => form.id === formularioId)?.titulo ?? actual?.formularioTitulo ?? "",
+      postulaciones: actual?.postulaciones ?? 0,
+      fechaInicio: inicio ? inicio.toISOString() : null,
+      fechaCierre: cierre ? cierre.toISOString() : null,
+      imagenUrl: imagenPreview ?? actual?.imagenUrl ?? null,
+      imagenPos,
+    };
+  }
+
+  function persistirYRefrescar(
+    apply: (prev: ConvocatoriaListaItem[]) => ConvocatoriaListaItem[],
+    accion: () => Promise<unknown>,
+  ) {
+    void lista.aplicar(apply, accion).then((result) => {
+      if (!errorDeResultado(result)) router.refresh();
+    });
+  }
+
   return (
     <div className="page-scroll h-full space-y-8 overflow-y-auto">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -167,12 +193,14 @@ export function ConvocatoriasAdmin({
           Crear mentoría
         </button>
       </div>
+      <IndicadorGuardando visible={lista.guardando} />
+      {lista.error ? <p className="text-danger">{lista.error}</p> : null}
 
       <div className="space-y-3" data-tour="mentorias-lista">
-        {convocatorias.length === 0 ? (
+        {lista.dato.length === 0 ? (
           <p className="text-muted">Aún no hay mentorías.</p>
         ) : null}
-        {convocatorias.map((item, index) => {
+        {lista.dato.map((item, index) => {
           const rango = formatoRangoFechas(item.fechaInicio, item.fechaCierre);
           return (
             <article key={item.id} className="card flex flex-wrap items-center justify-between gap-4 p-5">
@@ -200,36 +228,53 @@ export function ConvocatoriasAdmin({
                 <button className="btn btn-sm btn-secondary" type="button" onClick={() => abrirEditar(item)}>
                   Editar
                 </button>
-                <ConfirmForm
-                  action={toggleConvocatoriaForm}
-                  message={
-                    item.estado === "ABIERTA"
-                      ? "Al cerrar, nadie podrá editar ni evaluar. ¿Continuar?"
-                      : "¿Reabrir esta mentoría?"
-                  }
+                <button
+                  className="btn btn-sm btn-secondary"
+                  type="button"
+                  data-tour={index === 0 ? "mentoria-abrir-cerrar" : undefined}
+                  onClick={() => {
+                    const cerrar = item.estado === "ABIERTA";
+                    const ok = window.confirm(
+                      cerrar
+                        ? "Al cerrar, nadie podrá editar ni evaluar. ¿Continuar?"
+                        : "¿Reabrir esta mentoría?",
+                    );
+                    if (!ok) return;
+                    const formData = new FormData();
+                    formData.set("id", item.id);
+                    persistirYRefrescar(
+                      (prev) =>
+                        prev.map((row) =>
+                          row.id === item.id
+                            ? { ...row, estado: row.estado === "ABIERTA" ? "CERRADA" : "ABIERTA" }
+                            : row,
+                        ),
+                      () => toggleConvocatoria(formData),
+                    );
+                  }}
                 >
-                  <input type="hidden" name="id" value={item.id} />
-                  <button
-                    className="btn btn-sm btn-secondary"
-                    type="submit"
-                    data-tour={index === 0 ? "mentoria-abrir-cerrar" : undefined}
-                  >
-                    {item.estado === "ABIERTA" ? "Cerrar" : "Abrir"}
-                  </button>
-                </ConfirmForm>
-                <ConfirmForm
-                  action={eliminarConvocatoriaForm}
-                  message={
-                    item.postulaciones > 0
-                      ? `¿Eliminar "${item.titulo}"?\n\nSe borrarán ${item.postulaciones} caso(s), respuestas, evaluaciones y archivos. Esta acción no se puede deshacer.`
-                      : `¿Eliminar "${item.titulo}"?\n\nEsta acción no se puede deshacer.`
-                  }
+                  {item.estado === "ABIERTA" ? "Cerrar" : "Abrir"}
+                </button>
+                <button
+                  className="btn btn-sm btn-danger"
+                  type="button"
+                  onClick={() => {
+                    const ok = window.confirm(
+                      item.postulaciones > 0
+                        ? `¿Eliminar "${item.titulo}"?\n\nSe borrarán ${item.postulaciones} caso(s), respuestas, evaluaciones y archivos. Esta acción no se puede deshacer.`
+                        : `¿Eliminar "${item.titulo}"?\n\nEsta acción no se puede deshacer.`,
+                    );
+                    if (!ok) return;
+                    const formData = new FormData();
+                    formData.set("id", item.id);
+                    persistirYRefrescar(
+                      (prev) => prev.filter((row) => row.id !== item.id),
+                      () => eliminarConvocatoria(formData),
+                    );
+                  }}
                 >
-                  <input type="hidden" name="id" value={item.id} />
-                  <button className="btn btn-sm btn-danger" type="submit">
-                    Eliminar
-                  </button>
-                </ConfirmForm>
+                  Eliminar
+                </button>
               </div>
             </article>
           );
@@ -290,30 +335,22 @@ export function ConvocatoriasAdmin({
           ref={formRef}
           key={editing?.id ?? "nuevo"}
           className="grid gap-4"
-          aria-busy={saving}
-          action={async (formData) => {
-            // Ref síncrono: setState no alcanza a bloquear un segundo clic/Enter.
-            if (savingRef.current) return;
-            savingRef.current = true;
-            setSaving(true);
-            setError(null);
-            try {
-              const result = editing
-                ? await actualizarConvocatoria(formData)
-                : await crearConvocatoria(formData);
-              if (result && "error" in result && result.error) {
-                setError(result.error);
-                return;
-              }
-              savingRef.current = false;
-              setSaving(false);
-              cerrarModal();
-            } finally {
-              if (savingRef.current) {
-                savingRef.current = false;
-                setSaving(false);
-              }
+          action={(formData) => {
+            const actual = editing;
+            const tempId = `tmp-${crypto.randomUUID()}`;
+            const siguiente = itemDesdeFormulario(formData, actual, tempId);
+            if (!siguiente.titulo) {
+              setError("Título y formulario son obligatorios.");
+              return;
             }
+            cerrarModal();
+            persistirYRefrescar(
+              (prev) =>
+                actual
+                  ? prev.map((row) => (row.id === actual.id ? siguiente : row))
+                  : [siguiente, ...prev],
+              () => (actual ? actualizarConvocatoria(formData) : crearConvocatoria(formData)),
+            );
           }}
         >
           {editing ? <input type="hidden" name="id" value={editing.id} /> : null}
@@ -435,8 +472,8 @@ export function ConvocatoriasAdmin({
               />
             </div>
           </div>
-          <button className="btn btn-primary" type="submit" disabled={saving}>
-            {saving ? "Guardando…" : editing ? "Guardar cambios" : "Crear mentoría"}
+          <button className="btn btn-primary" type="submit">
+            {editing ? "Guardar cambios" : "Crear mentoría"}
           </button>
         </form>
       </Modal>
@@ -477,7 +514,7 @@ function VistaEmprendedorMentoria({
       {descripcion ? <p>{descripcion}</p> : <p className="text-muted">Sin descripción</p>}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <button className="btn btn-primary" type="button" disabled>
-          Postular
+          Participar
         </button>
         <div className="ml-auto flex flex-col items-end gap-2 text-right">
           {cierre ? (

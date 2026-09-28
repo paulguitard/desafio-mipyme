@@ -15,13 +15,29 @@ export type ConfigCorreoRecuperacionData = {
   imagenUrl: string | null;
 };
 
+/** Convierte voseo argentino de las plantillas a tuteo castellano. */
+export function destosearTextoCorreo(texto: string): string {
+  return texto
+    .replaceAll("copiá y pegá", "copia y pega")
+    .replaceAll("copiá", "copia")
+    .replaceAll("pegá", "pega")
+    .replaceAll("Entrá", "Entra")
+    .replaceAll("podés", "puedes")
+    .replaceAll("Revisá", "Revisa")
+    .replaceAll("revisá", "revisa")
+    .replaceAll("Volvé", "Vuelve")
+    .replaceAll("volvé", "vuelve")
+    .replaceAll("Ignorá", "Ignora")
+    .replaceAll("ignorá", "ignora");
+}
+
 export const DEFAULT_CORREO_RECUPERACION: Omit<ConfigCorreoRecuperacionData, "imagenUrl"> = {
   asunto: "Restablecer contraseña — Desafío AIEP",
   titulo: "Restablecer contraseña",
   cuerpo:
-    "Hola {{nombre}},\n\nRecibimos un pedido para restablecer tu contraseña en Desafío AIEP. El enlace vence en 1 hora. Si no pediste este cambio, ignorá este correo.",
+    "Hola {{nombre}},\n\nRecibimos un pedido para restablecer tu contraseña en Desafío AIEP. El enlace vence en 1 hora. Si no pediste este cambio, ignora este correo.",
   textoBoton: "Elegir nueva contraseña",
-  pie: "Si el botón no funciona, copiá y pegá este enlace en tu navegador:\n{{enlace}}",
+  pie: "Si el botón no funciona, copia y pega este enlace en tu navegador:\n{{enlace}}",
   colorFondo: "#f4f6fa",
   colorEncabezado: "#0a2156",
   colorBoton: "#c8102e",
@@ -40,6 +56,11 @@ export function toConfigCorreoView(
   const base = row ?? DEFAULT_CORREO_RECUPERACION;
   return {
     ...base,
+    asunto: destosearTextoCorreo(base.asunto),
+    titulo: destosearTextoCorreo(base.titulo),
+    cuerpo: destosearTextoCorreo(base.cuerpo),
+    textoBoton: destosearTextoCorreo(base.textoBoton),
+    pie: destosearTextoCorreo(base.pie),
     imagenUrl: imagenUrlFromStored(base.imagen),
   };
 }

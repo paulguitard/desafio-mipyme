@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { formatearRut } from "@/lib/rut";
 import { workbookXlsx } from "@/lib/xlsx-workbook";
+import { normalizarCorreo } from "@/lib/correo";
 
 export type PerfilParticipanteRow = {
   id: string;
@@ -51,7 +52,7 @@ function filasExcel(filas: PerfilParticipanteRow[]) {
     ],
     ...filas.map((perfil) => [
       perfil.name,
-      perfil.email,
+      normalizarCorreo(perfil.email),
       rutVisible(perfil.rutPersonal) === "—" ? "" : rutVisible(perfil.rutPersonal),
       perfil.direccionPersonal?.trim() ?? "",
       perfil.telefonoMovil?.trim() ?? "",
@@ -182,7 +183,7 @@ export function PerfilesParticipantesAdmin({ perfiles }: { perfiles: PerfilParti
             {visibles.map((perfil) => (
               <tr key={perfil.id} className="border-b border-border">
                 <td className="whitespace-nowrap px-5 py-3.5">{perfil.name}</td>
-                <td className="whitespace-nowrap px-5 py-3.5">{perfil.email}</td>
+                <td className="whitespace-nowrap px-5 py-3.5">{normalizarCorreo(perfil.email)}</td>
                 <td className="whitespace-nowrap px-5 py-3.5">{rutVisible(perfil.rutPersonal)}</td>
                 <td className="px-5 py-3.5">{celda(perfil.direccionPersonal)}</td>
                 <td className="whitespace-nowrap px-5 py-3.5">{celda(perfil.telefonoMovil)}</td>

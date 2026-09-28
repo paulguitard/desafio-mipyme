@@ -1,7 +1,9 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getAppBaseUrl } from "@/lib/app-url";
 import { imagenUrlForMail, loadConfigCorreoRecuperacionForMail } from "@/lib/correo-config";
 import {
+  destosearTextoCorreo,
   renderCorreoRecuperacion,
   type ConfigCorreoRecuperacionData,
 } from "@/lib/correo-recuperacion";
@@ -9,6 +11,7 @@ import { isMailConfigured, sendMail } from "@/lib/mail";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
 import {
   DEFAULT_CORREO_NOTIFICACION,
+  TIPOS_CORREO_NOTIFICACION,
   type TipoCorreoNotificacion,
   type TextosCorreoNotificacion,
 } from "@/lib/correo-notificacion-ui";
@@ -22,17 +25,74 @@ export {
   type TextosCorreoNotificacion,
 } from "@/lib/correo-notificacion-ui";
 
+type FilaCorreoNotificacion = {
+  id: string;
+  asunto: string;
+  titulo: string;
+  cuerpo: string;
+  textoBoton: string;
+  pie: string;
+};
+
+/**
+ * El delegate `prisma.configCorreoNotificacion` a veces no existe en `next dev`
+ * (cliente generado viejo cacheado). Las lecturas/escritas van por SQL.
+ */
+async function asegurarTablaCorreoNotificacion() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "ConfigCorreoNotificacion" (
+      "id" TEXT NOT NULL,
+      "asunto" TEXT NOT NULL,
+      "titulo" TEXT NOT NULL,
+      "cuerpo" TEXT NOT NULL,
+      "textoBoton" TEXT NOT NULL,
+      "pie" TEXT NOT NULL,
+      "updatedAt" TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "ConfigCorreoNotificacion_pkey" PRIMARY KEY ("id")
+    )
+  `);
+}
+
+export async function listarConfigCorreoNotificacion(): Promise<FilaCorreoNotificacion[]> {
+  await asegurarTablaCorreoNotificacion();
+  const ids = Prisma.join(TIPOS_CORREO_NOTIFICACION.map((id) => Prisma.sql`${id}`));
+  return prisma.$queryRaw<FilaCorreoNotificacion[]>`
+    SELECT id, asunto, titulo, cuerpo, "textoBoton", pie
+    FROM "ConfigCorreoNotificacion"
+    WHERE id IN (${ids})
+  `;
+}
+
+export async function guardarFilaCorreoNotificacion(
+  id: TipoCorreoNotificacion,
+  textos: TextosCorreoNotificacion,
+) {
+  await asegurarTablaCorreoNotificacion();
+  await prisma.$executeRaw`
+    INSERT INTO "ConfigCorreoNotificacion" (id, asunto, titulo, cuerpo, "textoBoton", pie, "updatedAt")
+    VALUES (${id}, ${textos.asunto}, ${textos.titulo}, ${textos.cuerpo}, ${textos.textoBoton}, ${textos.pie}, CURRENT_TIMESTAMP)
+    ON CONFLICT (id) DO UPDATE SET
+      asunto = EXCLUDED.asunto,
+      titulo = EXCLUDED.titulo,
+      cuerpo = EXCLUDED.cuerpo,
+      "textoBoton" = EXCLUDED."textoBoton",
+      pie = EXCLUDED.pie,
+      "updatedAt" = CURRENT_TIMESTAMP
+  `;
+}
+
 export async function loadTextosCorreoNotificacion(
   tipo: TipoCorreoNotificacion,
 ): Promise<TextosCorreoNotificacion> {
-  const row = await prisma.configCorreoNotificacion.findUnique({ where: { id: tipo } });
+  const rows = await listarConfigCorreoNotificacion();
+  const row = rows.find((item) => item.id === tipo);
   if (!row) return DEFAULT_CORREO_NOTIFICACION[tipo];
   return {
-    asunto: row.asunto,
-    titulo: row.titulo,
-    cuerpo: row.cuerpo,
-    textoBoton: row.textoBoton,
-    pie: row.pie,
+    asunto: destosearTextoCorreo(row.asunto),
+    titulo: destosearTextoCorreo(row.titulo),
+    cuerpo: destosearTextoCorreo(row.cuerpo),
+    textoBoton: destosearTextoCorreo(row.textoBoton),
+    pie: destosearTextoCorreo(row.pie),
   };
 }
 

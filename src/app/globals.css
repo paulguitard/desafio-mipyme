@@ -217,6 +217,43 @@ textarea {
   gap: 0.4rem;
 }
 
+.campo-adjunto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.9rem 1rem;
+  border: 1.5px dashed rgba(10, 33, 86, 0.28);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.campo-adjunto-titulo {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.campo-adjunto-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.campo-adjunto-nombre {
+  min-width: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--navy);
+  overflow-wrap: anywhere;
+}
+
+.campo-adjunto-vacio {
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -465,7 +502,7 @@ html:has(.app-shell) body {
 .casos-filtros-banda {
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 0.38rem;
   min-width: 0;
   padding: 0.15rem 0.15rem 0.1rem;
@@ -484,6 +521,18 @@ html:has(.app-shell) body {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.casos-filtros-banda-chips.is-apilada {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.casos-filtros-banda-chips.is-apilada .casos-filtro {
+  width: 100%;
+  justify-content: space-between;
 }
 
 .casos-banda {
@@ -699,6 +748,91 @@ html:has(.app-shell) body {
   background: transparent;
 }
 
+.eval-detalle-body.is-columnas {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-items: stretch;
+  gap: 0.75rem;
+  overflow: hidden;
+  padding: 0;
+  background: transparent;
+}
+
+.eval-detalle-body.is-columnas.is-bloqueado {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.eval-detalle-shell > input[type="hidden"] {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .eval-detalle-body.is-columnas {
+    flex-direction: column;
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(10, 33, 86, 0.22) transparent;
+  }
+
+  .eval-detalle-col {
+    flex: 0 1 auto;
+    max-height: min(70vh, 34rem);
+  }
+
+  .eval-detalle-col.is-collapsed {
+    max-height: none;
+  }
+}
+
+.eval-detalle-col {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.eval-detalle-col.is-eval.is-collapsed,
+.eval-detalle-col.is-sup.is-collapsed {
+  flex: 0 0 auto;
+}
+
+.eval-detalle-col.is-collapsed .eval-detalle-col-scroll {
+  display: none;
+}
+
+.eval-detalle-col-scroll {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(10, 33, 86, 0.22) transparent;
+}
+
+.eval-detalle-col-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.eval-detalle-col-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.eval-detalle-col-scroll::-webkit-scrollbar-thumb {
+  background: rgba(10, 33, 86, 0.22);
+  border-radius: 999px;
+}
+
+.eval-detalle-col-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(10, 33, 86, 0.38);
+}
+
 .eval-detalle-body {
   display: grid;
   min-height: 0;
@@ -760,7 +894,8 @@ html:has(.app-shell) body {
 }
 
 .eval-detalle-body.is-eval-collapsed .eval-detalle-head.is-eval .eval-detalle-head-copy,
-.eval-detalle-body.is-sup-collapsed .eval-detalle-head.is-sup .eval-detalle-head-copy {
+.eval-detalle-body.is-sup-collapsed .eval-detalle-head.is-sup .eval-detalle-head-copy,
+.eval-detalle-col.is-collapsed .eval-detalle-head .eval-detalle-head-copy {
   display: none;
 }
 
@@ -776,7 +911,8 @@ html:has(.app-shell) body {
 }
 
 .eval-detalle-body.is-eval-collapsed .eval-detalle-head.is-eval,
-.eval-detalle-body.is-sup-collapsed .eval-detalle-head.is-sup {
+.eval-detalle-body.is-sup-collapsed .eval-detalle-head.is-sup,
+.eval-detalle-col.is-collapsed .eval-detalle-head {
   align-items: center;
   justify-content: center;
   padding: 0.7rem 0.65rem;
@@ -829,12 +965,16 @@ html:has(.app-shell) body {
 }
 
 .eval-detalle-cell > * {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   width: 100%;
   min-width: 0;
-  min-height: 100%;
-  height: 100%;
   box-sizing: border-box;
+}
+
+.eval-detalle-col-scroll .eval-detalle-cell:last-child {
+  border-bottom: 1px solid var(--eval-detalle-panel-border, rgba(10, 33, 86, 0.12));
+  border-radius: 0 0 1rem 1rem;
+  flex: 1 1 auto;
 }
 
 .eval-detalle-cell.is-caso {
@@ -875,6 +1015,14 @@ html:has(.app-shell) body {
 
   .eval-detalle-body.is-eval-collapsed.is-sup-collapsed {
     grid-template-columns: minmax(0, 1fr) 0.75rem max-content 0.75rem max-content;
+  }
+
+  .eval-detalle-body.is-sin-sup {
+    grid-template-columns: minmax(0, 1fr) 0.75rem minmax(0, 1fr);
+  }
+
+  .eval-detalle-body.is-sin-sup.is-eval-collapsed {
+    grid-template-columns: minmax(0, 1fr) 0.75rem max-content;
   }
 
   .eval-detalle-headers,
@@ -1917,11 +2065,12 @@ html:has(.app-shell) body {
 }
 
 .eval-avatar {
-  display: flex;
-  width: auto;
-  min-width: 4.5rem;
-  max-width: 9.5rem;
-  flex-direction: column;
+  display: grid;
+  width: 8.25rem;
+  min-width: 8.25rem;
+  max-width: 8.25rem;
+  grid-template-rows: minmax(1.85rem, auto) 2.55rem auto;
+  justify-items: center;
   align-items: center;
   gap: 0.35rem;
   text-align: center;
@@ -1933,13 +2082,15 @@ html:has(.app-shell) body {
   max-width: 100%;
   align-items: center;
   justify-content: center;
+  align-self: end;
   border-radius: 999px;
   padding: 0.15rem 0.55rem;
   font-size: 0.68rem;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: 0.01em;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
 }
 
 .eval-avatar-pill.is-pendiente,
@@ -1981,13 +2132,6 @@ html:has(.app-shell) body {
   color: #1d4ed8;
 }
 
-.eval-avatar-pill.is-esperando-respuesta,
-.eval-avatar-pill.is-esperando-evaluacion,
-.eval-avatar-pill.is-esperando-supervision {
-  white-space: normal;
-  text-align: center;
-}
-
 .eval-avatar-icon {
   display: inline-flex;
   align-items: center;
@@ -2001,13 +2145,15 @@ html:has(.app-shell) body {
 }
 
 .eval-avatar-name {
+  max-width: 100%;
   color: var(--navy);
   font-size: 0.72rem;
   font-weight: 600;
   line-height: 1.25;
-  overflow: visible;
-  white-space: normal;
-  word-break: break-word;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .eval-avatar-finalizada .eval-avatar-icon {

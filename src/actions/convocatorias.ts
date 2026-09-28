@@ -329,9 +329,6 @@ export async function asignarEvaluadorAPostulacion(formData: FormData) {
     },
   });
   if (!postulacion) return { error: "Caso no encontrado." };
-  if (postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La mentoría está cerrada. No se puede asignar." };
-  }
   if (postulacion.estado === "FINALIZADA" || !postulacion.enviadaAt) {
     return { error: "Solo se asignan respuestas enviadas y no finalizadas." };
   }
@@ -394,9 +391,6 @@ export async function asignarEvaluadores(formData: FormData) {
     },
   });
   if (!postulacion) return { error: "Caso no encontrado." };
-  if (postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La mentoría está cerrada. No se puede asignar." };
-  }
   if (postulacion.estado === "FINALIZADA" || !postulacion.enviadaAt) {
     return { error: "Solo se asignan casos enviados y no finalizados." };
   }
@@ -460,7 +454,7 @@ export async function eliminarPostulacion(formData: FormData) {
       respuestas: { include: { versiones: true } },
     },
   });
-  if (!postulacion) return { error: "Postulación no encontrada." };
+  if (!postulacion) return { error: "Participación no encontrada." };
 
   const adjuntos = new Set<string>();
   for (const respuesta of postulacion.respuestas) {
@@ -486,7 +480,7 @@ export async function eliminarPostulacion(formData: FormData) {
 
   revalidateConvocatorias(postulacion.convocatoriaId);
   revalidatePath("/evaluador");
-  return { ok: true, mensaje: "Postulación eliminada." };
+  return { ok: true, mensaje: "Participación eliminada." };
 }
 
 export async function eliminarConvocatoria(formData: FormData) {
@@ -635,9 +629,6 @@ export async function asignarSupervisorAPostulacion(formData: FormData) {
     },
   });
   if (!postulacion) return { error: "Caso no encontrado." };
-  if (postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La mentoría está cerrada. No se puede asignar." };
-  }
   if (postulacion.estado === "FINALIZADA" || !postulacion.enviadaAt) {
     return { error: "Solo se asignan respuestas enviadas y no finalizadas." };
   }
@@ -698,9 +689,9 @@ export async function cargarPanelEvaluacion(convocatoriaId: string, page = 1) {
 
 export async function cargarDetalleFichaAdmin(postulacionId: string) {
   await requireUser("ADMIN");
-  if (!postulacionId) return { error: "Postulación no encontrada." };
+  if (!postulacionId) return { error: "Participación no encontrada." };
   const data = await getDetalleFichaAdmin(postulacionId);
-  if (!data) return { error: "Postulación no encontrada." };
+  if (!data) return { error: "Participación no encontrada." };
   return { data };
 }
 

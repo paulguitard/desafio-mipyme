@@ -63,25 +63,25 @@ export const DEFAULT_CORREO_NOTIFICACION: Record<TipoCorreoNotificacion, TextosC
     asunto: "Hay observaciones para reparar — {{caso}}",
     titulo: "Observaciones para reparar",
     cuerpo:
-      "Hola {{nombre}},\n\nEl evaluador envió observaciones sobre tu caso «{{caso}}» en {{mentoria}}, y el supervisor ya las aprobó. Entrá para revisarlas y enviar las correcciones.",
+      "Hola {{nombre}},\n\nEl evaluador envió observaciones sobre tu caso «{{caso}}» en {{mentoria}}, y el supervisor ya las aprobó. Entra para revisarlas y enviar las correcciones.",
     textoBoton: "Ver el caso",
-    pie: "Si el botón no funciona, copiá y pegá este enlace en tu navegador:\n{{enlace}}",
+    pie: "Si el botón no funciona, copia y pega este enlace en tu navegador:\n{{enlace}}",
   },
   EVALUADOR_RESPUESTA_REENVIO: {
     asunto: "El participante reenvió el caso — {{caso}}",
     titulo: "Respuestas actualizadas",
     cuerpo:
-      "Hola {{nombre}},\n\n{{actor}} reenvió las respuestas de «{{caso}}» en {{mentoria}} después de tus observaciones. Ya podés volver a evaluar.",
+      "Hola {{nombre}},\n\n{{actor}} reenvió las respuestas de «{{caso}}» en {{mentoria}} después de tus observaciones. Ya puedes volver a evaluar.",
     textoBoton: "Abrir la evaluación",
-    pie: "Si el botón no funciona, copiá y pegá este enlace en tu navegador:\n{{enlace}}",
+    pie: "Si el botón no funciona, copia y pega este enlace en tu navegador:\n{{enlace}}",
   },
   EVALUADOR_DEVOLUCION_SUPERVISOR: {
     asunto: "El supervisor devolvió tu evaluación — {{caso}}",
     titulo: "Evaluación devuelta",
     cuerpo:
-      "Hola {{nombre}},\n\n{{actor}} devolvió tu evaluación de «{{caso}}» en {{mentoria}}. Revisá sus comentarios y volvé a enviarla.",
+      "Hola {{nombre}},\n\n{{actor}} devolvió tu evaluación de «{{caso}}» en {{mentoria}}. Revisa sus comentarios y vuelve a enviarla.",
     textoBoton: "Revisar la evaluación",
-    pie: "Si el botón no funciona, copiá y pegá este enlace en tu navegador:\n{{enlace}}",
+    pie: "Si el botón no funciona, copia y pega este enlace en tu navegador:\n{{enlace}}",
   },
   EVALUADOR_APROBACION_SUPERVISOR: {
     asunto: "El supervisor aprobó tu evaluación — {{caso}}",
@@ -89,7 +89,7 @@ export const DEFAULT_CORREO_NOTIFICACION: Record<TipoCorreoNotificacion, TextosC
     cuerpo:
       "Hola {{nombre}},\n\n{{actor}} aprobó tu evaluación de «{{caso}}» en {{mentoria}} ({{resultado}}).",
     textoBoton: "Ver la evaluación",
-    pie: "Si el botón no funciona, copiá y pegá este enlace en tu navegador:\n{{enlace}}",
+    pie: "Si el botón no funciona, copia y pega este enlace en tu navegador:\n{{enlace}}",
   },
   SUPERVISOR_NUEVA_REVISION: {
     asunto: "Nueva evaluación para revisar — {{caso}}",
@@ -97,7 +97,7 @@ export const DEFAULT_CORREO_NOTIFICACION: Record<TipoCorreoNotificacion, TextosC
     cuerpo:
       "Hola {{nombre}},\n\n{{actor}} envió una evaluación de «{{caso}}» en {{mentoria}} para tu revisión.",
     textoBoton: "Abrir la supervisión",
-    pie: "Si el botón no funciona, copiá y pegá este enlace en tu navegador:\n{{enlace}}",
+    pie: "Si el botón no funciona, copia y pega este enlace en tu navegador:\n{{enlace}}",
   },
 };
 

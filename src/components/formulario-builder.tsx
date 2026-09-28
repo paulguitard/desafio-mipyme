@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import {
   actualizarFormulario,
   actualizarPregunta,
@@ -12,6 +11,7 @@ import {
 } from "@/actions/formularios";
 import { BotonAtras } from "@/components/boton-atras";
 import { CampoEditable } from "@/components/campo-editable";
+import { IndicadorGuardando } from "@/components/indicador-guardando";
 import { Modal } from "@/components/modal";
 import { PreguntaCampo } from "@/components/pregunta-campo";
 import {
@@ -55,6 +55,7 @@ import {
   type ConfigLimites,
   type TipoPregunta,
 } from "@/lib/preguntas";
+import { useAccionOptimista, useDatoOptimista } from "@/lib/use-dato-optimista";
 
 function IconoSubir() {
   return (
@@ -238,7 +239,14 @@ export function FormularioBuilder({
     preguntas: PreguntaVista[];
   };
 }) {
-  const router = useRouter();
+  const accion = useAccionOptimista();
+  const preguntasIniciales = useMemo(() => {
+    const actuales = formulario?.preguntas ?? [];
+    if (actuales.some(esPreguntaNombreCaso)) return actuales;
+    return [preguntaNombreCasoVista(ID_BORRADOR_NOMBRE_CASO), ...actuales];
+  }, [formulario?.preguntas]);
+  const preguntasState = useDatoOptimista(preguntasIniciales);
+  const preguntas = preguntasState.dato;
   const [titulo, setTitulo] = useState(formulario?.titulo ?? "");
   const [descripcion, setDescripcion] = useState(formulario?.descripcion ?? "");
   const [modoEvaluacion, setModoEvaluacion] = useState<ModoEvaluacion>(
@@ -248,17 +256,14 @@ export function FormularioBuilder({
   const [descripcionDraft, setDescripcionDraft] = useState(formulario?.descripcion ?? "");
   const [editandoTitulo, setEditandoTitulo] = useState(modo === "nuevo" || !formulario?.titulo);
   const [editandoDescripcion, setEditandoDescripcion] = useState(modo === "nuevo");
-  const [preguntas, setPreguntas] = useState<PreguntaVista[]>(() => {
-    const actuales = formulario?.preguntas ?? [];
-    if (actuales.some(esPreguntaNombreCaso)) return actuales;
-    return [preguntaNombreCasoVista(ID_BORRADOR_NOMBRE_CASO), ...actuales];
-  });
   const [agregando, setAgregando] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [obligatoria, setObligatoria] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [guardando, setGuardando] = useState(false);
-  const [guardandoCampo, setGuardandoCampo] = useState<"titulo" | "descripcion" | "modo" | null>(null);
+  const error = preguntasState.error ?? accion.error;
+  const setError = (valor: string | null) => {
+    preguntasState.setError(valor);
+    accion.setError(valor);
+  };
 
   const esNuevo = modo === "nuevo";
   const puedeCambiarModo = esNuevo || Boolean(formulario?.puedeCambiarModo);
@@ -272,92 +277,80 @@ export function FormularioBuilder({
     setError(null);
   }
 
-  async function persistirTituloDescripcion(
+  function persistirTituloDescripcion(
     siguienteTitulo: string,
     siguienteDescripcion: string,
     siguienteModo: ModoEvaluacion = modoEvaluacion,
   ) {
-    if (esNuevo || !formulario) return true;
+    if (esNuevo || !formulario) return;
     const tituloFinal = siguienteTitulo.trim();
     if (!tituloFinal) {
       setError("El título es obligatorio.");
-      return false;
+      return;
     }
     const formData = new FormData();
     formData.set("id", formulario.id);
     formData.set("titulo", tituloFinal);
     formData.set("descripcion", siguienteDescripcion);
     formData.set("modoEvaluacion", siguienteModo);
-    const result = await actualizarFormulario(formData);
-    if (result?.error) {
-      setError(result.error);
-      return false;
-    }
-    setError(null);
-    return true;
+    void accion.ejecutar(() => actualizarFormulario(formData));
   }
 
-  async function guardarTitulo() {
+  function guardarTitulo() {
     const siguiente = tituloDraft.trim();
     if (!siguiente) {
       setError("El título es obligatorio.");
       return;
     }
-    setGuardandoCampo("titulo");
-    const ok = await persistirTituloDescripcion(siguiente, descripcion);
-    setGuardandoCampo(null);
-    if (!ok) return;
     setTitulo(siguiente);
     setTituloDraft(siguiente);
     setEditandoTitulo(false);
+    persistirTituloDescripcion(siguiente, descripcion);
   }
 
-  async function guardarDescripcion() {
-    setGuardandoCampo("descripcion");
-    const ok = await persistirTituloDescripcion(titulo, descripcionDraft);
-    setGuardandoCampo(null);
-    if (!ok) return;
+  function guardarDescripcion() {
     setDescripcion(descripcionDraft);
     setEditandoDescripcion(false);
+    persistirTituloDescripcion(titulo, descripcionDraft);
   }
 
-  async function onCambiarModo(siguiente: ModoEvaluacion) {
+  function onCambiarModo(siguiente: ModoEvaluacion) {
     if (!puedeCambiarModo || siguiente === modoEvaluacion) return;
-    if (esNuevo) {
-      setModoEvaluacion(siguiente);
-      return;
-    }
-    setGuardandoCampo("modo");
-    const ok = await persistirTituloDescripcion(titulo, descripcion, siguiente);
-    setGuardandoCampo(null);
-    if (!ok) return;
     setModoEvaluacion(siguiente);
-    router.refresh();
+    if (esNuevo) return;
+    persistirTituloDescripcion(titulo, descripcion, siguiente);
   }
 
-  async function onAgregar(borrador: PreguntaBorrador) {
+  function onAgregar(borrador: PreguntaBorrador) {
     const mensaje = validarPregunta(borrador);
     if (mensaje) {
       setError(mensaje);
       return;
     }
     setError(null);
-    if (esNuevo) {
-      setPreguntas((actual) => [...actual, preguntaDesdeBorrador(crypto.randomUUID(), borrador)]);
-      setAgregando(false);
-      return;
-    }
-    const result = await agregarPregunta(formDataPregunta(formulario!.id, null, borrador));
-    if (result?.error || !result?.id) {
-      setError(result?.error ?? "No se pudo agregar la pregunta.");
-      return;
-    }
-    setPreguntas((actual) => [...actual, preguntaDesdeBorrador(result.id, borrador)]);
+    const tempId = crypto.randomUUID();
     setAgregando(false);
-    router.refresh();
+    if (esNuevo) {
+      void preguntasState.aplicar(
+        (actual) => [...actual, preguntaDesdeBorrador(tempId, borrador)],
+        async () => ({ ok: true }),
+      );
+      return;
+    }
+    void preguntasState.aplicar(
+      (actual) => [...actual, preguntaDesdeBorrador(tempId, borrador)],
+      () => agregarPregunta(formDataPregunta(formulario!.id, null, borrador)),
+      {
+        reconciliar: (result, actual) => {
+          const id = result && "id" in result && typeof result.id === "string" ? result.id : null;
+          if (!id) return actual;
+          return actual.map((item) => (item.id === tempId ? { ...item, id } : item));
+        },
+      },
+    );
   }
 
-  async function onGuardarEdicion(borrador: PreguntaBorrador) {
+  function onGuardarEdicion(borrador: PreguntaBorrador) {
     if (!editandoId) return;
     const actual = preguntas.find((item) => item.id === editandoId);
     if (actual && esPreguntaNombreCaso(actual)) {
@@ -369,87 +362,98 @@ export function FormularioBuilder({
       setError(mensaje);
       return;
     }
-    setError(null);
-    const actualizada = preguntaDesdeBorrador(editandoId, borrador);
-    if (esNuevo) {
-      setPreguntas((actual) => actual.map((item) => (item.id === editandoId ? actualizada : item)));
-      setEditandoId(null);
-      return;
-    }
-    const result = await actualizarPregunta(formDataPregunta(formulario!.id, editandoId, borrador));
-    if (result?.error) {
-      setError(result.error);
-      return;
-    }
-    setPreguntas((actual) => actual.map((item) => (item.id === editandoId ? actualizada : item)));
+    const id = editandoId;
+    const actualizada = preguntaDesdeBorrador(id, borrador);
     setEditandoId(null);
-    router.refresh();
+    setError(null);
+    if (esNuevo) {
+      void preguntasState.aplicar(
+        (lista) => lista.map((item) => (item.id === id ? actualizada : item)),
+        async () => ({ ok: true }),
+      );
+      return;
+    }
+    void preguntasState.aplicar(
+      (lista) => lista.map((item) => (item.id === id ? actualizada : item)),
+      () => actualizarPregunta(formDataPregunta(formulario!.id, id, borrador)),
+    );
   }
 
-  async function onEliminar(id: string) {
+  function onEliminar(id: string) {
     const actual = preguntas.find((item) => item.id === id);
     if (actual && esPreguntaNombreCaso(actual)) {
       setError("El nombre del caso es una pregunta fija y no se puede eliminar.");
       return;
     }
     if (esNuevo) {
-      setPreguntas((actual) => actual.filter((item) => item.id !== id));
+      void preguntasState.aplicar(
+        (lista) => lista.filter((item) => item.id !== id),
+        async () => ({ ok: true }),
+      );
       return;
     }
     const formData = new FormData();
     formData.set("id", id);
     formData.set("formularioId", formulario!.id);
-    const result = await eliminarPregunta(formData);
-    if (result?.error) {
-      setError(result.error);
-      return;
-    }
-    setPreguntas((actual) => actual.filter((item) => item.id !== id));
-    router.refresh();
+    void preguntasState.aplicar(
+      (lista) => lista.filter((item) => item.id !== id),
+      () => eliminarPregunta(formData),
+    );
   }
 
-  async function onMover(id: string, direccion: "up" | "down") {
+  function onMover(id: string, direccion: "up" | "down") {
     const index = preguntas.findIndex((item) => item.id === id);
     const swapWith = direccion === "up" ? index - 1 : index + 1;
     if (index < 0 || swapWith < 0 || swapWith >= preguntas.length) return;
     if (esPreguntaNombreCaso(preguntas[index]) || esPreguntaNombreCaso(preguntas[swapWith])) return;
-    const reordenadas = [...preguntas];
-    [reordenadas[index], reordenadas[swapWith]] = [reordenadas[swapWith], reordenadas[index]];
-    setPreguntas(reordenadas);
-    if (esNuevo) return;
+    if (esNuevo) {
+      void preguntasState.aplicar((lista) => {
+        const reordenadas = [...lista];
+        const i = reordenadas.findIndex((item) => item.id === id);
+        const j = direccion === "up" ? i - 1 : i + 1;
+        [reordenadas[i], reordenadas[j]] = [reordenadas[j], reordenadas[i]];
+        return reordenadas;
+      }, async () => ({ ok: true }));
+      return;
+    }
     const formData = new FormData();
     formData.set("id", id);
     formData.set("formularioId", formulario!.id);
     formData.set("direccion", direccion);
-    await moverPregunta(formData);
-    router.refresh();
+    void preguntasState.aplicar((lista) => {
+      const reordenadas = [...lista];
+      const i = reordenadas.findIndex((item) => item.id === id);
+      const j = direccion === "up" ? i - 1 : i + 1;
+      if (i < 0 || j < 0 || j >= reordenadas.length) return lista;
+      [reordenadas[i], reordenadas[j]] = [reordenadas[j], reordenadas[i]];
+      return reordenadas;
+    }, () => moverPregunta(formData));
   }
 
-  async function onGuardarNuevo() {
+  function onGuardarNuevo() {
     if (!titulo.trim()) {
       setError("El título es obligatorio.");
       return;
     }
-    setGuardando(true);
-    const result = await crearFormularioCompleto({
-      titulo: titulo.trim(),
-      descripcion: descripcion.trim(),
-      modoEvaluacion,
-      preguntas: preguntas.map((pregunta) => ({
-        enunciado: pregunta.enunciado,
-        ayuda: pregunta.ayuda,
-        tipo: pregunta.tipo as TipoPregunta,
-        opciones: pregunta.opciones,
-        obligatoria: pregunta.obligatoria,
-        permiteArchivo: pregunta.permiteArchivo,
-        permiteImagen: pregunta.permiteImagen,
-        permiteVideoLink: pregunta.permiteVideoLink,
-        conNotas: pregunta.conNotas,
-        escalaNotas: parseEscalaNotas(pregunta.escalaNotas),
-      })),
-    });
-    setGuardando(false);
-    if (result?.error) setError(result.error);
+    void accion.ejecutar(() =>
+      crearFormularioCompleto({
+        titulo: titulo.trim(),
+        descripcion: descripcion.trim(),
+        modoEvaluacion,
+        preguntas: preguntas.map((pregunta) => ({
+          enunciado: pregunta.enunciado,
+          ayuda: pregunta.ayuda,
+          tipo: pregunta.tipo as TipoPregunta,
+          opciones: pregunta.opciones,
+          obligatoria: pregunta.obligatoria,
+          permiteArchivo: pregunta.permiteArchivo,
+          permiteImagen: pregunta.permiteImagen,
+          permiteVideoLink: pregunta.permiteVideoLink,
+          conNotas: pregunta.conNotas,
+          escalaNotas: parseEscalaNotas(pregunta.escalaNotas),
+        })),
+      }),
+    );
   }
 
   return (
@@ -461,7 +465,6 @@ export function FormularioBuilder({
             <div className="min-w-0 flex-1" data-tour="formulario-titulo">
               <CampoEditable
                 editing={editandoTitulo}
-                guardando={guardandoCampo === "titulo"}
                 onEditar={() => {
                   setTituloDraft(titulo);
                   setEditandoTitulo(true);
@@ -495,15 +498,15 @@ export function FormularioBuilder({
             <button
               className="btn btn-sm btn-primary shrink-0"
               type="button"
-              disabled={guardando}
               onClick={onGuardarNuevo}
               data-tour="formulario-guardar"
             >
-              {guardando ? "Guardando…" : "Guardar formulario"}
+              Guardar formulario
             </button>
           ) : null}
         </div>
         {error ? <p className="text-danger">{error}</p> : null}
+        <IndicadorGuardando visible={preguntasState.guardando || accion.guardando} />
         <div className="flex flex-col items-end gap-1">
           <div className="flex flex-wrap items-center justify-end gap-2">
             <p className="text-sm font-semibold text-navy">Tipo de evaluación</p>
@@ -514,7 +517,7 @@ export function FormularioBuilder({
                   key={modoItem}
                   className={`btn btn-sm ${activo ? "btn-primary" : "btn-secondary"}`}
                   type="button"
-                  disabled={!puedeCambiarModo || guardandoCampo === "modo"}
+                  disabled={!puedeCambiarModo}
                   onClick={() => onCambiarModo(modoItem)}
                 >
                   {MODO_EVALUACION_BOTON[modoItem]}
@@ -530,7 +533,6 @@ export function FormularioBuilder({
         </div>
         <CampoEditable
           editing={editandoDescripcion}
-          guardando={guardandoCampo === "descripcion"}
           onEditar={() => {
             setDescripcionDraft(descripcion);
             setEditandoDescripcion(true);

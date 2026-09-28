@@ -12,9 +12,6 @@ export async function asignarSupervisoresAutomaticoEnConvocatoria(convocatoriaId
     },
   });
   if (!convocatoria) return { error: "Mentoría no encontrada." };
-  if (convocatoria.estado !== "ABIERTA") {
-    return { error: "La mentoría está cerrada. No se puede asignar." };
-  }
   if (convocatoria.supervisores.length === 0) {
     return { error: "Agrega supervisores al pool de la mentoría primero." };
   }

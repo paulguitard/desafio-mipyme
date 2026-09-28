@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { normalizarCorreo } from "@/lib/correo";
 import { esEvaluacionObservada } from "@/lib/cupo-asignacion";
 import { extraerNombreCaso } from "@/lib/nombre-caso";
 import { USER_PUBLIC_SELECT } from "@/lib/user-public";
@@ -68,7 +69,7 @@ export async function getRespuestasConvocatoria(id: string) {
       estado: postulacion.estado,
       enviadaAt: postulacion.enviadaAt?.toISOString() ?? null,
       emprendedorNombre: postulacion.postulante.name,
-      emprendedorEmail: postulacion.postulante.email,
+      emprendedorEmail: normalizarCorreo(postulacion.postulante.email),
       respuestas: postulacion.respuestas.map((respuesta) => ({
         preguntaId: respuesta.preguntaId,
         valor: respuesta.valor,
@@ -226,7 +227,7 @@ export async function getPanelEvaluacion(id: string, page = 1) {
         evaluador: {
           id: item.evaluador.id,
           name: item.evaluador.name,
-          email: item.evaluador.email,
+          email: normalizarCorreo(item.evaluador.email),
           escuela: item.evaluador.escuela,
         },
         carga: resumen.asignadas,
@@ -241,7 +242,7 @@ export async function getPanelEvaluacion(id: string, page = 1) {
     evaluadoresDisponibles: evaluadores.map((user) => ({
       id: user.id,
       name: user.name,
-      email: user.email,
+      email: normalizarCorreo(user.email),
       escuela: user.escuela,
     })),
     poolSupervisores: convocatoria.supervisores.map((item) => {
@@ -252,7 +253,7 @@ export async function getPanelEvaluacion(id: string, page = 1) {
         evaluador: {
           id: item.supervisor.id,
           name: item.supervisor.name,
-          email: item.supervisor.email,
+          email: normalizarCorreo(item.supervisor.email),
           escuela: item.supervisor.escuela,
         },
         carga: resumen.asignadas,
@@ -267,7 +268,7 @@ export async function getPanelEvaluacion(id: string, page = 1) {
     supervisoresDisponibles: supervisores.map((user) => ({
       id: user.id,
       name: user.name,
-      email: user.email,
+      email: normalizarCorreo(user.email),
       escuela: user.escuela,
     })),
     postulaciones: convocatoria.postulaciones.map((postulacion) => ({
@@ -275,7 +276,7 @@ export async function getPanelEvaluacion(id: string, page = 1) {
       estado: postulacion.estado,
       enviadaAt: postulacion.enviadaAt?.toISOString() ?? null,
       emprendedorNombre: postulacion.postulante.name,
-      emprendedorEmail: postulacion.postulante.email,
+      emprendedorEmail: normalizarCorreo(postulacion.postulante.email),
       respuestas: postulacion.respuestas.map((respuesta) => ({
         preguntaId: respuesta.preguntaId,
         valor: respuesta.valor,
@@ -310,8 +311,8 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
       asignaciones: {
         include: {
           evaluador: { select: USER_PUBLIC_SELECT },
-          revisiones: { orderBy: [{ ronda: "asc" }, { createdAt: "asc" }] },
-          revisionesGenerales: { orderBy: [{ ronda: "asc" }, { createdAt: "asc" }] },
+          revisiones: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
+          revisionesGenerales: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
           supervisionesPregunta: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
           supervisionesGenerales: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
         },
@@ -334,13 +335,15 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
     estado: postulacion.estado,
     enviadaAt: postulacion.enviadaAt?.toISOString() ?? null,
     emprendedorNombre: postulacion.postulante.name,
-    emprendedorEmail: postulacion.postulante.email,
+    emprendedorEmail: normalizarCorreo(postulacion.postulante.email),
     nombreCaso: postulacion.nombreCaso || extraerNombreCaso(preguntas, postulacion.respuestas),
     convocatoriaTitulo: postulacion.convocatoria.titulo,
     convocatoriaEstado: postulacion.convocatoria.estado,
     modoEvaluacion: postulacion.convocatoria.formulario.modoEvaluacion,
     supervisorNombre: postulacion.supervision?.supervisor.name ?? null,
-    supervisorEmail: postulacion.supervision?.supervisor.email ?? null,
+    supervisorEmail: postulacion.supervision?.supervisor.email
+      ? normalizarCorreo(postulacion.supervision.supervisor.email)
+      : null,
     preguntas: preguntas.map((pregunta) => ({
       id: pregunta.id,
       enunciado: pregunta.enunciado,
@@ -369,7 +372,7 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
       id: asignacion.id,
       evaluadorId: asignacion.evaluadorId,
       evaluadorNombre: asignacion.evaluador.name,
-      evaluadorEmail: asignacion.evaluador.email,
+      evaluadorEmail: normalizarCorreo(asignacion.evaluador.email),
       estado: asignacion.estado,
       rondaActual: asignacion.rondaActual,
       cicloSupervision: asignacion.cicloSupervision,
@@ -379,6 +382,7 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
         id: revision.id,
         preguntaId: revision.preguntaId,
         ronda: revision.ronda,
+        ciclo: revision.ciclo,
         veredicto: revision.veredicto,
         comentario: revision.comentario,
         nota: revision.nota,
@@ -387,6 +391,7 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
       revisionesGenerales: asignacion.revisionesGenerales.map((revision) => ({
         id: revision.id,
         ronda: revision.ronda,
+        ciclo: revision.ciclo,
         veredicto: revision.veredicto,
         comentario: revision.comentario,
         createdAt: revision.createdAt.toISOString(),

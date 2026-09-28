@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { requestPasswordResetAction } from "@/actions/auth";
+import { InputCorreo } from "@/components/input-correo";
 
 export function ForgotPasswordForm() {
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +60,7 @@ export function ForgotPasswordForm() {
       ) : null}
       <div className="field">
         <label htmlFor="email">Correo</label>
-        <input className="input" id="email" name="email" type="email" autoComplete="email" required />
+        <InputCorreo className="input" id="email" name="email" autoComplete="email" required />
       </div>
       <button className="btn btn-primary w-full uppercase tracking-wide" type="submit">
         Enviar enlace

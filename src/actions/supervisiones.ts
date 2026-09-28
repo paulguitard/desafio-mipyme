@@ -104,9 +104,6 @@ export async function guardarSupervision(formData: FormData) {
   const asignacionId = String(formData.get("asignacionId") ?? "");
   const asignacion = await cargaAsignacionParaSupervisor(asignacionId, user.id);
   if (!asignacion) return { error: "Evaluación no encontrada." };
-  if (asignacion.postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La mentoría está cerrada." };
-  }
   if (asignacion.estado !== "EN_SUPERVISION") {
     return { error: "Solo puedes supervisar evaluaciones enviadas al supervisor." };
   }
@@ -131,9 +128,6 @@ export async function enviarObservacionesSupervision(formData: FormData) {
   const asignacionId = String(formData.get("asignacionId") ?? "");
   const asignacion = await cargaAsignacionParaSupervisor(asignacionId, user.id);
   if (!asignacion) return { error: "Evaluación no encontrada." };
-  if (asignacion.postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La mentoría está cerrada." };
-  }
   if (asignacion.estado !== "EN_SUPERVISION") {
     return { error: "Solo puedes devolver evaluaciones que están en supervisión." };
   }
@@ -192,9 +186,6 @@ export async function procederSupervision(formData: FormData) {
   const asignacionId = String(formData.get("asignacionId") ?? "");
   const asignacion = await cargaAsignacionParaSupervisor(asignacionId, user.id);
   if (!asignacion) return { error: "Evaluación no encontrada." };
-  if (asignacion.postulacion.convocatoria.estado !== "ABIERTA") {
-    return { error: "La mentoría está cerrada." };
-  }
   if (asignacion.estado !== "EN_SUPERVISION") {
     return { error: "Solo puedes proceder evaluaciones que están en supervisión." };
   }

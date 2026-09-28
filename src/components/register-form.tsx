@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { registerEmprendedorAction } from "@/actions/auth";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
+import { InputCorreo } from "@/components/input-correo";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password-policy";
 
 export function RegisterForm() {
@@ -62,7 +63,7 @@ export function RegisterForm() {
         </div>
         <div className="field">
           <label htmlFor="email">Correo</label>
-          <input className="input" id="email" name="email" type="email" autoComplete="email" required />
+          <InputCorreo className="input" id="email" name="email" autoComplete="email" required />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="field">

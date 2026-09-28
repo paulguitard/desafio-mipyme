@@ -1,4 +1,5 @@
 export { saveUpload, deleteUpload } from "./cloudinary";
+export { directStoredImageUrl } from "./image-url";
 export {
   deleteLocalUpload,
   publicUploadUrl,

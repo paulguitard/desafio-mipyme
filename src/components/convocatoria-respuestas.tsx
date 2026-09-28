@@ -5,6 +5,7 @@ import { BadgePostulacion } from "@/components/badges";
 import { BotonAtras } from "@/components/boton-atras";
 import { PreguntaCampo } from "@/components/pregunta-campo";
 import type { RespuestasConvocatoria } from "@/lib/convocatoria-admin-data";
+import { normalizarCorreo } from "@/lib/correo";
 import { parseValor } from "@/lib/preguntas";
 
 function textoPlano(valor: unknown) {
@@ -52,7 +53,7 @@ export function ConvocatoriaRespuestas({ data }: { data: RespuestasConvocatoria 
               <BotonAtras onClick={() => setFichaId(null)} />
               <p className="font-semibold">{ficha.emprendedorNombre}</p>
             </div>
-            <p className="text-muted">{ficha.emprendedorEmail}</p>
+            <p className="text-muted">{normalizarCorreo(ficha.emprendedorEmail)}</p>
             <p className="text-muted">
               Enviada: {new Date(ficha.enviadaAt ?? "").toLocaleString("es-CL")}
             </p>
@@ -153,7 +154,7 @@ export function ConvocatoriaRespuestas({ data }: { data: RespuestasConvocatoria 
             >
               <div className="min-w-0">
                 <p className="font-semibold">{postulacion.emprendedorNombre}</p>
-                <p className="text-muted">{postulacion.emprendedorEmail}</p>
+                <p className="text-muted">{normalizarCorreo(postulacion.emprendedorEmail)}</p>
                 <p className="text-muted">
                   Enviada: {new Date(postulacion.enviadaAt ?? "").toLocaleString("es-CL")}
                 </p>

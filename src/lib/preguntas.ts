@@ -1,3 +1,5 @@
+import { normalizarCorreo, normalizarValorCampoCorreo } from "@/lib/correo";
+import { revisionParaEditar } from "@/lib/revision-ciclo";
 import { appUploadUrl } from "@/lib/storage/public-id";
 
 export const TIPOS_PREGUNTA = [
@@ -861,7 +863,7 @@ export function esFechaValida(value: string): boolean {
 }
 
 export function esCorreoValido(value: string): boolean {
-  return EMAIL_RE.test(value.trim());
+  return EMAIL_RE.test(normalizarCorreo(value));
 }
 
 export function formatearValorPregunta(tipo: string, valor: unknown, opcionesRaw = "[]"): string {
@@ -892,8 +894,9 @@ export function formatearValorPregunta(tipo: string, valor: unknown, opcionesRaw
     return valor == null ? "" : String(valor);
   }
   if (tipo === "correo") {
-    if (Array.isArray(valor)) return valor.map(String).filter(Boolean).join(", ");
-    return valor == null ? "" : String(valor);
+    const normalizado = normalizarValorCampoCorreo(valor);
+    if (Array.isArray(normalizado)) return normalizado.filter(Boolean).join(", ");
+    return String(normalizado);
   }
   if (tipo === "texto_largo") {
     if (valor == null) return "";
@@ -968,8 +971,8 @@ export function validarValorRespuesta(args: {
   if (tipo === "correo") {
     const cantidad = parseConfigCorreo(opciones);
     const correos = Array.isArray(valor)
-      ? valor.map((item) => String(item).trim())
-      : [String(valor ?? "").trim()];
+      ? valor.map((item) => normalizarCorreo(String(item)))
+      : [normalizarCorreo(String(valor ?? ""))];
     while (correos.length < cantidad) correos.push("");
     const usados = correos.slice(0, cantidad);
     const llenos = usados.filter(Boolean);
@@ -1033,14 +1036,19 @@ export type NotaPreguntaGeneral = {
 
 export function notasParaEvaluacionGeneral(
   preguntas: { id: string; enunciado: string; conNotas: boolean; escalaNotas: string }[],
-  revisiones: { preguntaId: string; ronda: number; nota: number | null }[],
+  revisiones: { preguntaId: string; ronda: number; ciclo?: number; nota: number | null }[],
   ronda: number,
+  ciclo?: number,
 ): NotaPreguntaGeneral[] {
   return preguntas.flatMap((pregunta) => {
     if (!pregunta.conNotas) return [];
     const escala = parseEscalaNotas(pregunta.escalaNotas);
     if (escala.length === 0) return [];
-    const actual = revisiones.find((item) => item.preguntaId === pregunta.id && item.ronda === ronda);
+    const dePregunta = revisiones.filter((item) => item.preguntaId === pregunta.id);
+    const actual =
+      ciclo == null
+        ? dePregunta.find((item) => item.ronda === ronda)
+        : revisionParaEditar(dePregunta, ronda, ciclo);
     return [
       {
         preguntaId: pregunta.id,

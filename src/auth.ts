@@ -5,6 +5,8 @@ import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { authConfig, deniedUrl } from "@/auth.config";
 import { prisma } from "@/lib/db";
+import { findUserByEmail } from "@/lib/correo-db";
+import { normalizarCorreo } from "@/lib/correo";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { isRole, normalizeRole, rolCoincideConIngreso, type Role } from "@/lib/roles";
 
@@ -12,8 +14,8 @@ async function findOrCreateEmprendedorFromGoogle(input: {
   email: string;
   name?: string | null;
 }) {
-  const email = input.email.trim().toLowerCase();
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const email = normalizarCorreo(input.email);
+  const existing = await findUserByEmail(email);
   if (existing) {
     const role = normalizeRole(existing.role);
     if (role !== "EMPRENDEDOR") {
@@ -61,14 +63,12 @@ export const {
         expectedRole: { label: "Rol", type: "text" },
       },
       async authorize(credentials) {
-        const email = String(credentials?.email ?? "")
-          .trim()
-          .toLowerCase();
+        const email = normalizarCorreo(String(credentials?.email ?? ""));
         const password = String(credentials?.password ?? "");
         const expectedRole = String(credentials?.expectedRole ?? "");
         if (!email || !password || !isRole(expectedRole)) return null;
 
-        const user = await prisma.user.findUnique({ where: { email } });
+        const user = await findUserByEmail(email);
         if (!user) return null;
         const ok = await verifyPassword(password, user.passwordHash);
         if (!ok) return null;
@@ -78,7 +78,7 @@ export const {
         return {
           id: user.id,
           name: user.name,
-          email: user.email,
+          email: normalizarCorreo(user.email),
           role,
           passwordChangedAt: user.passwordChangedAt.toISOString(),
         };
@@ -90,7 +90,7 @@ export const {
     async signIn({ user, account }) {
       if (account?.provider !== "google") return true;
 
-      const email = user.email?.trim().toLowerCase();
+      const email = user.email ? normalizarCorreo(user.email) : "";
       if (!email) return false;
 
       const result = await findOrCreateEmprendedorFromGoogle({
@@ -105,17 +105,15 @@ export const {
     },
     async jwt({ token, user, account, trigger, session }) {
       if (account?.provider === "google") {
-        const email = String(user?.email ?? token.email ?? "")
-          .trim()
-          .toLowerCase();
+        const email = normalizarCorreo(String(user?.email ?? token.email ?? ""));
         if (email) {
-          const dbUser = await prisma.user.findUnique({ where: { email } });
+          const dbUser = await findUserByEmail(email);
           if (dbUser) {
             const role = normalizeRole(dbUser.role);
             if (!role) return {};
             token.id = dbUser.id;
             token.role = role;
-            token.email = dbUser.email;
+            token.email = normalizarCorreo(dbUser.email);
             token.name = dbUser.name;
             token.pwc = dbUser.passwordChangedAt.toISOString();
           }
@@ -130,7 +128,7 @@ export const {
         const stamped = (user as { passwordChangedAt?: string }).passwordChangedAt;
         if (stamped) token.pwc = stamped;
         if (user.name) token.name = user.name;
-        if (user.email) token.email = user.email;
+        if (user.email) token.email = normalizarCorreo(user.email);
       }
 
       if (trigger === "update" && session?.user) {
@@ -153,7 +151,7 @@ export const {
         token.role = role;
         token.pwc = pwc;
         token.name = dbUser.name;
-        token.email = dbUser.email;
+        token.email = normalizarCorreo(dbUser.email);
       }
 
       token.role = normalizeRole(String(token.role ?? "")) ?? undefined;

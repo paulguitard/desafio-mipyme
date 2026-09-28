@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 export function useEvalPanelesColapsables() {
   const [evalColapsado, setEvalColapsado] = useState(false);
@@ -66,6 +66,87 @@ export function EvalDetalleHead({
           {etiquetaAccion}
         </button>
       ) : null}
+    </div>
+  );
+}
+
+export function EvalDetalleCelda({
+  panel,
+  children,
+}: {
+  panel: "caso" | "eval" | "sup";
+  children: ReactNode;
+}) {
+  return <div className={`eval-detalle-cell is-${panel}`}>{children}</div>;
+}
+
+export function EvalDetalleColumnas({
+  casoTitle,
+  casoSubtitle,
+  caso,
+  evalTitle,
+  evalSubtitle,
+  evaluacion,
+  supTitle,
+  supSubtitle,
+  supervision,
+  sinSupervision = false,
+  bloqueado = false,
+  className,
+}: {
+  casoTitle: string;
+  casoSubtitle?: ReactNode;
+  caso: ReactNode;
+  evalTitle: string;
+  evalSubtitle?: ReactNode;
+  evaluacion: ReactNode;
+  supTitle?: string;
+  supSubtitle?: ReactNode;
+  supervision?: ReactNode;
+  sinSupervision?: boolean;
+  bloqueado?: boolean;
+  className?: string;
+}) {
+  const paneles = useEvalPanelesColapsables();
+
+  return (
+    <div
+      className={[
+        "eval-detalle-body is-columnas",
+        sinSupervision ? "is-sin-sup" : "",
+        paneles.bodyClassName,
+        bloqueado ? "is-bloqueado" : "",
+        className ?? "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <div className="eval-detalle-col is-caso">
+        <EvalDetalleHead panel="caso" title={casoTitle} subtitle={casoSubtitle} />
+        <div className="eval-detalle-col-scroll">{caso}</div>
+      </div>
+      <div className={`eval-detalle-col is-eval${paneles.evalColapsado ? " is-collapsed" : ""}`}>
+        <EvalDetalleHead
+          panel="eval"
+          title={evalTitle}
+          subtitle={evalSubtitle}
+          collapsed={paneles.evalColapsado}
+          onToggle={paneles.toggleEval}
+        />
+        <div className="eval-detalle-col-scroll">{evaluacion}</div>
+      </div>
+      {sinSupervision ? null : (
+        <div className={`eval-detalle-col is-sup${paneles.supColapsado ? " is-collapsed" : ""}`}>
+          <EvalDetalleHead
+            panel="sup"
+            title={supTitle ?? "Supervisión"}
+            subtitle={supSubtitle}
+            collapsed={paneles.supColapsado}
+            onToggle={paneles.toggleSup}
+          />
+          <div className="eval-detalle-col-scroll">{supervision}</div>
+        </div>
+      )}
     </div>
   );
 }

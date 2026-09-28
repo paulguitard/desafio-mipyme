@@ -1,7 +1,7 @@
 import { ConvocatoriasAdmin } from "@/components/convocatorias-admin";
 import { prisma } from "@/lib/db";
 import { parseImagenConvocatoria, parseImagenPosicion } from "@/lib/convocatoria";
-import { publicUploadUrl } from "@/lib/preguntas";
+import { directStoredImageUrl } from "@/lib/storage/image-url";
 
 export default async function MentoriasPage() {
   const [convocatorias, formularios] = await Promise.all([
@@ -29,7 +29,7 @@ export default async function MentoriasPage() {
           postulaciones: item._count.postulaciones,
           fechaInicio: item.fechaInicio?.toISOString() ?? null,
           fechaCierre: item.fechaCierre?.toISOString() ?? null,
-          imagenUrl: imagen ? publicUploadUrl(imagen, { width: 400 }) : null,
+          imagenUrl: imagen ? directStoredImageUrl(imagen) : null,
           imagenPos: parseImagenPosicion(item.imagen),
         };
       })}

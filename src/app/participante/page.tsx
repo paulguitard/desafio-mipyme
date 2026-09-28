@@ -11,7 +11,7 @@ import {
   parseImagenConvocatoria,
   parseImagenPosicion,
 } from "@/lib/convocatoria";
-import { publicUploadUrl } from "@/lib/preguntas";
+import { directStoredImageUrl } from "@/lib/storage/image-url";
 
 export default async function ParticipanteHomePage() {
   const user = await requireUser("EMPRENDEDOR");
@@ -38,7 +38,7 @@ export default async function ParticipanteHomePage() {
         id: item.id,
         titulo: item.titulo,
         descripcion: item.descripcion,
-        imagenUrl: imagen ? publicUploadUrl(imagen, { width: 960 }) : null,
+        imagenUrl: imagen ? directStoredImageUrl(imagen) : null,
         imagenPos: parseImagenPosicion(item.imagen),
         cierre: etiquetaCierreAbierto(item.fechaCierre),
         restantes: etiquetaDiasRestantes(diasRestantesHasta(item.fechaCierre)),

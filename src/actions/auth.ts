@@ -7,6 +7,8 @@ import { loadConfigCorreoRecuperacionForMail, imagenUrlForMail } from "@/lib/cor
 import { getAppBaseUrl } from "@/lib/app-url";
 import { renderCorreoRecuperacion } from "@/lib/correo-recuperacion";
 import { prisma } from "@/lib/db";
+import { findUserByEmail } from "@/lib/correo-db";
+import { normalizarCorreo } from "@/lib/correo";
 import { isMailConfigured, sendMail } from "@/lib/mail";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { validatePassword } from "@/lib/password-policy";
@@ -54,7 +56,7 @@ export async function loginAction(formData: FormData) {
   }
 
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await findUserByEmail(email);
     if (!user) {
       return { error: LOGIN_GENERIC_ERROR };
     }
@@ -135,9 +137,7 @@ export async function signInWithGoogleAction() {
 
 export async function registerEmprendedorAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
-  const email = String(formData.get("email") ?? "")
-    .trim()
-    .toLowerCase();
+  const email = normalizarCorreo(String(formData.get("email") ?? ""));
   const password = String(formData.get("password") ?? "");
   const passwordConfirm = String(formData.get("passwordConfirm") ?? "");
 
@@ -161,7 +161,7 @@ export async function registerEmprendedorAction(formData: FormData) {
   }
 
   try {
-    const exists = await prisma.user.findUnique({ where: { email } });
+    const exists = await findUserByEmail(email);
     if (exists) {
       return { error: "Ya existe un usuario con ese correo." };
     }
@@ -199,9 +199,7 @@ export async function registerEmprendedorAction(formData: FormData) {
 }
 
 export async function requestPasswordResetAction(formData: FormData) {
-  const email = String(formData.get("email") ?? "")
-    .trim()
-    .toLowerCase();
+  const email = normalizarCorreo(String(formData.get("email") ?? ""));
 
   if (!email || !email.includes("@")) {
     return { error: "Ingresá un correo válido." };
@@ -222,7 +220,7 @@ export async function requestPasswordResetAction(formData: FormData) {
   }
 
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await findUserByEmail(email);
     // Solo participantes auto-registrados (modal / Google). Admin y evaluador: sin mail, mismo mensaje.
     if (
       !user ||
@@ -256,7 +254,7 @@ export async function requestPasswordResetAction(formData: FormData) {
     );
 
     const sent = await sendMail({
-      to: user.email,
+      to: normalizarCorreo(user.email),
       subject: rendered.subject,
       html: rendered.html,
       text: rendered.text,

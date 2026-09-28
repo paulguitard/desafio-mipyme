@@ -1,3 +1,4 @@
+import { normalizarCorreo } from "@/lib/correo";
 import { ROLE_LABELS, esRolCatalogoEvaluador, isRole, type Role } from "@/lib/roles";
 import { ESCUELAS, isEscuela, type Escuela } from "@/lib/escuelas";
 import { validatePassword } from "@/lib/password-policy";
@@ -176,7 +177,7 @@ export function parseUsuariosCsv(text: string): ParseUsuariosCsvResult {
     const linea = i + 1;
     const cells = rows[i];
     const name = (cells[nameIdx] ?? "").trim();
-    const email = (cells[emailIdx] ?? "").trim().toLowerCase();
+    const email = normalizarCorreo(cells[emailIdx] ?? "");
     const password = (cells[passwordIdx] ?? "").trim();
     const roleRaw = cells[roleIdx] ?? "";
     const role = resolveRole(roleRaw);

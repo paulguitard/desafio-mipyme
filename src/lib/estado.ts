@@ -85,8 +85,8 @@ export function postulacionEditable(
   estadoPostulacion: EstadoPostulacion,
   convocatoriaAbierta: boolean,
 ): boolean {
-  if (!convocatoriaAbierta) return false;
-  return estadoPostulacion === "BORRADOR" || estadoPostulacion === "CON_OBSERVACIONES";
+  if (estadoPostulacion === "CON_OBSERVACIONES") return true;
+  return convocatoriaAbierta && estadoPostulacion === "BORRADOR";
 }
 
 export function rondaRespuestaEmprendedor(

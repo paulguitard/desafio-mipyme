@@ -7,7 +7,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /** Subir este valor tras cambios de schema para invalidar el cliente cacheado en `next dev`. */
-const PRISMA_SCHEMA_REV = "configCorreoRecuperacion-1";
+const PRISMA_SCHEMA_REV = "configCorreoNotificacion-sql-1";
 
 if (
   process.env.NODE_ENV !== "production" &&
