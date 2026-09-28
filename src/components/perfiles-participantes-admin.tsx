@@ -117,7 +117,7 @@ export function PerfilesParticipantesAdmin({ perfiles }: { perfiles: PerfilParti
 
   function descargarExcel() {
     const bytes = workbookXlsx("Perfiles", filasExcel(visibles));
-    const blob = new Blob([bytes], {
+    const blob = new Blob([new Uint8Array(bytes)], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
     const url = URL.createObjectURL(blob);
