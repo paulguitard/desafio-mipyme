@@ -71,7 +71,7 @@ function CampoAdjunto({
         id={id}
         name={name}
         type="file"
-        accept={esImagen ? "image/*" : undefined}
+        accept={esImagen ? "image/jpeg,image/png,.jpg,.jpeg,.png" : undefined}
         onChange={(event) => alCambiar(event.target.files)}
       />
       <div className="campo-adjunto-fila">
@@ -93,9 +93,57 @@ function CampoAdjunto({
       </div>
       <p className="text-xs text-muted">
         {esImagen
-          ? "JPG, PNG o WebP. Al guardar se ajusta sola (máx. 250 KB)."
-          : "PDF u otro documento, máximo 2 MB. Al guardar podrás abrirlo en otra pestaña."}
+          ? "Acepta JPG o PNG."
+          : "PDF u otro documento, máximo 2 MB."}
       </p>
+    </div>
+  );
+}
+
+function CampoVideoLink({
+  id,
+  name,
+  defaultValue,
+  disabled,
+  preview,
+  embed,
+}: {
+  id: string;
+  name?: string;
+  defaultValue: string;
+  disabled?: boolean;
+  preview?: boolean;
+  embed?: ReactNode;
+}) {
+  const [url, setUrl] = useState(preview ? "" : defaultValue);
+  const bloqueado = Boolean(disabled || preview);
+
+  function quitar() {
+    setUrl("");
+  }
+
+  return (
+    <div className="campo-adjunto">
+      <p className="campo-adjunto-titulo">Link de video</p>
+      <div className="campo-adjunto-fila">
+        <input
+          className="input campo-adjunto-url"
+          id={id}
+          name={name}
+          type="url"
+          placeholder="https://..."
+          value={url}
+          onChange={(event) => setUrl(event.target.value)}
+          disabled={bloqueado}
+        />
+        {url && !bloqueado ? (
+          <button className="btn btn-sm btn-ghost" type="button" onClick={quitar}>
+            Quitar
+          </button>
+        ) : null}
+      </div>
+      <p className="text-xs text-muted">YouTube, Vimeo, Google Drive o SharePoint.</p>
+      {embed}
     </div>
   );
 }
@@ -500,21 +548,13 @@ export function PreguntaCampo({
         <CampoAdjunto id={`imagen-${pregunta.id}`} name={`imagen-${pregunta.id}`} tipo="imagen" />
       ) : null}
       {pregunta.permiteVideoLink ? (
-        <div className="field">
-          <label htmlFor={`video-${pregunta.id}`}>
-            Link de video (YouTube, Vimeo, Google Drive o SharePoint)
-          </label>
-          <input
-            className="input w-full"
-            id={`video-${pregunta.id}`}
-            name={preview ? undefined : `video-${pregunta.id}`}
-            type="url"
-            placeholder="https://..."
-            defaultValue={preview ? "" : (videoLink?.url ?? "")}
-            disabled={preview}
-          />
-          {!preview && videoLink ? <VideoLinkVista archivos={archivos} /> : null}
-        </div>
+        <CampoVideoLink
+          id={`video-${pregunta.id}`}
+          name={preview ? undefined : `video-${pregunta.id}`}
+          defaultValue={videoLink?.url ?? ""}
+          preview={preview}
+          embed={!preview && videoLink ? <VideoLinkVista archivos={archivos} /> : null}
+        />
       ) : null}
     </fieldset>
   );
