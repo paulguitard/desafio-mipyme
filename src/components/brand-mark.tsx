@@ -2,6 +2,7 @@ import Image from "next/image";
 
 export function BrandMark({
   href = "/",
+  inverted = false,
 }: {
   href?: string;
   inverted?: boolean;
@@ -18,11 +19,11 @@ export function BrandMark({
         priority
       />
       <Image
-        src="/entel2.png"
+        src="/entel.png"
         alt="Fondo 55+ Entel"
-        width={802}
-        height={530}
-        className="object-contain object-left"
+        width={827}
+        height={545}
+        className={`object-contain object-left${inverted ? " brightness-0 invert" : ""}`}
         style={{ width: "auto", height: "2.75rem" }}
         priority
       />
