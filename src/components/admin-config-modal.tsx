@@ -4,11 +4,14 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { IndicadorGuardando } from "@/components/indicador-guardando";
 import { Modal } from "@/components/modal";
 import {
+  getConfigApp,
   getConfigCorreoNotificaciones,
   getConfigCorreoRecuperacion,
+  guardarConfigApp,
   guardarConfigCorreoNotificacion,
   guardarConfigCorreoRecuperacion,
 } from "@/actions/config-admin";
+import { DEFAULT_CONFIG_APP, type ConfigAppData } from "@/lib/config-app";
 import {
   DEFAULT_CORREO_RECUPERACION,
   type ConfigCorreoRecuperacionData,
@@ -22,9 +25,10 @@ import {
 } from "@/lib/correo-notificacion-ui";
 import { useAccionOptimista } from "@/lib/use-dato-optimista";
 
-type Seccion = "recuperacion" | TipoCorreoNotificacion;
+type Seccion = "formularios" | "recuperacion" | TipoCorreoNotificacion;
 
 const SECCIONES: { id: Seccion; label: string }[] = [
+  { id: "formularios", label: "Formularios" },
   { id: "recuperacion", label: "Recuperación" },
   ...SECCIONES_CORREO_NOTIFICACION.map((item) => ({
     id: item.id,
@@ -191,11 +195,12 @@ function VistaPreviaCorreo({
 
 export function AdminConfigLauncher() {
   const [open, setOpen] = useState(false);
-  const [seccion, setSeccion] = useState<Seccion>("recuperacion");
+  const [seccion, setSeccion] = useState<Seccion>("formularios");
   const [loading, setLoading] = useState(false);
   const accion = useAccionOptimista();
   const error = accion.error;
   const okMsg = accion.mensaje;
+  const [configApp, setConfigApp] = useState<ConfigAppData>(DEFAULT_CONFIG_APP);
   const [config, setConfig] = useState<ConfigCorreoRecuperacionData>(() => ({
     ...DEFAULT_CORREO_RECUPERACION,
     imagenUrl: null,
@@ -218,9 +223,14 @@ export function AdminConfigLauncher() {
     setLoading(true);
     accion.setError(null);
     accion.setMensaje(null);
-    void Promise.all([getConfigCorreoRecuperacion(), getConfigCorreoNotificaciones()])
-      .then(([recuperacion, avisos]) => {
+    void Promise.all([
+      getConfigApp(),
+      getConfigCorreoRecuperacion(),
+      getConfigCorreoNotificaciones(),
+    ])
+      .then(([app, recuperacion, avisos]) => {
         if (cancelled) return;
+        setConfigApp(app.config);
         setConfig(recuperacion.config);
         setTextos(avisos.textos);
         setQuitarImagen(false);
@@ -228,9 +238,11 @@ export function AdminConfigLauncher() {
           if (prev) URL.revokeObjectURL(prev);
           return null;
         });
-        const parts = [!recuperacion.ok ? recuperacion.error : null, !avisos.ok ? avisos.error : null].filter(
-          Boolean,
-        );
+        const parts = [
+          !app.ok ? app.error : null,
+          !recuperacion.ok ? recuperacion.error : null,
+          !avisos.ok ? avisos.error : null,
+        ].filter(Boolean);
         if (parts.length > 0) accion.setError(parts.join(" "));
       })
       .catch((err: unknown) => {
@@ -273,6 +285,23 @@ export function AdminConfigLauncher() {
             if (prev) URL.revokeObjectURL(prev);
             return null;
           });
+        }
+      },
+    });
+  }
+
+  function onSubmitFormularios(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    formData.set(
+      "permitirEvaluacionPorPregunta",
+      configApp.permitirEvaluacionPorPregunta ? "1" : "0",
+    );
+    accion.setMensaje("Configuración de formularios guardada.");
+    void accion.ejecutar(() => guardarConfigApp(formData), {
+      onOk: (result) => {
+        if (result && "config" in result && result.config) {
+          setConfigApp(result.config);
         }
       },
     });
@@ -323,6 +352,7 @@ export function AdminConfigLauncher() {
         wide
         tall
         toned
+        sinCerrar
       >
         <div className="admin-config-shell">
           <aside className="admin-config-side" aria-label="Secciones de configuración">
@@ -348,6 +378,78 @@ export function AdminConfigLauncher() {
           <div className="admin-config-main">
             {loading ? (
               <p className="text-muted">Cargando configuración…</p>
+            ) : seccion === "formularios" ? (
+              <form className="admin-config-form space-y-4" onSubmit={onSubmitFormularios}>
+                <div>
+                  <h3 className="font-heading text-xl font-semibold text-navy">Formularios</h3>
+                  <p className="mt-1 text-sm text-muted">
+                    Controla qué tipos de evaluación se pueden elegir al crear un formulario.
+                    Los formularios ya existentes no se modifican.
+                  </p>
+                </div>
+
+                {error ? <p className="text-danger">{error}</p> : null}
+                {okMsg ? <p className="font-semibold text-navy">{okMsg}</p> : null}
+                <IndicadorGuardando visible={accion.guardando} />
+
+                <div className="flex flex-wrap items-start gap-3 rounded-xl border border-border bg-white/70 p-4">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={configApp.permitirEvaluacionPorPregunta}
+                    aria-label="Permitir evaluación pregunta por pregunta"
+                    onClick={() =>
+                      setConfigApp((prev) => ({
+                        ...prev,
+                        permitirEvaluacionPorPregunta: !prev.permitirEvaluacionPorPregunta,
+                      }))
+                    }
+                    className={`relative inline-flex h-7 w-[3.5rem] shrink-0 items-center rounded-full border px-0.5 transition-colors ${
+                      configApp.permitirEvaluacionPorPregunta
+                        ? "border-navy bg-navy"
+                        : "border-border bg-slate-100"
+                    }`}
+                  >
+                    <span
+                      aria-hidden
+                      className={`pointer-events-none absolute inset-y-0 flex w-[45%] items-center justify-center text-[10px] font-bold uppercase tracking-wide ${
+                        configApp.permitirEvaluacionPorPregunta
+                          ? "left-0 text-white"
+                          : "right-0 text-muted"
+                      }`}
+                    >
+                      {configApp.permitirEvaluacionPorPregunta ? "Sí" : "No"}
+                    </span>
+                    <span
+                      className={`relative z-10 inline-block size-5 rounded-full shadow transition-transform ${
+                        configApp.permitirEvaluacionPorPregunta
+                          ? "translate-x-[1.65rem] bg-white"
+                          : "translate-x-0 bg-white"
+                      }`}
+                    />
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-navy">Evaluación pregunta por pregunta</p>
+                    <p className="mt-1 text-sm text-muted">
+                      Si está desactivada, al crear un formulario solo estará disponible la
+                      evaluación general.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    onClick={() => setOpen(false)}
+                  >
+                    Cancelar
+                  </button>
+                  <button className="btn btn-primary" type="submit">
+                    Guardar
+                  </button>
+                </div>
+              </form>
             ) : seccion === "recuperacion" ? (
               <form className="admin-config-form space-y-4" onSubmit={onSubmitRecuperacion}>
                 <div>

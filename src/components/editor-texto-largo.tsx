@@ -8,6 +8,7 @@ import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
 import { TextStyle, FontSize } from "@tiptap/extension-text-style";
 import { esHtmlVacio } from "@/lib/preguntas";
+import { textoContinuo } from "@/lib/texto-continuo";
 
 function htmlParaFormulario(html: string) {
   return esHtmlVacio(html) ? "" : html;
@@ -299,21 +300,17 @@ export function EditorTextoLargo({
 
 export function TextoLargoVista({ html }: { html: string }) {
   if (esHtmlVacio(html)) {
-    return (
-      <p className="whitespace-pre-wrap rounded-lg border border-border bg-white p-4">Sin respuesta</p>
-    );
+    return <p className="texto-solo-lectura is-vacio">Sin respuesta</p>;
   }
 
   // Respuestas antiguas en texto plano (sin etiquetas)
   if (!/<[a-z][\s\S]*>/i.test(html)) {
-    return (
-      <p className="whitespace-pre-wrap rounded-lg border border-border bg-white p-4">{html}</p>
-    );
+    return <p className="texto-solo-lectura">{textoContinuo(html)}</p>;
   }
 
   return (
     <div
-      className="rte-content rte-readonly rounded-lg border border-border bg-white p-4"
+      className="rte-content rte-readonly texto-solo-lectura"
       dangerouslySetInnerHTML={{ __html: sanitizeClientHtml(html) }}
     />
   );

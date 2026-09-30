@@ -9,7 +9,13 @@ import {
   esPreguntaNombreCaso,
   asegurarPreguntaNombreCaso,
 } from "@/lib/nombre-caso";
-import { esModoEvaluacion, parseModoEvaluacion, type ModoEvaluacion } from "@/lib/modo-evaluacion";
+import { leerConfigApp } from "@/lib/config-app";
+import {
+  esModoEvaluacion,
+  modoEvaluacionAlCrear,
+  puedeAsignarModoEvaluacion,
+  type ModoEvaluacion,
+} from "@/lib/modo-evaluacion";
 import {
   esTipoFormato,
   parseEscalaNotas,
@@ -151,14 +157,16 @@ function leerOpcionesGuardadas(tipo: TipoPregunta, formData: FormData): { opcion
 export async function crearFormulario(formData: FormData) {
   const admin = await requireUser("ADMIN");
   const titulo = String(formData.get("titulo") ?? "").trim();
-  const descripcion = String(formData.get("descripcion") ?? "").trim();
-  const modoEvaluacion = parseModoEvaluacion(formData.get("modoEvaluacion"));
+  const { permitirEvaluacionPorPregunta } = await leerConfigApp();
+  const modoEvaluacion = modoEvaluacionAlCrear(
+    formData.get("modoEvaluacion"),
+    permitirEvaluacionPorPregunta,
+  );
   if (!titulo) return { error: "El título es obligatorio." };
 
   const form = await prisma.formulario.create({
     data: {
       titulo,
-      descripcion,
       modoEvaluacion,
       creadoPorId: admin.id,
       preguntas: {
@@ -174,7 +182,6 @@ export async function actualizarFormulario(formData: FormData) {
   await requireUser("ADMIN");
   const id = String(formData.get("id") ?? "");
   const titulo = String(formData.get("titulo") ?? "").trim();
-  const descripcion = String(formData.get("descripcion") ?? "").trim();
   if (!id || !titulo) return { error: "El título es obligatorio." };
 
   const existente = await prisma.formulario.findUnique({
@@ -183,9 +190,8 @@ export async function actualizarFormulario(formData: FormData) {
   });
   if (!existente) return { error: "Formulario no encontrado." };
 
-  const data: { titulo: string; descripcion: string; modoEvaluacion?: ModoEvaluacion } = {
+  const data: { titulo: string; modoEvaluacion?: ModoEvaluacion } = {
     titulo,
-    descripcion,
   };
 
   if (formData.has("modoEvaluacion")) {
@@ -195,6 +201,13 @@ export async function actualizarFormulario(formData: FormData) {
     }
     if (existente._count.convocatorias > 0 && modoRaw !== existente.modoEvaluacion) {
       return { error: "No puedes cambiar el tipo de evaluación de un formulario con mentorías." };
+    }
+    const { permitirEvaluacionPorPregunta } = await leerConfigApp();
+    if (!puedeAsignarModoEvaluacion(modoRaw, permitirEvaluacionPorPregunta, existente.modoEvaluacion)) {
+      return {
+        error:
+          "La evaluación pregunta por pregunta está desactivada. Puedes habilitarla en Configuración.",
+      };
     }
     data.modoEvaluacion = modoRaw;
   }
@@ -348,7 +361,6 @@ export async function actualizarPregunta(formData: FormData) {
 
 export async function crearFormularioCompleto(payload: {
   titulo: string;
-  descripcion: string;
   modoEvaluacion?: string;
   preguntas: {
     enunciado: string;
@@ -366,7 +378,8 @@ export async function crearFormularioCompleto(payload: {
   const admin = await requireUser("ADMIN");
   const titulo = payload.titulo.trim();
   if (!titulo) return { error: "El título es obligatorio." };
-  const modoEvaluacion = parseModoEvaluacion(payload.modoEvaluacion);
+  const { permitirEvaluacionPorPregunta } = await leerConfigApp();
+  const modoEvaluacion = modoEvaluacionAlCrear(payload.modoEvaluacion, permitirEvaluacionPorPregunta);
 
   const payloadPreguntas = esPreguntaNombreCaso(payload.preguntas[0] ?? { opciones: "" })
     ? payload.preguntas
@@ -395,7 +408,6 @@ export async function crearFormularioCompleto(payload: {
   const form = await prisma.formulario.create({
     data: {
       titulo,
-      descripcion: payload.descripcion.trim(),
       modoEvaluacion,
       creadoPorId: admin.id,
       preguntas: {

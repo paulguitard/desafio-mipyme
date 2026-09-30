@@ -4,11 +4,11 @@ import { FormularioBuilder } from "@/components/formulario-builder";
 
 export function FormularioEditor({
   formulario,
+  permitirEvaluacionPorPregunta,
 }: {
   formulario: {
     id: string;
     titulo: string;
-    descripcion: string;
     modoEvaluacion: string;
     puedeCambiarModo: boolean;
     preguntas: {
@@ -25,6 +25,13 @@ export function FormularioEditor({
       escalaNotas: string;
     }[];
   };
+  permitirEvaluacionPorPregunta: boolean;
 }) {
-  return <FormularioBuilder modo="existente" formulario={formulario} />;
+  return (
+    <FormularioBuilder
+      modo="existente"
+      formulario={formulario}
+      permitirEvaluacionPorPregunta={permitirEvaluacionPorPregunta}
+    />
+  );
 }

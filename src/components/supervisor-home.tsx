@@ -2,6 +2,7 @@ import { CasosPanel } from "@/components/casos-panel";
 import { prisma } from "@/lib/db";
 import {
   etiquetaAsignacionPanelSupervisor,
+  BANDA_MOVIL_LABEL_SUPERVISOR,
   FILTROS_SUPERVISOR,
   gruposDeSupervisor,
   resolverFiltroSupervisor,
@@ -57,6 +58,7 @@ export async function SupervisorHome({
       casos={casos}
       tourFiltros="filtros-supervision"
       tourLista="lista-supervision"
+      labelsBandaMovil={BANDA_MOVIL_LABEL_SUPERVISOR}
       emptyLabel="Aún no tienes participaciones asignadas."
     />
   );

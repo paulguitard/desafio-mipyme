@@ -42,6 +42,12 @@ body {
   font-family: var(--font-nunito), "Segoe UI", sans-serif;
 }
 
+@media (min-width: 768px) {
+  html {
+    font-size: clamp(13px, min(100vw / 120, 100dvh / 56.25), 16px);
+  }
+}
+
 body {
   font-size: 1.125rem;
   line-height: 1.55;
@@ -70,7 +76,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
+  min-height: 3rem;
   padding: 0.7rem 1.35rem;
   border-radius: 0.55rem;
   font-weight: 700;
@@ -102,7 +108,7 @@ textarea {
 }
 
 .btn-sm {
-  min-height: 36px;
+  min-height: 2.25rem;
   padding: 0.35rem 0.9rem;
   font-size: 0.875rem;
 }
@@ -271,7 +277,7 @@ textarea {
 }
 
 .input {
-  min-height: 48px;
+  min-height: 3rem;
   border: 1.5px solid var(--border);
   border-radius: 0.55rem;
   padding: 0.55rem 0.9rem;
@@ -332,6 +338,18 @@ textarea.input {
   background: var(--navy);
   color: white;
   box-shadow: 0 8px 24px rgba(6, 21, 54, 0.28);
+}
+
+.site-header-menu-btn {
+  display: none;
+}
+
+.site-header-tools {
+  display: contents;
+}
+
+.site-header-tutorial-slot {
+  display: none;
 }
 
 .tutorial-launcher {
@@ -473,8 +491,40 @@ html:has(.app-shell) body {
 }
 
 .page-workspace.is-participante-home {
-  grid-template-rows: auto auto minmax(14rem, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 1.5rem;
+}
+
+@media (min-width: 768px) and (max-height: 760px) {
+  html:has(.app-shell),
+  html:has(.app-shell) body {
+    height: auto;
+    min-height: 100%;
+    overflow: auto;
+  }
+
+  .app-shell {
+    height: auto;
+    max-height: none;
+    min-height: 100%;
+    overflow: visible;
+  }
+
+  @supports (height: 100dvh) {
+    .app-shell {
+      height: auto;
+      max-height: none;
+      min-height: 100dvh;
+    }
+  }
+
+  .app-shell-body,
+  .app-shell-inner,
+  .page-workspace {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
 }
 
 .casos-lista {
@@ -488,6 +538,10 @@ html:has(.app-shell) body {
   flex-wrap: wrap;
   align-items: stretch;
   gap: 0.55rem 0;
+}
+
+.casos-filtros-movil {
+  display: none;
 }
 
 .casos-filtros-slot {
@@ -708,6 +762,12 @@ html:has(.app-shell) body {
   font-size: 1.08rem;
   line-height: 1.4;
   color: #3d4a5f;
+}
+
+.caso-fila-texto-corto,
+.badge-texto-corto,
+.casos-filtro-texto-corto {
+  display: none;
 }
 
 .caso-fila .badge {
@@ -1434,6 +1494,10 @@ html:has(.app-shell) body {
   letter-spacing: 0.02em;
 }
 
+.modal-close-icon {
+  display: none;
+}
+
 .modal-dialog.modal-toned > .modal-panel > .modal-body {
   display: flex;
   flex-direction: column;
@@ -1612,6 +1676,25 @@ html:has(.app-shell) body {
 .ficha-detalle-admin-eval .input {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.ficha-caso-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.ficha-caso-meta p {
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.ficha-caso-meta p:last-child {
+  text-align: right;
 }
 
 .ficha-detalle-admin .eval-detalle-shell {
@@ -2595,6 +2678,66 @@ html:has(.app-shell) body {
   min-height: auto;
 }
 
+.texto-solo-lectura {
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--foreground);
+  font-weight: 500;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.pregunta-lectura-cuerpo .texto-solo-lectura,
+.pregunta-lectura-cuerpo .historial-feed-valor,
+.pregunta-lectura-cuerpo p {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.texto-solo-lectura.is-vacio {
+  color: var(--muted);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.rte-content.rte-readonly {
+  min-height: 0;
+  padding: 0;
+  white-space: normal;
+}
+
+.pregunta-lectura {
+  overflow: hidden;
+  padding: 0;
+  border-width: 1.5px;
+  border-color: #b7c4d8;
+}
+
+.pregunta-lectura-enunciado {
+  padding: 0.7rem 1.05rem;
+  background: #f3f6fb;
+}
+
+.pregunta-lectura-enunciado h3 {
+  color: var(--navy);
+}
+
+.pregunta-lectura-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.85rem 1.05rem 1.05rem;
+}
+
+.pregunta-lectura-cuerpo p {
+  margin: 0;
+}
+
 .rte .ProseMirror p,
 .rte-content p {
   margin: 0 0 0.65em;
@@ -3361,6 +3504,42 @@ html:has(.app-shell) body {
   background: #fff;
 }
 
+.historial-feed-card.pregunta-lectura,
+.historial-feed-card.pregunta-edicion {
+  padding: 0;
+  border-radius: 1.15rem;
+}
+
+.historial-feed-card.pregunta-lectura {
+  border-width: 1.5px;
+  border-color: #b7c4d8;
+}
+
+.historial-feed-card.pregunta-edicion {
+  border: 1.5px solid var(--red);
+  box-shadow: 0 0 0 3px rgba(200, 16, 46, 0.12);
+}
+
+.pregunta-edicion-enunciado {
+  padding: 0.7rem 1.05rem;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+}
+
+.pregunta-edicion-cuerpo {
+  padding: 0.85rem 1.05rem 1.05rem;
+}
+
+.pregunta-lectura-enunciado .historial-feed-date,
+.pregunta-edicion-enunciado .historial-feed-date {
+  margin-top: 0.15rem;
+}
+
+.pregunta-lectura-cuerpo .historial-feed-valor {
+  margin: 0;
+  color: var(--foreground);
+}
+
 .historial-feed-item:last-child .historial-feed-card {
   margin-bottom: 0;
 }
@@ -3396,7 +3575,8 @@ html:has(.app-shell) body {
   max-width: 100%;
   overflow-wrap: anywhere;
   word-break: break-word;
-  white-space: pre-wrap;
+  white-space: normal;
+  line-height: 1.4;
   color: var(--navy);
 }
 
@@ -3778,6 +3958,10 @@ html:has(.app-shell) body {
   text-align: right;
 }
 
+.reel-postular-texto-corto {
+  display: none;
+}
+
 .reel-mentoria-slide.is-center {
   z-index: 4;
   opacity: 1;
@@ -3913,4 +4097,1166 @@ html:has(.app-shell) body {
     right: 0.2rem;
   }
 }
+
+.gantt-cards,
+.presupuesto-cards,
+.eval-detalle-tabs {
+  display: none;
+}
+
+.eval-detalle-movil {
+  display: contents;
+}
+
+@media (max-width: 767px) {
+  .hero-aiep header img {
+    height: 2.25rem !important;
+  }
+
+  .hero-aiep main .grid.gap-10 {
+    gap: 1.35rem;
+    justify-items: center;
+  }
+
+  .hero-aiep main .grid.gap-10 > div {
+    width: min(100%, 16.5rem);
+  }
+
+  .hero-aiep .card.card-portal {
+    width: min(100%, 16.5rem);
+    min-height: 4.15rem;
+    padding: 0.7rem 0.85rem;
+    gap: 0.65rem;
+  }
+
+  .hero-aiep .card.card-portal svg {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .hero-aiep .card.card-portal .font-heading {
+    font-size: 1.12rem;
+  }
+
+  .hero-aiep .portal-admin-link {
+    font-size: 0.75rem;
+    line-height: 1.2;
+  }
+
+  .hero-aiep footer {
+    padding-top: 1rem;
+    padding-bottom: 0.7rem;
+    padding-left: 0.65rem;
+    padding-right: 0.65rem;
+  }
+
+  .hero-aiep footer p {
+    font-size: 0.62rem;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .hero-aiep:has(.login-panel) {
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .hero-aiep:has(.login-panel) > main {
+    min-height: 100%;
+    height: 100%;
+    padding: 0.45rem 0.85rem;
+    overflow: hidden;
+  }
+
+  .login-panel.space-y-4 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.45rem;
+  }
+
+  .login-panel .flex.items-center.justify-end p {
+    font-size: 0.88rem;
+  }
+
+  .login-panel .flex.items-center.justify-end .btn {
+    min-height: 2.2rem;
+    padding: 0.3rem 0.85rem;
+    font-size: 0.88rem;
+  }
+
+  .login-panel .card {
+    padding: 0.8rem 1rem;
+  }
+
+  .login-panel .card.space-y-5 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.4rem;
+  }
+
+  .login-panel img {
+    height: 2.15rem !important;
+  }
+
+  .login-panel h1 {
+    margin-top: 0.1rem;
+    font-size: 1.35rem;
+    line-height: 1.15;
+  }
+
+  .login-panel .field {
+    gap: 0.2rem;
+  }
+
+  .login-panel .field label {
+    font-size: 0.88rem;
+  }
+
+  .login-panel .input {
+    min-height: 2.3rem;
+    padding: 0.35rem 0.7rem;
+  }
+
+  .login-panel .btn.btn-primary {
+    min-height: 2.35rem;
+    padding: 0.35rem 0.9rem;
+  }
+
+  .login-panel .auth-divider {
+    margin: 0.1rem 0;
+    font-size: 0.7rem;
+  }
+
+  .login-panel .btn-google {
+    min-height: 2.3rem;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  .login-panel a.block {
+    font-size: 0.85rem;
+  }
+
+  .rol-movil .app-shell-inner {
+    padding: 0.75rem 0.85rem 1rem;
+  }
+
+  .rol-movil .site-header {
+    box-shadow: none;
+  }
+
+  .rol-movil .site-header > div {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.45rem 0.75rem;
+    padding-left: 0.85rem;
+    padding-right: 0.85rem;
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+  }
+
+  .rol-movil .site-header.is-menu-open > div {
+    padding-bottom: 0;
+  }
+
+  .rol-movil .site-header a img {
+    height: 2rem !important;
+  }
+
+  .rol-movil .site-header-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+    flex: 0 0 auto;
+  }
+
+  .rol-movil .site-header-tutorial-slot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .rol-movil .site-header-menu-btn {
+    display: inline-flex;
+    margin-left: 0;
+    width: 2.75rem;
+    height: 2.75rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 0.7rem;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    cursor: pointer;
+  }
+
+  .rol-movil .site-header-menu-btn:hover,
+  .rol-movil .site-header-menu-btn:focus-visible {
+    background: rgba(255, 255, 255, 0.16);
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
+
+  .rol-movil .site-header-nav {
+    display: none;
+    box-sizing: border-box;
+    width: calc(100% + 1.7rem);
+    margin: 0 -0.85rem;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 0.85rem;
+    background: #1a3d7a;
+  }
+
+  .rol-movil .site-header-nav.is-open {
+    display: flex;
+  }
+
+  .rol-movil .site-header-nav a,
+  .rol-movil .site-header-nav .btn {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    height: 2.15rem;
+    min-height: 2.15rem;
+    max-height: 2.15rem;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0 0.45rem;
+    border: 2px solid transparent;
+    border-radius: 0.55rem;
+    box-shadow: none;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .rol-movil .site-header-nav form {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+    height: 2.15rem;
+    align-items: center;
+    margin: 0;
+  }
+
+  .rol-movil .site-header-nav form .btn {
+    width: 100%;
+  }
+
+  .rol-movil h1.text-3xl,
+  .rol-movil h2.text-3xl {
+    font-size: 1.55rem;
+    line-height: 1.2;
+  }
+
+  .rol-movil h1.formulario-caso-titulo {
+    font-size: 1.05rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  .rol-movil .page-workspace.is-formulario-caso {
+    gap: 0.55rem;
+  }
+
+  .rol-movil .is-formulario-caso > .shrink-0.space-y-3 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.4rem;
+  }
+
+  .rol-movil .is-formulario-caso > .shrink-0 p {
+    font-size: 0.8rem;
+    line-height: 1.35;
+  }
+
+  .rol-movil .is-formulario-caso .eval-detalle-shell {
+    min-height: 0;
+    height: 100%;
+  }
+
+  .rol-movil .formulario-caso-acciones {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    flex-wrap: nowrap;
+    justify-content: stretch;
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+    gap: 0.3rem;
+    padding: 0.45rem 0.5rem max(0.45rem, env(safe-area-inset-bottom));
+    background: #e4e8f0;
+    border-top: 1px solid #d5dbe6;
+  }
+
+  .rol-movil .formulario-caso-acciones .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 2.15rem;
+    height: auto;
+    padding: 0.28rem 0.28rem;
+    font-size: 0.62rem;
+    line-height: 1.15;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .rol-movil .page-workspace.is-formulario-caso .page-scroll,
+  .rol-movil .is-formulario-caso .eval-detalle-col-scroll {
+    font-size: 0.875rem;
+    padding-bottom: 2.4rem;
+  }
+
+  .rol-movil .page-workspace.is-formulario-caso.has-acciones-caso .page-scroll,
+  .rol-movil .is-formulario-caso.has-acciones-caso .eval-detalle-col-scroll {
+    padding-bottom: 3.6rem;
+  }
+
+  .rol-movil .is-formulario-caso h3.text-xl {
+    font-size: 1.05rem;
+    line-height: 1.3;
+  }
+
+  .rol-movil .is-formulario-caso .input {
+    min-height: 2.5rem;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.875rem;
+  }
+
+  .rol-movil .is-formulario-caso .eval-detalle-head {
+    display: none;
+  }
+
+  .rol-movil .is-formulario-caso .eval-detalle-tabs {
+    gap: 0.3rem;
+    padding-bottom: 0.4rem;
+  }
+
+  .rol-movil .is-formulario-caso .eval-detalle-tab {
+    min-height: 2.15rem;
+    padding: 0.3rem 0.35rem;
+    font-size: 0.78rem;
+    border-radius: 0.55rem;
+  }
+
+  .rol-movil .is-formulario-caso .eval-detalle-cell {
+    padding: 0.65rem 0.7rem;
+  }
+
+  .rol-movil .is-formulario-caso .eval-detalle-cell .card {
+    padding: 0.85rem 0.9rem;
+  }
+
+  .rol-movil .is-formulario-caso .eval-detalle-cell .card.pregunta-lectura {
+    padding: 0;
+  }
+
+  .rol-movil .is-formulario-caso .pregunta-lectura-enunciado,
+  .rol-movil .is-formulario-caso .pregunta-edicion-enunciado {
+    padding: 0.6rem 0.85rem;
+  }
+
+  .rol-movil .is-formulario-caso .pregunta-lectura-cuerpo,
+  .rol-movil .is-formulario-caso .pregunta-edicion-cuerpo {
+    padding: 0.7rem 0.85rem 0.85rem;
+    gap: 0.55rem;
+  }
+
+  .rol-movil .is-formulario-caso .eval-detalle-cell .card.space-y-3 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.55rem;
+  }
+
+  .rol-movil .is-formulario-caso .text-muted {
+    font-size: 0.8rem;
+    line-height: 1.35;
+  }
+
+  .rol-movil .page-workspace.is-participante-home {
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 0.55rem;
+  }
+
+  .rol-movil .is-participante-home h1.text-3xl,
+  .rol-movil .is-participante-home h2.text-3xl {
+    font-size: 1.25rem;
+    line-height: 1.2;
+  }
+
+  .rol-movil .is-participante-home .casos-lista {
+    margin-top: 0.4rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .rol-movil .is-participante-home .caso-fila {
+    padding: 0.5rem 0.75rem;
+    gap: 0.45rem 0.65rem;
+  }
+
+  .rol-movil .is-participante-home .caso-fila-nombre {
+    font-size: 0.92rem;
+    line-height: 1.25;
+  }
+
+  .rol-movil .is-participante-home .caso-fila-mentoria {
+    font-size: 0.8rem;
+    line-height: 1.3;
+  }
+
+  .rol-movil .is-participante-home .caso-fila .badge {
+    font-size: 0.72rem;
+    padding: 0.16rem 0.5rem;
+    white-space: nowrap;
+  }
+
+  .rol-movil .caso-fila-texto-largo,
+  .rol-movil .caso-fila .badge-texto-largo {
+    display: none;
+  }
+
+  .rol-movil .caso-fila-texto-corto,
+  .rol-movil .caso-fila .badge-texto-corto {
+    display: inline;
+  }
+
+  .rol-movil .reel-mentorias-stage {
+    min-height: 0;
+    padding: 0.1rem 2.15rem 0.45rem;
+  }
+
+  .rol-movil .reel-mentorias-sizer,
+  .rol-movil .reel-mentoria-slide {
+    width: 100%;
+    height: 16.35rem;
+  }
+
+  .rol-movil .reel-mentoria-slide {
+    top: 0.1rem;
+    bottom: 0.45rem;
+  }
+
+  .rol-movil .reel-mentorias .card.space-y-2\.5 > * + * {
+    margin-top: 0;
+  }
+
+  .rol-movil .reel-mentoria-slide > .card,
+  .rol-movil .reel-mentorias-sizer > .card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "foto foto"
+      "titulo titulo"
+      "cierre cierre"
+      "restantes accion";
+    gap: 0.28rem 0.5rem;
+    overflow: hidden;
+    padding: 0.4rem 0.7rem 0.45rem;
+    align-items: center;
+  }
+
+  .rol-movil .reel-mentoria-foto-wrap {
+    grid-area: foto;
+  }
+
+  .rol-movil .reel-mentoria-foto {
+    height: 8rem;
+  }
+
+  .rol-movil .reel-mentoria-ver-mas {
+    top: 0.4rem;
+    right: 0.4rem;
+    width: 1.65rem;
+    height: 1.65rem;
+  }
+
+  .rol-movil .reel-mentoria-ver-mas svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .rol-movil .reel-mentoria-slide h2,
+  .rol-movil .reel-mentorias-sizer h2 {
+    grid-area: titulo;
+    min-height: 0;
+    max-height: 2.4em;
+    overflow: hidden;
+    margin: 0;
+    font-size: 1.02rem;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .rol-movil .reel-mentoria-pie,
+  .rol-movil .reel-mentoria-meta {
+    display: contents;
+  }
+
+  .rol-movil .reel-mentoria-cierre {
+    grid-area: cierre;
+    justify-content: flex-start;
+    margin: 0;
+    font-size: 0.78rem;
+    text-align: left;
+  }
+
+  .rol-movil .reel-mentoria-restantes {
+    grid-area: restantes;
+    justify-self: start;
+    align-self: center;
+    margin: 0;
+    font-size: 0.75rem;
+  }
+
+  .rol-movil .reel-mentoria-accion {
+    grid-area: accion;
+    width: auto;
+    min-width: 0;
+    max-width: 9.5rem;
+    height: 2.2rem;
+    min-height: 2.2rem;
+    justify-self: end;
+    align-self: center;
+  }
+
+  .rol-movil .reel-mentoria-accion .btn,
+  .rol-movil .reel-mentoria-accion .reel-postular-fuera {
+    font-size: 0.78rem;
+    padding: 0.25rem 0.55rem;
+    white-space: nowrap;
+  }
+
+  .rol-movil .reel-mentoria-accion .btn-postular-bloqueado {
+    max-width: none;
+    min-height: 0;
+  }
+
+  .rol-movil .reel-postular-texto-largo {
+    display: none;
+  }
+
+  .rol-movil .reel-postular-texto-corto {
+    display: inline;
+  }
+
+  .rol-movil .reel-mentorias-nav {
+    width: 2.1rem;
+    height: 2.1rem;
+    top: 4.5rem;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 8px rgba(10, 33, 86, 0.28);
+  }
+
+  .rol-movil .reel-mentorias-nav.is-prev {
+    left: 0.2rem;
+  }
+
+  .rol-movil .reel-mentorias-nav.is-next {
+    right: 0.2rem;
+  }
+
+  .rol-movil .reel-mentorias-nav svg {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
+  .rol-movil .reel-mentorias-dots {
+    margin-top: 0.15rem;
+  }
+
+  .rol-movil .casos-panel {
+    gap: 1.85rem;
+  }
+
+  .rol-movil .casos-panel > .page-scroll {
+    padding-top: 0.4rem;
+  }
+
+  .rol-movil .casos-panel-head.space-y-4 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.35rem;
+  }
+
+  .rol-movil .casos-panel h1.text-3xl {
+    font-size: 1.12rem;
+    line-height: 1.15;
+  }
+
+  .rol-movil .casos-filtros-desktop {
+    display: none;
+  }
+
+  .rol-movil .casos-filtros-movil {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .rol-movil .casos-filtro-activo-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .rol-movil .casos-filtro-activo-row .casos-filtro {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    min-height: 2.05rem;
+    justify-content: space-between;
+    padding: 0.32rem 0.7rem;
+    font-size: 0.78rem;
+    line-height: 1.2;
+    white-space: normal;
+    text-align: left;
+    cursor: default;
+  }
+
+  .rol-movil .casos-filtro-abrir {
+    flex-shrink: 0;
+    min-height: 2.05rem;
+    padding-inline: 0.85rem;
+  }
+
+  html:has(.rol-movil) .modal-dialog.modal-filtros-casos {
+    max-height: min(82vh, 34rem);
+  }
+
+  html:has(.rol-movil) .modal-dialog.modal-filtros-casos .modal-panel {
+    max-height: min(82vh, 34rem);
+  }
+
+  html:has(.rol-movil) .casos-filtros-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  html:has(.rol-movil) .casos-filtro-cat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+  }
+
+  html:has(.rol-movil) .casos-filtro-cat-btn {
+    display: flex;
+    width: 100%;
+    min-height: 2.05rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    padding: 0.32rem 0.7rem;
+    font-size: 0.78rem;
+    line-height: 1.2;
+    text-align: left;
+    white-space: normal;
+  }
+
+  html:has(.rol-movil) .casos-filtro-cat-btn > span:first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  html:has(.rol-movil) .casos-filtro-chevron {
+    display: inline-flex;
+    flex-shrink: 0;
+    color: currentColor;
+    opacity: 0.8;
+    transition: transform 0.15s ease;
+  }
+
+  html:has(.rol-movil) .casos-filtro-cat.is-open .casos-filtro-chevron {
+    transform: rotate(180deg);
+  }
+
+  html:has(.rol-movil) .casos-filtro-cat-btn.is-cat-activa {
+    background: var(--navy-soft);
+    color: var(--navy);
+    box-shadow: inset 0 0 0 1.5px var(--navy);
+  }
+
+  html:has(.rol-movil) .casos-filtro-sub {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    padding: 0.1rem 0 0.15rem 0.7rem;
+  }
+
+  html:has(.rol-movil) .casos-filtro-sub .casos-filtro {
+    width: 100%;
+    min-height: 1.85rem;
+    justify-content: space-between;
+    padding: 0.28rem 0.65rem;
+    font-size: 0.75rem;
+    line-height: 1.25;
+    white-space: normal;
+    text-align: left;
+  }
+
+  .rol-movil .casos-panel .page-scroll.space-y-7 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.55rem;
+  }
+
+  .rol-movil .casos-banda {
+    gap: 0.4rem;
+  }
+
+  .rol-movil .casos-banda:has(.casos-banda-titulo) {
+    padding-left: 0.55rem;
+    border-left: 3px solid #c5d2ea;
+  }
+
+  .rol-movil .casos-banda-titulo {
+    display: block;
+    font-size: 0.65rem;
+    margin-bottom: 0.1rem;
+  }
+
+  .rol-movil .casos-grupo-cabecera {
+    margin-bottom: 0.28rem;
+    padding: 0;
+    gap: 0.3rem;
+  }
+
+  .rol-movil .casos-grupo-cabecera h3 {
+    font-size: 0.8rem;
+  }
+
+  .rol-movil .casos-grupo-n {
+    font-size: 0.7rem;
+  }
+
+  .rol-movil .casos-panel .card.card-link.caso-fila {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.55rem 0.7rem;
+    gap: 0.28rem;
+    border-radius: 0.75rem;
+  }
+
+  .rol-movil .casos-panel .caso-fila-textos {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .rol-movil .casos-panel .caso-fila-nombre,
+  .rol-movil .casos-panel .caso-fila-mentoria {
+    overflow: hidden;
+    overflow-wrap: break-word;
+    word-break: normal;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .rol-movil .casos-panel .caso-fila-nombre {
+    font-size: 0.92rem;
+    line-height: 1.25;
+  }
+
+  .rol-movil .casos-panel .caso-fila-mentoria {
+    font-size: 0.72rem;
+    line-height: 1.3;
+    margin-top: 0.06rem;
+  }
+
+  .rol-movil .casos-panel .caso-fila .badge {
+    align-self: flex-start;
+    justify-self: start;
+    max-width: 100%;
+    font-size: 0.68rem;
+    padding: 0.12rem 0.5rem;
+    white-space: normal;
+  }
+
+  .rol-movil .casos-panel .caso-fila-evals {
+    margin-top: 0.2rem;
+    gap: 0.25rem 0.45rem;
+  }
+
+  .rol-movil .casos-panel .caso-fila-evals li {
+    font-size: 0.7rem;
+  }
+
+  .rol-movil .casos-panel .caso-fila-flecha {
+    display: none;
+  }
+
+  .rol-movil .caso-fila-nombre,
+  .rol-movil .caso-fila-mentoria {
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+
+  .rol-movil .field,
+  .rol-movil .input,
+  .rol-movil .card {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .rol-movil .gantt-wrap > .gantt-scroll {
+    display: none;
+  }
+
+  .rol-movil .gantt-cards,
+  .rol-movil .presupuesto-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.85rem;
+  }
+
+  .rol-movil .gantt-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.85rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 0.85rem;
+    background: #fff;
+  }
+
+  .rol-movil .gantt-card.is-editing {
+    background: #fafbfd;
+  }
+
+  .rol-movil .gantt-card-empty {
+    margin: 0;
+    padding: 0.4rem 0.15rem;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  .rol-movil .gantt-card-fechas {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  .rol-movil .presupuesto-limites-resumen thead {
+    display: none;
+  }
+
+  .rol-movil .presupuesto-limites-resumen,
+  .rol-movil .presupuesto-limites-resumen tbody,
+  .rol-movil .presupuesto-limites-resumen tfoot {
+    display: block;
+    width: 100%;
+  }
+
+  .rol-movil .presupuesto-limites-resumen tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.15rem 0.75rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .rol-movil .presupuesto-limites-resumen th,
+  .rol-movil .presupuesto-limites-resumen td {
+    display: block;
+    padding: 0;
+  }
+
+  .rol-movil .presupuesto-limites-resumen td:nth-child(3) {
+    grid-column: 1 / -1;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .rol-movil .eval-detalle-movil {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .rol-movil .eval-detalle-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0.35rem;
+    padding: 0 0 0.55rem;
+  }
+
+  .rol-movil .eval-detalle-tab {
+    min-width: 0;
+    flex: 1 1 0;
+    min-height: 2.5rem;
+    padding: 0.4rem 0.45rem;
+    border: 1px solid var(--border);
+    border-radius: 0.7rem;
+    background: #fff;
+    color: var(--navy);
+    font-size: 0.82rem;
+    font-weight: 800;
+    line-height: 1.2;
+    cursor: pointer;
+  }
+
+  .rol-movil .eval-detalle-tab.is-active {
+    background: var(--navy);
+    border-color: var(--navy);
+    color: #fff;
+  }
+
+  .rol-movil .eval-detalle-body.is-columnas {
+    flex: 1 1 auto;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .rol-movil .eval-detalle-col {
+    display: none;
+    flex: 1 1 auto;
+    max-height: none;
+    min-height: 0;
+  }
+
+  .rol-movil .eval-detalle-body.is-tab-caso .eval-detalle-col.is-caso,
+  .rol-movil .eval-detalle-body.is-tab-eval .eval-detalle-col.is-eval,
+  .rol-movil .eval-detalle-body.is-tab-sup .eval-detalle-col.is-sup {
+    display: flex;
+  }
+
+  .rol-movil .eval-detalle-collapse {
+    display: none;
+  }
+
+  .rol-movil .eval-detalle-head {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  html:has(.rol-movil) .tutorial-launcher {
+    inset: auto 0.85rem 0.85rem auto;
+    width: 2.1rem;
+    height: 2.1rem;
+    min-width: 2.1rem;
+    min-height: 2.1rem;
+    font-size: 1rem;
+    background: var(--navy);
+    border-color: rgba(255, 255, 255, 0.45);
+    box-shadow: 0 2px 8px rgba(6, 21, 54, 0.32);
+  }
+
+  html:has(.rol-movil) .tutorial-launcher:hover,
+  html:has(.rol-movil) .tutorial-launcher:focus-visible {
+    background: #1a3d7a;
+  }
+
+  .rol-movil .site-header .tutorial-launcher {
+    position: static;
+    inset: auto;
+    z-index: 1;
+    width: 2.75rem;
+    height: 2.75rem;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    font-size: 1.15rem;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: none;
+  }
+
+  .rol-movil .site-header .tutorial-launcher:hover,
+  .rol-movil .site-header .tutorial-launcher:focus-visible {
+    background: rgba(255, 255, 255, 0.16);
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
+
+  html:has(.rol-movil) .driver-popover.tutorial-popover {
+    max-width: min(20.5rem, calc(100vw - 1.4rem));
+  }
+
+  html:has(.rol-movil) .modal-dialog.modal-historial-versiones .modal-title {
+    font-size: 1.05rem;
+    line-height: 1.25;
+  }
+
+  html:has(.rol-movil) .modal-dialog.modal-historial-versiones .historial-feed-meta strong {
+    font-size: 1.05rem;
+    line-height: 1.3;
+  }
+
+  html:has(.rol-movil) .modal-dialog.modal-historial-versiones .historial-feed-date {
+    font-size: 0.8rem;
+  }
+
+  html:has(.rol-movil) .modal-dialog.modal-historial-versiones .historial-feed-valor {
+    font-size: 0.875rem;
+    line-height: 1.4;
+  }
+
+  html:has(.rol-movil) .modal-dialog.modal-historial-versiones .historial-feed-badge {
+    font-size: 0.65rem;
+  }
+
+  .rol-movil .perfil-guardar-bar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    justify-content: initial;
+  }
+
+  .rol-movil .perfil-guardar-bar > :first-child {
+    grid-column: 1;
+    min-height: 0;
+  }
+
+  .rol-movil .perfil-guardar-bar > button {
+    grid-column: 2;
+    justify-self: center;
+  }
+
+  html:has(.rol-movil) .modal-dialog.modal-mentoria-detalle {
+    width: calc(100% - 2rem);
+    max-width: calc(100% - 2rem);
+    height: auto;
+    min-height: min(34rem, calc(100dvh - 8.4rem));
+    max-height: calc(100dvh - 8.4rem);
+    margin: auto;
+  }
+
+  html:has(.rol-movil) .modal-dialog.modal-mentoria-detalle .modal-panel {
+    height: auto;
+    min-height: min(34rem, calc(100dvh - 8.4rem));
+    max-height: calc(100dvh - 8.4rem);
+    gap: 0.4rem;
+    padding: 0.85rem 1rem 1.15rem;
+  }
+
+  html:has(.rol-movil) .modal-dialog.modal-mentoria-detalle .modal-chrome .flex {
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+
+  html:has(.rol-movil) .modal-dialog.modal-mentoria-detalle .modal-title {
+    font-size: 1.12rem;
+    line-height: 1.2;
+  }
+
+  html:has(.rol-movil) .modal-dialog.modal-mentoria-detalle .modal-close-label {
+    display: none;
+  }
+
+  html:has(.rol-movil) .modal-dialog.modal-mentoria-detalle .modal-close-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  html:has(.rol-movil) .modal-dialog.modal-mentoria-detalle .modal-close-btn {
+    width: 2.1rem;
+    height: 2.1rem;
+    min-width: 2.1rem;
+    min-height: 2.1rem;
+    padding: 0;
+    border-radius: 999px;
+  }
+
+  html:has(.rol-movil) .mentoria-detalle {
+    gap: 0.45rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  html:has(.rol-movil) .mentoria-detalle-hero {
+    order: 1;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    border-radius: 0.75rem;
+  }
+
+  html:has(.rol-movil) .mentoria-detalle-cuerpo {
+    order: 2;
+  }
+
+  html:has(.rol-movil) .mentoria-detalle-chips {
+    order: 3;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    margin-top: 0.15rem;
+  }
+
+  html:has(.rol-movil) .mentoria-detalle-acciones {
+    order: 4;
+    justify-content: center;
+    width: 100%;
+    margin-top: 0.35rem;
+    padding-top: 0.15rem;
+  }
+
+  html:has(.rol-movil) .mentoria-detalle-foto,
+  html:has(.rol-movil) .mentoria-detalle-foto-vacia {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: 8rem;
+    object-fit: cover;
+    border-radius: 0.75rem;
+  }
+
+  html:has(.rol-movil) .mentoria-detalle-chip {
+    max-width: 100%;
+    padding: 0.28rem 0.65rem;
+    font-size: 0.75rem;
+    line-height: 1.25;
+    font-weight: 600;
+  }
+
+  html:has(.rol-movil) .mentoria-detalle-chip svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+
+  html:has(.rol-movil) .mentoria-detalle-subtitulo {
+    font-size: 0.7rem;
+  }
+
+  html:has(.rol-movil) .mentoria-detalle-desc {
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+
+  html:has(.rol-movil) .mentoria-detalle-acciones .reel-mentoria-accion,
+  html:has(.rol-movil) .mentoria-detalle-acciones form {
+    display: flex;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    min-height: 0;
+    justify-content: center;
+  }
+
+  html:has(.rol-movil) .mentoria-detalle-acciones .btn {
+    min-width: 0;
+    min-height: 2.35rem;
+    width: min(100%, 14rem);
+    margin-inline: auto;
+    padding: 0.35rem 0.9rem;
+    font-size: 0.9rem;
+  }
+}
+
 

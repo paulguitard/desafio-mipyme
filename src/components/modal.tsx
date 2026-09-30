@@ -16,6 +16,7 @@ export function Modal({
   className: extraClassName,
   tourContexto,
   tourAnclaTitulo,
+  sinCerrar,
 }: {
   open: boolean;
   title: ReactNode;
@@ -29,6 +30,7 @@ export function Modal({
   className?: string;
   tourContexto?: string;
   tourAnclaTitulo?: string;
+  sinCerrar?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const openRef = useRef(open);
@@ -87,19 +89,34 @@ export function Modal({
             <h2 className="modal-title text-2xl font-semibold text-navy" data-tour={tourAnclaTitulo}>
               {title}
             </h2>
+            {headerExtra || !sinCerrar ? (
             <div className="flex shrink-0 items-center gap-3">
               {headerExtra}
+              {sinCerrar ? null : (
               <button
-                className="btn btn-sm btn-secondary"
+                className="btn btn-sm btn-secondary modal-close-btn"
                 type="button"
+                aria-label="Cerrar"
                 onClick={(event) => {
                   event.stopPropagation();
                   onClose();
                 }}
               >
-                Cerrar
+                <span className="modal-close-label">Cerrar</span>
+                <span className="modal-close-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+                    <path
+                      d="M6 6l12 12M18 6L6 18"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </span>
               </button>
+              )}
             </div>
+            ) : null}
           </div>
         </div>
         <div className="modal-body">{children}</div>

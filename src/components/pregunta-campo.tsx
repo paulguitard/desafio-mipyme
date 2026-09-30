@@ -21,6 +21,7 @@ const CampoObjetivosIndicadores = dynamic(
 import { VideoEmbed, VideoMiniatura } from "@/components/video-embed";
 import { InputCorreo } from "@/components/input-correo";
 import { normalizarCorreo } from "@/lib/correo";
+import { textoContinuo } from "@/lib/texto-continuo";
 import {
   esTipoFormato,
   formatearValorPregunta,
@@ -364,6 +365,7 @@ export function PreguntaCampo({
   );
 
   if (locked) {
+    const textoCorto = formatearValorPregunta(tipo, valor, pregunta.opciones);
     const valorNodo =
       tipo === "texto_largo" ? (
         <TextoLargoVista html={valorTexto(valor)} />
@@ -383,20 +385,22 @@ export function PreguntaCampo({
           />
         )
       ) : (
-        <p className="whitespace-pre-wrap rounded-lg border border-border bg-white p-4">
-          {formatearValorPregunta(tipo, valor, pregunta.opciones) || "Sin respuesta"}
+        <p className={`texto-solo-lectura${textoCorto ? "" : " is-vacio"}`}>
+          {textoCorto ? textoContinuo(textoCorto) : "Sin respuesta"}
         </p>
       );
 
     const hayAdjuntos = archivos.length > 0;
 
     return (
-      <section className="card space-y-3 p-5">
-        {encabezado}
-        {pregunta.ayuda ? <p className="text-muted">{pregunta.ayuda}</p> : null}
-        <div className={hayAdjuntos ? "pregunta-con-adjuntos" : undefined}>
-          <div className="pregunta-valor min-w-0">{valorNodo}</div>
-          <AdjuntosRespuesta archivos={archivos} />
+      <section className="card pregunta-lectura">
+        <div className="pregunta-lectura-enunciado">{encabezado}</div>
+        <div className="pregunta-lectura-cuerpo">
+          {pregunta.ayuda ? <p className="text-muted">{pregunta.ayuda}</p> : null}
+          <div className={hayAdjuntos ? "pregunta-con-adjuntos" : undefined}>
+            <div className="pregunta-valor min-w-0">{valorNodo}</div>
+            <AdjuntosRespuesta archivos={archivos} />
+          </div>
         </div>
       </section>
     );

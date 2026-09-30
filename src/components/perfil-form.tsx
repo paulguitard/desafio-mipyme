@@ -169,10 +169,10 @@ export function PerfilForm({
   ];
 
   return (
-    <div className="grid gap-6">
+    <div className="perfil-form flex h-full min-h-0 flex-col gap-4">
       {esParticipante ? (
         <div
-          className="flex flex-wrap gap-2"
+          className="flex shrink-0 flex-wrap gap-2"
           role="tablist"
           aria-label="Secciones de Mi perfil"
         >
@@ -198,7 +198,9 @@ export function PerfilForm({
       ) : null}
 
       <form
-        className="card overflow-hidden"
+        className={`card min-h-0 flex-1 flex-col overflow-hidden ${
+          esParticipante && pestana !== "datos" ? "hidden" : "flex"
+        }`}
         data-tour="perfil-datos"
         action={onSubmit}
         hidden={esParticipante && pestana !== "datos"}
@@ -206,13 +208,13 @@ export function PerfilForm({
         role={esParticipante ? "tabpanel" : undefined}
         aria-labelledby={esParticipante ? "perfil-tab-datos" : undefined}
       >
-        <div className="border-b border-border px-6 py-4">
+        <div className="shrink-0 border-b border-border px-6 py-4">
           <p className="text-sm font-bold uppercase tracking-[0.12em] text-muted">
             Datos personales
           </p>
         </div>
 
-        <div className="grid gap-5 px-6 py-5 md:grid-cols-2">
+        <div className="page-scroll min-h-0 flex-1 overflow-y-auto grid gap-5 px-6 py-5 md:grid-cols-2">
           <div className="field">
             <label htmlFor="perfil-name">Nombre</label>
             <input
@@ -311,7 +313,7 @@ export function PerfilForm({
           ) : null}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-[var(--navy-soft)]/40 px-6 py-4">
+        <div className="perfil-guardar-bar flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-[var(--navy-soft)]/40 px-6 py-4">
           <div className="min-h-5 text-sm" aria-live="polite">
             {error ? <p className="font-semibold text-danger">{error}</p> : null}
             {ok && !error ? <p className="font-semibold text-navy">Cambios guardados.</p> : null}
@@ -329,13 +331,15 @@ export function PerfilForm({
 
       {esParticipante ? (
         <section
-          className="card overflow-hidden"
+          className={`card min-h-0 flex-1 flex-col overflow-hidden ${
+            pestana !== "formalizacion" ? "hidden" : "flex"
+          }`}
           hidden={pestana !== "formalizacion"}
           id="perfil-panel-formalizacion"
           role="tabpanel"
           aria-labelledby="perfil-tab-formalizacion"
         >
-          <div className="border-b border-border px-6 py-4">
+          <div className="shrink-0 border-b border-border px-6 py-4">
             <p className="text-sm font-bold uppercase tracking-[0.12em] text-muted">
               Formalización Empresa
             </p>
@@ -345,7 +349,7 @@ export function PerfilForm({
             </p>
           </div>
 
-          <div className="grid gap-4 px-6 py-5">
+          <div className="page-scroll min-h-0 flex-1 overflow-y-auto grid gap-4 px-6 py-5">
             <div className="flex flex-wrap items-center gap-3">
               <input
                 ref={fileInputRef}

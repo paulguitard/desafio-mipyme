@@ -30,11 +30,8 @@ export default async function ParticipantePerfilPage() {
     <div className="page-workspace mx-auto grid h-full min-h-0 w-full max-w-4xl grid-rows-[auto_minmax(0,1fr)] gap-6 overflow-hidden">
       <div className="shrink-0">
         <h1 className="text-3xl font-extrabold text-navy">Mi perfil</h1>
-        <p className="mt-1 text-muted">
-          Actualiza tus datos personales o los documentos de formalización de tu empresa.
-        </p>
       </div>
-      <div className="page-scroll min-h-0 overflow-y-auto pr-1">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
         <PerfilForm
           name={user.name}
           email={normalizarCorreo(user.email)}

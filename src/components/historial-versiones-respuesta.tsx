@@ -62,7 +62,7 @@ export function HistorialVersionesRespuesta({
 
   return (
     <>
-      <div className={`historial-versiones ${conCambios ? "is-changed" : "is-single"}`}>
+      <div className={`historial-versiones ${conCambios ? "is-changed" : "is-single"}`} data-tour="historial-versiones">
         <span className="historial-versiones-label">Versiones</span>
         <button
           type="button"
@@ -80,7 +80,13 @@ export function HistorialVersionesRespuesta({
         </button>
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Historial de versiones" tall>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Historial de versiones"
+        tall
+        className="modal-historial-versiones"
+      >
         <ol className="historial-feed">
           {versiones.map((version, index) => (
             <li key={version.id} className="historial-feed-item">

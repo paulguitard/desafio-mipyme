@@ -108,11 +108,48 @@ export function EvalDetalleColumnas({
   className?: string;
 }) {
   const paneles = useEvalPanelesColapsables();
+  const [tab, setTab] = useState<"caso" | "eval" | "sup">("caso");
 
   return (
+    <div className="eval-detalle-movil">
+      <div className="eval-detalle-tabs" role="tablist" aria-label="Paneles de la ficha">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "caso"}
+          className={`eval-detalle-tab${tab === "caso" ? " is-active" : ""}`}
+          data-tour="pestaña-caso"
+          onClick={() => setTab("caso")}
+        >
+          {casoTitle}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "eval"}
+          className={`eval-detalle-tab${tab === "eval" ? " is-active" : ""}`}
+          data-tour="pestaña-evaluacion"
+          onClick={() => setTab("eval")}
+        >
+          {evalTitle}
+        </button>
+        {sinSupervision ? null : (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "sup"}
+            className={`eval-detalle-tab${tab === "sup" ? " is-active" : ""}`}
+            data-tour="pestaña-supervision"
+            onClick={() => setTab("sup")}
+          >
+            {supTitle ?? "Supervisión"}
+          </button>
+        )}
+      </div>
     <div
       className={[
         "eval-detalle-body is-columnas",
+        `is-tab-${tab}`,
         sinSupervision ? "is-sin-sup" : "",
         paneles.bodyClassName,
         bloqueado ? "is-bloqueado" : "",
@@ -147,6 +184,7 @@ export function EvalDetalleColumnas({
           <div className="eval-detalle-col-scroll">{supervision}</div>
         </div>
       )}
+    </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AvisoEntradaCaso } from "@/components/aviso-entrada-caso";
 import { BotonAtras } from "@/components/boton-atras";
 import { EvalDetalleCelda } from "@/components/eval-detalle-head";
 import { FormularioEvaluacion } from "@/components/formulario-evaluacion";
@@ -9,12 +10,12 @@ import { PanelEvaluacionPregunta } from "@/components/panel-evaluacion-pregunta"
 import { PanelObservacionGeneral, PanelSupervisionPendiente } from "@/components/panel-observacion-general";
 import { PreguntaCampo } from "@/components/pregunta-campo";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
+import { avisoEntradaSupervisor } from "@/lib/aviso-entrada-caso";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
 import { notasParaEvaluacionGeneral, parseEscalaNotas } from "@/lib/preguntas";
 import { historialEvaluacion, revisionVigente } from "@/lib/revision-ciclo";
 import { historialSupervision } from "@/lib/supervision-ui";
 import type { DetalleFichaAdmin } from "@/lib/convocatoria-admin-data";
-import { normalizarCorreo } from "@/lib/correo";
 
 export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
   const [asignacionId, setAsignacionId] = useState(data.asignaciones[0]?.id ?? "");
@@ -28,6 +29,12 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
   const ciclo = asignacion?.cicloSupervision ?? 1;
   const canEdit = Boolean(asignacion && asignacion.estado === "EN_SUPERVISION");
   const nombreCaso = etiquetaNombreCaso(data.nombreCaso);
+  const [avisoEntrada] = useState(() => {
+    const primera = data.asignaciones[0];
+    return primera
+      ? avisoEntradaSupervisor(primera.estado, primera.intencionPendiente)
+      : null;
+  });
 
   if (!asignacion) {
     return (
@@ -39,6 +46,8 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
   }
 
   return (
+    <>
+    <AvisoEntradaCaso aviso={avisoEntrada} />
     <FormularioEvaluacion
       key={asignacion.id}
       asignacionId={asignacion.id}
@@ -48,7 +57,7 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
       modoEvaluacion={modoEvaluacion}
       back={<BotonAtras href="/evaluador" />}
       title={
-        <h1 className="text-3xl font-extrabold text-navy">
+        <h1 className="formulario-caso-titulo text-3xl font-extrabold text-navy">
           {nombreCaso} · {data.convocatoriaTitulo}
         </h1>
       }
@@ -59,20 +68,14 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
           : "Supervisión"
       }
       meta={
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="space-y-1">
-            <p className="text-muted">
-              {data.emprendedorNombre} · {normalizarCorreo(data.emprendedorEmail)}
+        <div className="space-y-3">
+          <div className="ficha-caso-meta">
+            <p title={data.emprendedorNombre}>
+              Particip.: {(data.emprendedorNombre ?? "").slice(0, 14)}
             </p>
-            {asignacion.estado === "EN_SUPERVISION" ? (
-              <p>
-                {asignacion.intencionPendiente === "FINALIZAR"
-                  ? "El evaluador pidió finalizar. Revisa y procede o devuelve observaciones."
-                  : "El evaluador envió observaciones. Revisa y procede o devuelve observaciones."}
-              </p>
-            ) : asignacion.estado === "DEVUELTA_SUPERVISOR" ? (
-              <p>Esperando que el evaluador corrija según tu última supervisión.</p>
-            ) : null}
+            <p title={asignacion.evaluadorNombre}>
+              Evaluador: {(asignacion.evaluadorNombre ?? "").slice(0, 14)}
+            </p>
           </div>
           {data.asignaciones.length > 1 ? (
             <div className="ficha-detalle-admin-eval">
@@ -227,5 +230,6 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
         )
       }
     />
+    </>
   );
 }

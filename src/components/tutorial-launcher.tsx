@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import type { Role } from "@/lib/roles";
-import { resolverTutorial, selectorTour, type PasoTutorial } from "@/lib/tutoriales";
+import { resolverTutorial, nodoTourVisible, type PasoTutorial } from "@/lib/tutoriales";
 
 function dialogAbiertoMasAlto() {
   const dialogs = document.querySelectorAll("dialog[open]");
@@ -19,7 +19,26 @@ function dialogTutorialAbierto() {
 }
 
 function pasosPresentes(pasos: PasoTutorial[], raiz: ParentNode) {
-  return pasos.filter((paso) => raiz.querySelector(selectorTour(paso.ancla)));
+  return pasos.filter((paso) => nodoTourVisible(paso.ancla, raiz) != null);
+}
+
+function esTourMovil() {
+  return Boolean(
+    document.querySelector(".rol-movil") && window.matchMedia("(max-width: 767px)").matches,
+  );
+}
+
+function slotTutorialHeader() {
+  return document.querySelector("[data-tutorial-header-slot]");
+}
+
+function destinoTutorial() {
+  const dialog = dialogAbiertoMasAlto();
+  if (dialog) return dialog;
+  if (esTourMovil()) {
+    return slotTutorialHeader() ?? document.body;
+  }
+  return document.body;
 }
 
 function anclarCapaTourAlDialog(dialog: Element) {
@@ -47,10 +66,12 @@ export function TutorialLauncher({ rol }: { rol: Role }) {
 
   useEffect(() => {
     function sincronizarDestino() {
-      setDestino(dialogAbiertoMasAlto() ?? document.body);
+      setDestino(destinoTutorial());
     }
 
     sincronizarDestino();
+    const media = window.matchMedia("(max-width: 767px)");
+    media.addEventListener("change", sincronizarDestino);
 
     const observer = new MutationObserver((mutations) => {
       const dialogCambio = mutations.some((mutation) => {
@@ -76,6 +97,7 @@ export function TutorialLauncher({ rol }: { rol: Role }) {
     document.addEventListener("close", sincronizarDestino, true);
     return () => {
       observer.disconnect();
+      media.removeEventListener("change", sincronizarDestino);
       document.removeEventListener("close", sincronizarDestino, true);
     };
   }, []);
@@ -88,12 +110,13 @@ export function TutorialLauncher({ rol }: { rol: Role }) {
     const pasos = pasosPresentes(resolverTutorial(rol, pathname, contexto), raiz);
     if (pasos.length === 0) return;
 
+    const movil = esTourMovil();
     const instancia = driver({
       overlayColor: "#061536",
       overlayOpacity: 0.62,
       stagePadding: 8,
       stageRadius: 10,
-      popoverOffset: 12,
+      popoverOffset: movil ? 10 : 12,
       popoverClass: "tutorial-popover",
       showProgress: true,
       progressText: "{{current}} de {{total}}",
@@ -114,15 +137,24 @@ export function TutorialLauncher({ rol }: { rol: Role }) {
           element.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
         }
       },
-      steps: pasos.map((paso) => ({
-        element: () => raiz.querySelector(selectorTour(paso.ancla)) as Element,
-        popover: {
-          title: paso.titulo,
-          description: paso.descripcion,
-          side: "bottom",
-          align: "end",
-        },
-      })),
+      steps: pasos.map((paso) => {
+        const abajoFijo =
+          paso.ancla === "guardar-borrador" ||
+          paso.ancla === "enviar-caso" ||
+          paso.ancla === "guardar-revision" ||
+          paso.ancla === "enviar-supervisor" ||
+          paso.ancla === "enviar-observaciones" ||
+          paso.ancla === "finalizar-evaluacion";
+        return {
+          element: () => nodoTourVisible(paso.ancla, raiz) as Element,
+          popover: {
+            title: paso.titulo,
+            description: paso.descripcion,
+            side: movil && abajoFijo ? "top" : "bottom",
+            align: movil ? "start" : "end",
+          },
+        };
+      }),
     });
 
     recorriendo.current = instancia;

@@ -13,6 +13,7 @@ import {
   sumaCuentaPresupuesto,
   topeItemCuenta,
   type ActividadGantt,
+  type ConfigGantt,
   type IndicadorObjetivo,
   type ConfigPresupuesto,
   type ItemPresupuesto,
@@ -283,6 +284,123 @@ function IconoLapiz() {
   );
 }
 
+function GanttCards({
+  rows,
+  editable,
+  editingIndex,
+  ocupado,
+  config,
+  onActualizar,
+  onEditar,
+  onGuardar,
+  onQuitar,
+}: {
+  rows: ActividadGantt[];
+  editable: boolean;
+  editingIndex: number | null;
+  ocupado: boolean;
+  config: ConfigGantt;
+  onActualizar: (index: number, patch: Partial<ActividadGantt>) => void;
+  onEditar: (index: number) => void;
+  onGuardar: () => void;
+  onQuitar: (index: number) => void;
+}) {
+  return (
+    <div className="gantt-cards">
+      {rows.length === 0 ? (
+        <p className="gantt-card-empty">
+          {editable
+            ? "Aún no hay actividades. Usa Agregar actividad para crear la primera fila."
+            : "Sin actividades"}
+        </p>
+      ) : null}
+      {rows.map((act, index) => {
+        const editing = editable && editingIndex === index;
+        return (
+          <article key={index} className={`gantt-card${editing ? " is-editing" : ""}`}>
+            {editing ? (
+              <div className="gantt-edit-stack">
+                <input
+                  className="input gantt-input"
+                  placeholder={`Actividad ${index + 1}`}
+                  aria-label={`Nombre actividad ${index + 1}`}
+                  value={act.nombre}
+                  onChange={(event) => onActualizar(index, { nombre: event.target.value })}
+                />
+                <label className="gantt-date-field">
+                  <span>Inicio</span>
+                  <input
+                    className="input gantt-input"
+                    type="date"
+                    min={config.fechaMin ?? undefined}
+                    max={config.fechaMax ?? undefined}
+                    value={act.fechaInicio}
+                    onChange={(event) =>
+                      onActualizar(index, { fechaInicio: event.target.value })
+                    }
+                  />
+                </label>
+                <label className="gantt-date-field">
+                  <span>Cierre</span>
+                  <input
+                    className="input gantt-input"
+                    type="date"
+                    min={config.fechaMin ?? undefined}
+                    max={config.fechaMax ?? undefined}
+                    value={act.fechaCierre}
+                    onChange={(event) =>
+                      onActualizar(index, { fechaCierre: event.target.value })
+                    }
+                  />
+                </label>
+                <textarea
+                  className="input gantt-input gantt-textarea"
+                  rows={4}
+                  placeholder="Descripción"
+                  aria-label={`Descripción actividad ${index + 1}`}
+                  value={act.descripcion}
+                  onChange={(event) =>
+                    onActualizar(index, { descripcion: event.target.value })
+                  }
+                />
+                <div className="gantt-edit-buttons">
+                  <button className="btn btn-sm btn-navy" type="button" onClick={onGuardar}>
+                    Guardar
+                  </button>
+                  <button className="btn btn-sm btn-ghost" type="button" onClick={() => onQuitar(index)}>
+                    Quitar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="gantt-nombre-row">
+                  {editable ? (
+                    <button
+                      className="gantt-icon-btn"
+                      type="button"
+                      disabled={ocupado}
+                      aria-label={`Editar ${act.nombre || `actividad ${index + 1}`}`}
+                      onClick={() => onEditar(index)}
+                    >
+                      <IconoLapiz />
+                    </button>
+                  ) : null}
+                  <p className="gantt-nombre-text">{act.nombre || `Actividad ${index + 1}`}</p>
+                </div>
+                <p className="gantt-card-fechas">
+                  {act.fechaInicio || "Sin inicio"} — {act.fechaCierre || "sin cierre"}
+                </p>
+                <p className="gantt-desc-text">{act.descripcion || "—"}</p>
+              </>
+            )}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
 export function CampoGantt({
   name,
   opcionesRaw,
@@ -342,6 +460,17 @@ export function CampoGantt({
             </tbody>
           </table>
         </div>
+        <GanttCards
+          rows={rows}
+          editable={false}
+          editingIndex={null}
+          ocupado={false}
+          config={config}
+          onActualizar={() => {}}
+          onEditar={() => {}}
+          onGuardar={() => {}}
+          onQuitar={() => {}}
+        />
       </div>
     );
   }
@@ -471,6 +600,20 @@ export function CampoGantt({
             </tbody>
           </table>
         </div>
+        <GanttCards
+          rows={actividades}
+          editable
+          editingIndex={editingIndex}
+          ocupado={ocupado}
+          config={config}
+          onActualizar={actualizar}
+          onEditar={setEditingIndex}
+          onGuardar={() => setEditingIndex(null)}
+          onQuitar={(index) => {
+            setActividades((actual) => actual.filter((_, i) => i !== index));
+            setEditingIndex(null);
+          }}
+        />
       </div>
       <button
         className="btn btn-sm btn-secondary"
@@ -553,6 +696,154 @@ function TotalesPresupuesto({
           </tr>
         </tfoot>
       </table>
+    </div>
+  );
+}
+
+function PresupuestoCards({
+  filas,
+  editable,
+  ocupado,
+  editingIndex,
+  config,
+  onEditar,
+  onGuardar,
+  onQuitar,
+  onActualizar,
+}: {
+  filas: ItemPresupuesto[];
+  editable: boolean;
+  ocupado: boolean;
+  editingIndex: number | null;
+  config: ConfigPresupuesto;
+  onEditar: (index: number) => void;
+  onGuardar: () => void;
+  onQuitar: (index: number) => void;
+  onActualizar: (index: number, patch: Partial<ItemPresupuesto>) => void;
+}) {
+  return (
+    <div className="presupuesto-cards">
+      {filas.length === 0 ? (
+        <p className="gantt-card-empty">
+          {editable ? "Aún no hay ítems. Usa Agregar ítem para crear la primera fila." : "Sin ítems"}
+        </p>
+      ) : null}
+      {filas.map((item, index) => {
+        const editing = editable && editingIndex === index;
+        const tope =
+          editing && item.cuenta ? topeItemCuenta(filas, index, item.cuenta, config) : null;
+        const maxCuenta = item.cuenta ? config.limitesCuentas?.[item.cuenta]?.montoMax : null;
+        const sobreTope = tope != null && item.monto != null && item.monto > tope;
+        return (
+          <article key={index} className={`gantt-card${editing ? " is-editing" : ""}`}>
+            {editing ? (
+              <div className="gantt-edit-stack">
+                <input
+                  className="input gantt-input"
+                  placeholder={`Ítem ${index + 1}`}
+                  aria-label={`Nombre ítem ${index + 1}`}
+                  value={item.nombre}
+                  onChange={(event) => onActualizar(index, { nombre: event.target.value })}
+                />
+                <select
+                  className="input gantt-input"
+                  aria-label={`Cuenta ítem ${index + 1}`}
+                  value={item.cuenta}
+                  onChange={(event) =>
+                    onActualizar(index, {
+                      cuenta: event.target.value as ItemPresupuesto["cuenta"],
+                    })
+                  }
+                >
+                  <option value="">Selecciona</option>
+                  {CUENTAS_PRESUPUESTO.map((cuenta) => (
+                    <option key={cuenta.id} value={cuenta.id}>
+                      {cuenta.label}
+                    </option>
+                  ))}
+                </select>
+                <textarea
+                  className="input gantt-input gantt-textarea"
+                  rows={3}
+                  placeholder="Descripción"
+                  aria-label={`Descripción ítem ${index + 1}`}
+                  value={item.descripcion}
+                  onChange={(event) =>
+                    onActualizar(index, { descripcion: event.target.value })
+                  }
+                />
+                <div
+                  className={
+                    sobreTope ? "presupuesto-monto-input is-invalid" : "presupuesto-monto-input"
+                  }
+                >
+                  <span className="presupuesto-monto-prefix" aria-hidden>
+                    $
+                  </span>
+                  <input
+                    className="input gantt-input"
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="numeric"
+                    placeholder="0"
+                    aria-invalid={sobreTope}
+                    aria-label={`Monto ítem ${index + 1}`}
+                    value={item.monto ?? ""}
+                    onChange={(event) => {
+                      const raw = event.target.value;
+                      const monto = raw === "" ? null : Math.round(Number(raw));
+                      onActualizar(index, {
+                        monto: Number.isFinite(monto as number) ? monto : null,
+                      });
+                    }}
+                  />
+                </div>
+                {sobreTope && maxCuenta != null ? (
+                  <p className="presupuesto-monto-hint is-error" role="alert">
+                    Este monto supera el máximo de {etiquetaCuenta(item.cuenta)} (
+                    {formatearPesosCLP(maxCuenta)}). En este ítem el tope es{" "}
+                    {formatearPesosCLP(tope)}.
+                  </p>
+                ) : tope != null && maxCuenta != null ? (
+                  <p className="presupuesto-monto-hint">
+                    Tope de la cuenta: {formatearPesosCLP(maxCuenta)}. En este ítem puedes
+                    poner hasta {formatearPesosCLP(tope)}.
+                  </p>
+                ) : null}
+                <div className="gantt-edit-buttons">
+                  <button className="btn btn-sm btn-navy" type="button" onClick={onGuardar}>
+                    Guardar
+                  </button>
+                  <button className="btn btn-sm btn-ghost" type="button" onClick={() => onQuitar(index)}>
+                    Quitar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="gantt-nombre-row">
+                  {editable ? (
+                    <button
+                      className="gantt-icon-btn"
+                      type="button"
+                      disabled={ocupado}
+                      aria-label={`Editar ${item.nombre || `ítem ${index + 1}`}`}
+                      onClick={() => onEditar(index)}
+                    >
+                      <IconoLapiz />
+                    </button>
+                  ) : null}
+                  <p className="gantt-nombre-text">{item.nombre || `Ítem ${index + 1}`}</p>
+                </div>
+                <p className="gantt-card-fechas">{etiquetaCuenta(item.cuenta)}</p>
+                <p className="gantt-desc-text">{item.descripcion || "—"}</p>
+                <p className="presupuesto-monto-text">{formatearPesosCLP(item.monto)}</p>
+              </>
+            )}
+          </article>
+        );
+      })}
     </div>
   );
 }
@@ -749,6 +1040,17 @@ function TablaPresupuesto({
           </tbody>
         </table>
       </div>
+      <PresupuestoCards
+        filas={filas}
+        editable={editable}
+        ocupado={ocupado}
+        editingIndex={editingIndex}
+        config={config}
+        onEditar={onEditar}
+        onGuardar={onGuardar}
+        onQuitar={onQuitar}
+        onActualizar={onActualizar}
+      />
       {errorLimite ? <p className="presupuesto-error">{errorLimite}</p> : null}
       <TotalesPresupuesto items={filas} config={config} />
     </div>

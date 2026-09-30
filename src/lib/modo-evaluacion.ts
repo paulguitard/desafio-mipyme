@@ -20,3 +20,21 @@ export function parseModoEvaluacion(value: unknown): ModoEvaluacion {
   const raw = String(value ?? "").trim();
   return esModoEvaluacion(raw) ? raw : "POR_PREGUNTA";
 }
+
+export function modoEvaluacionAlCrear(
+  value: unknown,
+  permitirPorPregunta: boolean,
+): ModoEvaluacion {
+  if (!permitirPorPregunta) return "GENERAL";
+  return parseModoEvaluacion(value);
+}
+
+export function puedeAsignarModoEvaluacion(
+  modo: ModoEvaluacion,
+  permitirPorPregunta: boolean,
+  modoActual?: string | null,
+): boolean {
+  if (modo !== "POR_PREGUNTA") return true;
+  if (permitirPorPregunta) return true;
+  return modoActual === "POR_PREGUNTA";
+}

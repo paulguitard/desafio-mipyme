@@ -24,6 +24,7 @@ export function ConfirmacionEnvio({
     <Modal
       open={open}
       compact
+      sinCerrar
       title={title}
       onClose={() => {
         if (!confirming) onCancel();

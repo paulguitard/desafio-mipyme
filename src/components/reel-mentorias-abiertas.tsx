@@ -90,7 +90,8 @@ function AccionPostular({
   if (item.yaTieneCaso) {
     control = (
       <button className="btn btn-postular-bloqueado" type="button" disabled>
-        Ya tienes un caso en esta mentoría
+        <span className="reel-postular-texto-largo">Ya tienes un caso en esta mentoría</span>
+        <span className="reel-postular-texto-corto">Ya tienes un caso</span>
       </button>
     );
   } else if (!enfocada) {
@@ -176,7 +177,7 @@ function TarjetaMentoria({
         <AccionPostular item={item} enfocada={enfocada} />
         <div className="reel-mentoria-meta">
           {item.cierre ? (
-            <p className="flex items-center justify-end gap-2 text-sm text-muted">
+            <p className="reel-mentoria-cierre flex items-center justify-end gap-2 text-sm text-muted">
               <span className="inline-flex text-navy">
                 <IconoCalendario />
               </span>
@@ -184,7 +185,7 @@ function TarjetaMentoria({
             </p>
           ) : null}
           {item.restantes ? (
-            <p className="inline-flex items-center gap-2 rounded-full bg-navy-soft px-3 py-1 text-sm font-bold text-navy">
+            <p className="reel-mentoria-restantes inline-flex items-center gap-2 rounded-full bg-navy-soft px-3 py-1 text-sm font-bold text-navy">
               <span className="inline-flex">
                 <IconoReloj />
               </span>
@@ -244,9 +245,7 @@ function ModalDetalleMentoria({
             ) : null}
             {item.yaTieneCaso ? (
               <p className="mentoria-detalle-chip is-estado">Ya tienes un caso en esta mentoría</p>
-            ) : (
-              <p className="mentoria-detalle-chip is-estado">Puedes participar en esta mentoría</p>
-            )}
+            ) : null}
           </div>
           <div className="mentoria-detalle-cuerpo">
             <h3 className="mentoria-detalle-subtitulo">Descripción</h3>

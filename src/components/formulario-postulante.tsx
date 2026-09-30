@@ -1,9 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { enviarPostulacion, guardarBorrador } from "@/actions/postulaciones";
+import { AvisoEntradaCaso } from "@/components/aviso-entrada-caso";
 import { ConfirmacionEnvio } from "@/components/confirmacion-envio";
+import { EnvioExitoso } from "@/components/envio-exitoso";
 import { IndicadorGuardando } from "@/components/indicador-guardando";
+import type { AvisoEntradaCaso as AvisoEntradaCasoDatos } from "@/lib/aviso-entrada-caso";
 import {
   MAX_FILE_BYTES,
   MAX_IMAGE_INPUT_BYTES,
@@ -39,6 +43,7 @@ export function FormularioPostulante({
   back,
   title,
   meta,
+  avisoEntrada = null,
   children,
 }: {
   postulacionId: string;
@@ -48,22 +53,31 @@ export function FormularioPostulante({
   back: React.ReactNode;
   title: React.ReactNode;
   meta?: React.ReactNode;
+  avisoEntrada?: AvisoEntradaCasoDatos | null;
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const conPaneles = layout === "paneles";
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendienteEnvio, setPendienteEnvio] = useState<FormData | null>(null);
+  const [exito, setExito] = useState<{ title: string; detalle: string } | null>(null);
   const [bloqueado, setBloqueado] = useState(false);
   const accion = useAccionOptimista();
   const savingRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
+  const camposVisibles = useRef(children);
+  const conservarCampos = bloqueado || exito !== null;
+  if (!conservarCampos) camposVisibles.current = children;
+
+  function datosDelFormulario() {
+    return formRef.current ? new FormData(formRef.current) : null;
+  }
 
   function conGuardado(
     formData: FormData,
     persistir: (formData: FormData) => Promise<{ error?: string } | { ok?: boolean } | void>,
     mensajeOk: string,
-    opciones?: { bloquear?: boolean },
   ) {
     if (savingRef.current) return;
     const adjuntoError = validarAdjuntosCliente(formData);
@@ -74,7 +88,6 @@ export function FormularioPostulante({
     savingRef.current = true;
     setError(null);
     setMensaje(mensajeOk);
-    if (opciones?.bloquear) setBloqueado(true);
     void accion.ejecutar(() => persistir(formData), {
       onOk: () => {
         limpiarInputsArchivo(formRef.current);
@@ -84,7 +97,6 @@ export function FormularioPostulante({
         savingRef.current = false;
         setMensaje(null);
         setError(mensajeError);
-        if (opciones?.bloquear) setBloqueado(false);
       },
     });
   }
@@ -93,21 +105,52 @@ export function FormularioPostulante({
     if (!pendienteEnvio) return;
     const data = pendienteEnvio;
     setPendienteEnvio(null);
-    conGuardado(
-      data,
-      enviarPostulacion,
-      esCorreccion ? "Correcciones enviadas." : "Caso enviado.",
-      { bloquear: true },
-    );
+    if (savingRef.current) return;
+    const adjuntoError = validarAdjuntosCliente(data);
+    if (adjuntoError) {
+      setError(adjuntoError);
+      return;
+    }
+    savingRef.current = true;
+    setError(null);
+    setMensaje(null);
+    setBloqueado(true);
+    void accion.ejecutar(() => enviarPostulacion(data), {
+      onOk: () => {
+        savingRef.current = false;
+        setExito(
+          esCorreccion
+            ? {
+                title: "Correcciones enviadas",
+                detalle: "Las correcciones se enviaron al evaluador.",
+              }
+            : {
+                title: "Caso enviado",
+                detalle: "El caso se envió al evaluador.",
+              },
+        );
+      },
+      onError: (mensajeError) => {
+        savingRef.current = false;
+        setError(mensajeError);
+        setBloqueado(false);
+      },
+    });
   }
 
   return (
     <form
       ref={formRef}
+      onSubmit={(event) => event.preventDefault()}
       className={
-        conPaneles
-          ? "page-workspace mx-auto grid h-full min-h-0 w-full max-w-7xl overflow-hidden"
-          : "page-workspace mx-auto grid h-full min-h-0 w-full max-w-4xl grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden"
+        [
+          conPaneles
+            ? "page-workspace is-formulario-caso mx-auto grid h-full min-h-0 w-full max-w-7xl grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden"
+            : "page-workspace is-formulario-caso mx-auto grid h-full min-h-0 w-full max-w-4xl grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden",
+          canEdit && !bloqueado ? "has-acciones-caso" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
       }
       aria-busy={accion.guardando}
     >
@@ -118,12 +161,14 @@ export function FormularioPostulante({
             <div className="min-w-0 flex-1">{title}</div>
           </div>
           {canEdit && !bloqueado ? (
-            <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            <div className="formulario-caso-acciones flex shrink-0 flex-wrap justify-end gap-2">
               <button
                 className="btn btn-sm btn-secondary"
                 data-tour="guardar-borrador"
-                type="submit"
-                formAction={(formData) => {
+                type="button"
+                onClick={() => {
+                  const formData = datosDelFormulario();
+                  if (!formData) return;
                   conGuardado(formData, guardarBorrador, "Borrador guardado.");
                 }}
               >
@@ -132,9 +177,11 @@ export function FormularioPostulante({
               <button
                 className="btn btn-sm btn-primary"
                 data-tour="enviar-caso"
-                type="submit"
-                formAction={(formData) => {
+                type="button"
+                onClick={() => {
                   if (savingRef.current) return;
+                  const formData = datosDelFormulario();
+                  if (!formData) return;
                   setPendienteEnvio(formData);
                 }}
               >
@@ -157,19 +204,19 @@ export function FormularioPostulante({
         data-tour={conPaneles ? undefined : "formulario-caso"}
       >
         <div
-          className={
-            bloqueado
-              ? "pointer-events-none h-full min-h-0 opacity-70"
-              : conPaneles
-                ? "h-full min-h-0"
-                : undefined
-          }
+          className={[
+            bloqueado && !exito ? "pointer-events-none opacity-70" : "",
+            conPaneles ? "h-full min-h-0" : "flex flex-col gap-6",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
           <input type="hidden" name="postulacionId" value={postulacionId} />
-          {children}
+          {conservarCampos ? camposVisibles.current : children}
         </div>
       </div>
 
+      <AvisoEntradaCaso aviso={avisoEntrada} />
       <ConfirmacionEnvio
         open={pendienteEnvio !== null}
         title={esCorreccion ? "¿Enviar correcciones?" : "¿Enviar caso?"}
@@ -190,6 +237,12 @@ export function FormularioPostulante({
           </>
         )}
       </ConfirmacionEnvio>
+      <EnvioExitoso
+        open={exito !== null}
+        title={exito?.title ?? ""}
+        detalle={exito?.detalle}
+        onAceptar={() => router.push("/participante")}
+      />
     </form>
   );
 }

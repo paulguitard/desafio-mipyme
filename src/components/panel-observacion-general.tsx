@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { NotaPreguntaGeneral, PeldanoEscala } from "@/lib/preguntas";
 import { ordenHistorialRevision, textoEsperaRevision } from "@/lib/revision-ciclo";
+import { textoContinuo } from "@/lib/texto-continuo";
 
 type ItemHistorial = {
   id: string;
@@ -31,14 +32,14 @@ function ContenidoRevisionGeneralLectura({
 }) {
   if (item.veredicto === "OBSERVACION") {
     return (
-      <div className="historial-feed-valor space-y-1">
-        {item.comentario ? <p>{item.comentario}</p> : null}
+      <div className="historial-feed-valor space-y-1 texto-solo-lectura">
+        {item.comentario ? <p>{textoContinuo(item.comentario)}</p> : null}
       </div>
     );
   }
 
   return (
-    <div className="historial-feed-valor space-y-1">
+    <div className="historial-feed-valor space-y-1 texto-solo-lectura">
       <p>{item.veredicto === "OK" ? "Sin observaciones" : textoEsperaRevision(tipo, nombreResponsable)}</p>
     </div>
   );
@@ -108,8 +109,15 @@ function SelectoresNotasGenerales({
 
 export function PanelSupervisionPendiente() {
   return (
-    <div className="card space-y-2 p-4">
-      <p className="text-muted">Sin supervisión por el momento → a la espera de la evaluación</p>
+    <div className="card pregunta-lectura">
+      <div className="pregunta-lectura-enunciado">
+        <h3 className="text-xl font-semibold">Supervisión</h3>
+      </div>
+      <div className="pregunta-lectura-cuerpo">
+        <p className="texto-solo-lectura is-vacio">
+          Sin supervisión por el momento → a la espera de la evaluación
+        </p>
+      </div>
     </div>
   );
 }
@@ -158,7 +166,7 @@ export function PanelObservacionGeneral({
   }
 
   return (
-    <div className="card space-y-3 p-4">
+    <div className="revision-panel">
       {canEdit ? (
         <>
           <input type="hidden" name={campoVeredicto} value={veredicto} />
@@ -168,44 +176,48 @@ export function PanelObservacionGeneral({
         </>
       ) : null}
 
-      {!esSupervision ? (
-        <SelectoresNotasGenerales notas={notasPreguntas} canEdit={canEdit} namePrefix={namePrefix} />
-      ) : null}
-
       <ol className="historial-feed">
         {items.map((item, index) => {
           const esActual = esItemActual(item);
           const editable = canEdit && esActual;
 
           return (
-            <li key={item.id} className="historial-feed-item">
+            <li key={item.id} className={`historial-feed-item${editable ? " is-edicion" : ""}`}>
               <div className="historial-feed-rail" aria-hidden="true">
                 <span className="historial-feed-dot" />
                 {index < items.length - 1 ? <span className="historial-feed-line" /> : null}
               </div>
-              <div className="historial-feed-card">
-                <div className="historial-feed-meta">
-                  <strong>
-                    {item.etiqueta
-                      ? item.etiqueta
-                      : editable
-                        ? esSupervision
-                          ? `Tu supervisión (ciclo ${item.ronda})`
-                          : `Tu evaluación (ronda ${item.ronda}${item.ciclo != null ? ` · ciclo ${item.ciclo}` : ""})`
-                        : esSupervision
-                          ? `Supervisión (ciclo ${item.ronda})`
-                          : `Evaluación (ronda ${item.ronda}${item.ciclo != null ? ` · ciclo ${item.ciclo}` : ""})`}
-                  </strong>
-                  {index === 0 ? <span className="historial-feed-badge">Más reciente</span> : null}
+              <div className={`historial-feed-card ${editable ? "pregunta-edicion" : "pregunta-lectura"}`}>
+                <div className={editable ? "pregunta-edicion-enunciado" : "pregunta-lectura-enunciado"}>
+                  <div className="historial-feed-meta">
+                    <strong>
+                      {item.etiqueta
+                        ? item.etiqueta
+                        : editable
+                          ? esSupervision
+                            ? `Tu supervisión (ciclo ${item.ronda})`
+                            : `Tu evaluación (ronda ${item.ronda}${item.ciclo != null ? ` · ciclo ${item.ciclo}` : ""})`
+                          : esSupervision
+                            ? `Supervisión (ciclo ${item.ronda})`
+                            : `Evaluación (ronda ${item.ronda}${item.ciclo != null ? ` · ciclo ${item.ciclo}` : ""})`}
+                    </strong>
+                    {index === 0 ? <span className="historial-feed-badge">Más reciente</span> : null}
+                  </div>
+                  {item.createdAt ? (
+                    <time className="historial-feed-date" dateTime={item.createdAt}>
+                      {new Date(item.createdAt).toLocaleString("es-CL")}
+                    </time>
+                  ) : null}
                 </div>
-                {item.createdAt ? (
-                  <time className="historial-feed-date" dateTime={item.createdAt}>
-                    {new Date(item.createdAt).toLocaleString("es-CL")}
-                  </time>
-                ) : null}
-
                 {editable ? (
-                  <div className="mt-3 space-y-3">
+                  <div className="pregunta-edicion-cuerpo space-y-3">
+                    {!esSupervision ? (
+                      <SelectoresNotasGenerales
+                        notas={notasPreguntas}
+                        canEdit={canEdit}
+                        namePrefix={namePrefix}
+                      />
+                    ) : null}
                     <div className="flex flex-wrap gap-2">
                       <button
                         className={`btn btn-sm ${veredicto === "OBSERVACION" ? "btn-primary" : "btn-secondary"}`}
@@ -236,11 +248,20 @@ export function PanelObservacionGeneral({
                     ) : null}
                   </div>
                 ) : (
-                  <ContenidoRevisionGeneralLectura
-                    item={item}
-                    tipo={tipo}
-                    nombreResponsable={nombreResponsable}
-                  />
+                  <div className="pregunta-lectura-cuerpo">
+                    {esActual && !esSupervision ? (
+                      <SelectoresNotasGenerales
+                        notas={notasPreguntas}
+                        canEdit={false}
+                        namePrefix={namePrefix}
+                      />
+                    ) : null}
+                    <ContenidoRevisionGeneralLectura
+                      item={item}
+                      tipo={tipo}
+                      nombreResponsable={nombreResponsable}
+                    />
+                  </div>
                 )}
               </div>
             </li>

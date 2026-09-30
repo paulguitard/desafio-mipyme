@@ -72,6 +72,13 @@ model ConfigCorreoRecuperacion {
   updatedAt       DateTime @updatedAt
 }
 
+/// Singleton de ajustes de la app (id fijo "default").
+model ConfigApp {
+  id                              String   @id @default("default")
+  permitirEvaluacionPorPregunta   Boolean  @default(false)
+  updatedAt                       DateTime @updatedAt
+}
+
 /// Plantilla de texto de un aviso de novedad del caso (colores e imagen se toman de recuperación).
 model ConfigCorreoNotificacion {
   id         String   @id
@@ -87,7 +94,7 @@ model Formulario {
   id             String   @id @default(cuid())
   titulo         String
   descripcion    String   @default("")
-  modoEvaluacion String   @default("POR_PREGUNTA") // POR_PREGUNTA | GENERAL
+  modoEvaluacion String   @default("GENERAL") // POR_PREGUNTA | GENERAL
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   creadoPorId    String

@@ -1,15 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { enviarObservaciones, finalizarEvaluacion, guardarRevision } from "@/actions/evaluaciones";
 import {
   enviarObservacionesSupervision,
   guardarSupervision,
   procederSupervision,
 } from "@/actions/supervisiones";
+import { AvisoEntradaCaso } from "@/components/aviso-entrada-caso";
 import { ConfirmacionEnvio } from "@/components/confirmacion-envio";
+import { EnvioExitoso } from "@/components/envio-exitoso";
 import { IndicadorGuardando } from "@/components/indicador-guardando";
 import { EvalDetalleColumnas } from "@/components/eval-detalle-head";
+import type { AvisoEntradaCaso as AvisoEntradaCasoDatos } from "@/lib/aviso-entrada-caso";
 import { useAccionOptimista } from "@/lib/use-dato-optimista";
 import type { IntencionSupervision } from "@/lib/estado";
 import type { ModoEvaluacion } from "@/lib/modo-evaluacion";
@@ -39,6 +43,7 @@ export function FormularioEvaluacion({
   supervision,
   headerEvaluacion,
   headerSupervision,
+  avisoEntrada = null,
 }: {
   asignacionId: string;
   canEdit: boolean;
@@ -53,18 +58,31 @@ export function FormularioEvaluacion({
   supervision: React.ReactNode;
   headerEvaluacion?: string;
   headerSupervision?: string;
+  avisoEntrada?: AvisoEntradaCasoDatos | null;
 }) {
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendienteEnvio, setPendienteEnvio] = useState<PendienteEnvio | null>(null);
+  const [exito, setExito] = useState<{ title: string; detalle: string } | null>(null);
   const [bloqueado, setBloqueado] = useState(false);
   const accion = useAccionOptimista();
   const esGeneral = modoEvaluacion === "GENERAL";
   const esSupervisor = rolAccion === "supervisor";
   const mostrarAcciones = canEdit && rolAccion !== "lectura" && !bloqueado;
   const finalizaAlProceder = intencionPendiente === "FINALIZAR";
+  const conservarCampos = bloqueado || exito !== null;
+  const camposVisibles = useRef({ caso, evaluacion, supervision });
+  if (!conservarCampos) camposVisibles.current = { caso, evaluacion, supervision };
 
-  function abrirConfirmacion(formData: FormData, tipo: AccionEnvio) {
+  function datosDelFormulario() {
+    return formRef.current ? new FormData(formRef.current) : null;
+  }
+
+  function abrirConfirmacion(tipo: AccionEnvio) {
+    const formData = datosDelFormulario();
+    if (!formData) return;
     setPendienteEnvio({ formData, accion: tipo });
   }
 
@@ -73,26 +91,46 @@ export function FormularioEvaluacion({
     const { formData, accion: tipo } = pendienteEnvio;
     setPendienteEnvio(null);
     setError(null);
+    setMensaje(null);
     let persistir: (data: FormData) => Promise<{ error?: string } | { ok: boolean } | void>;
-    let mensajeOk = "";
+    let exitoEnvio: { title: string; detalle: string };
     if (tipo === "enviar-observaciones-supervisor") {
       persistir = enviarObservaciones;
-      mensajeOk = "Observaciones enviadas al supervisor.";
+      exitoEnvio = {
+        title: "Enviado al supervisor",
+        detalle: "Las observaciones se enviaron al supervisor.",
+      };
     } else if (tipo === "finalizar-evaluacion") {
       persistir = finalizarEvaluacion;
-      mensajeOk = "Finalización enviada al supervisor.";
+      exitoEnvio = {
+        title: "Finalización enviada",
+        detalle: "La finalización se envió al supervisor.",
+      };
     } else if (tipo === "enviar-observaciones-evaluador") {
       persistir = enviarObservacionesSupervision;
-      mensajeOk = "Observaciones enviadas al evaluador.";
+      exitoEnvio = {
+        title: "Observaciones enviadas al evaluador",
+        detalle: "Las observaciones se enviaron al evaluador.",
+      };
+    } else if (finalizaAlProceder) {
+      persistir = procederSupervision;
+      exitoEnvio = {
+        title: "Evaluación finalizada",
+        detalle: "La evaluación quedó cerrada.",
+      };
     } else {
       persistir = procederSupervision;
-      mensajeOk = "Supervisión procedida.";
+      exitoEnvio = {
+        title: "Observaciones enviadas",
+        detalle: "Las observaciones se enviaron al participante.",
+      };
     }
-    setMensaje(mensajeOk);
     setBloqueado(true);
     void accion.ejecutar(() => persistir(formData), {
+      onOk: () => {
+        setExito(exitoEnvio);
+      },
       onError: (mensajeError) => {
-        setMensaje(null);
         setError(mensajeError);
         setBloqueado(false);
       },
@@ -103,7 +141,9 @@ export function FormularioEvaluacion({
     persistir: (data: FormData) => Promise<{ error?: string } | { ok: boolean } | void>,
     mensajeOk: string,
   ) {
-    return (formData: FormData) => {
+    return () => {
+      const formData = datosDelFormulario();
+      if (!formData) return;
       setError(null);
       setMensaje(mensajeOk);
       void accion.ejecutar(() => persistir(formData), {
@@ -192,7 +232,13 @@ export function FormularioEvaluacion({
   })();
 
   return (
-    <form className="page-workspace grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden">
+    <form
+      ref={formRef}
+      onSubmit={(event) => event.preventDefault()}
+      className={`page-workspace is-formulario-caso grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden${
+        mostrarAcciones ? " has-acciones-caso" : ""
+      }`}
+    >
       <div className="shrink-0 space-y-3 bg-background">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -200,34 +246,30 @@ export function FormularioEvaluacion({
             <div className="min-w-0 flex-1">{title}</div>
           </div>
           {mostrarAcciones ? (
-            <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            <div className="formulario-caso-acciones flex shrink-0 flex-nowrap justify-end gap-2">
               {esSupervisor ? (
                 <>
                   <button
                     className="btn btn-sm btn-secondary"
                     data-tour="guardar-revision"
-                    type="submit"
-                    formAction={guardarRevisionActual(guardarSupervision, "Supervisión guardada.")}
+                    type="button"
+                    onClick={guardarRevisionActual(guardarSupervision, "Supervisión guardada.")}
                   >
                     Guardar revisión
                   </button>
                   <button
                     className="btn btn-sm btn-gold"
                     data-tour="enviar-observaciones"
-                    type="submit"
-                    formAction={(formData) => {
-                      abrirConfirmacion(formData, "enviar-observaciones-evaluador");
-                    }}
+                    type="button"
+                    onClick={() => abrirConfirmacion("enviar-observaciones-evaluador")}
                   >
                     Enviar observaciones
                   </button>
                   <button
                     className="btn btn-sm btn-primary"
                     data-tour="proceder"
-                    type="submit"
-                    formAction={(formData) => {
-                      abrirConfirmacion(formData, "proceder");
-                    }}
+                    type="button"
+                    onClick={() => abrirConfirmacion("proceder")}
                   >
                     Proceder
                   </button>
@@ -237,27 +279,24 @@ export function FormularioEvaluacion({
                   <button
                     className="btn btn-sm btn-secondary"
                     data-tour="guardar-revision"
-                    type="submit"
-                    formAction={guardarRevisionActual(guardarRevision, "Revisión guardada.")}
+                    type="button"
+                    onClick={guardarRevisionActual(guardarRevision, "Revisión guardada.")}
                   >
                     Guardar revisión
                   </button>
                   <button
                     className="btn btn-sm btn-gold"
                     data-tour="enviar-supervisor"
-                    type="submit"
-                    formAction={(formData) => {
-                      abrirConfirmacion(formData, "enviar-observaciones-supervisor");
-                    }}
+                    type="button"
+                    onClick={() => abrirConfirmacion("enviar-observaciones-supervisor")}
                   >
                     Enviar a supervisor
                   </button>
                   <button
                     className="btn btn-sm btn-primary"
-                    type="submit"
-                    formAction={(formData) => {
-                      abrirConfirmacion(formData, "finalizar-evaluacion");
-                    }}
+                    data-tour="finalizar-evaluacion"
+                    type="button"
+                    onClick={() => abrirConfirmacion("finalizar-evaluacion")}
                   >
                     Finalizar evaluación
                   </button>
@@ -272,18 +311,18 @@ export function FormularioEvaluacion({
         <IndicadorGuardando visible={accion.guardando} />
       </div>
 
-      <section className="eval-detalle-shell" aria-label="Caso, evaluación y supervisión">
+      <section className="eval-detalle-shell h-full min-h-0" aria-label="Caso, evaluación y supervisión">
         <input type="hidden" name="asignacionId" value={asignacionId} />
         <EvalDetalleColumnas
-          bloqueado={bloqueado}
+          bloqueado={bloqueado && !exito}
           casoTitle="Caso"
           casoSubtitle="Respuestas del participante"
-          caso={caso}
+          caso={conservarCampos ? camposVisibles.current.caso : caso}
           evalTitle="Evaluación"
           evalSubtitle={
             headerEvaluacion ?? (esGeneral ? "Revisión de la respuesta" : "Revisión por pregunta")
           }
-          evaluacion={evaluacion}
+          evaluacion={conservarCampos ? camposVisibles.current.evaluacion : evaluacion}
           supTitle="Supervisión"
           supSubtitle={
             headerSupervision ??
@@ -291,10 +330,11 @@ export function FormularioEvaluacion({
               ? "Revisión general de la evaluación"
               : "Revisión de la evaluación por pregunta")
           }
-          supervision={supervision}
+          supervision={conservarCampos ? camposVisibles.current.supervision : supervision}
         />
       </section>
 
+      <AvisoEntradaCaso aviso={avisoEntrada} />
       {modalConfirmacion ? (
         <ConfirmacionEnvio
           open
@@ -307,6 +347,12 @@ export function FormularioEvaluacion({
           {modalConfirmacion.body}
         </ConfirmacionEnvio>
       ) : null}
+      <EnvioExitoso
+        open={exito !== null}
+        title={exito?.title ?? ""}
+        detalle={exito?.detalle}
+        onAceptar={() => router.push("/evaluador")}
+      />
     </form>
   );
 }

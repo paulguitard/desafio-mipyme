@@ -1,8 +1,14 @@
 import "@/lib/env";
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
-import { authConfig, deniedUrl } from "@/auth.config";
-import { esRolCatalogoEvaluador, loginPathForRole, normalizeRole, type Role } from "@/lib/roles";
+import { authConfig } from "@/auth.config";
+import {
+  esRolCatalogoEvaluador,
+  homeForRole,
+  loginPathForRole,
+  normalizeRole,
+  type Role,
+} from "@/lib/roles";
 
 const { auth } = NextAuth(authConfig);
 
@@ -29,7 +35,7 @@ export default auth((req) => {
         ? esRolCatalogoEvaluador(role)
         : role === guard.expected;
     if (!coincide) {
-      return NextResponse.redirect(new URL(deniedUrl(guard.expected), req.nextUrl.origin));
+      return NextResponse.redirect(new URL(homeForRole(role), req.nextUrl.origin));
     }
   }
 

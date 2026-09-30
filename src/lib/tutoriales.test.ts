@@ -30,11 +30,32 @@ describe("resolverTutorial", () => {
   it("resuelve rutas dinámicas", () => {
     expect(
       resolverTutorial("EMPRENDEDOR", "/participante/postulaciones/abc").map((p) => p.ancla),
-    ).toContain("enviar-caso");
-    expect(resolverTutorial("EVALUADOR", "/evaluador/evaluaciones/xyz").map((p) => p.ancla)).toContain(
+    ).toEqual(["volver", "formulario-caso", "pestaña-evaluacion", "observacion-pregunta", "guardar-borrador", "enviar-caso"]);
+    expect(resolverTutorial("EVALUADOR", "/evaluador/evaluaciones/xyz").map((p) => p.ancla)).toEqual([
+      "volver",
+      "nav",
+      "pestaña-caso",
+      "ficha-caso",
+      "historial-versiones",
+      "pestaña-evaluacion",
+      "observacion-pregunta",
+      "pestaña-supervision",
+      "guardar-revision",
       "enviar-supervisor",
-    );
-    expect(resolverTutorial("SUPERVISOR", "/evaluador/supervision/xyz").map((p) => p.ancla)).toContain("proceder");
+      "finalizar-evaluacion",
+    ]);
+    expect(resolverTutorial("SUPERVISOR", "/evaluador/supervision/xyz").map((p) => p.ancla)).toEqual([
+      "volver",
+      "nav",
+      "pestaña-caso",
+      "ficha-caso",
+      "historial-versiones",
+      "pestaña-evaluacion",
+      "pestaña-supervision",
+      "guardar-revision",
+      "enviar-observaciones",
+      "proceder",
+    ]);
     expect(resolverTutorial("ADMIN", "/admin/formularios/nuevo").map((p) => p.ancla)).toContain("formulario-agregar");
     expect(resolverTutorial("ADMIN", "/admin/formularios/form-1").map((p) => p.ancla)).toContain("formulario-titulo");
     expect(resolverTutorial("ADMIN", "/admin/mentorias/m-1").map((p) => p.ancla)).toContain("pool-evaluadores");

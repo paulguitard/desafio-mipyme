@@ -3,8 +3,13 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { normalizarCorreo } from "@/lib/correo";
 import type { Role } from "@/lib/roles";
-import { esRolCatalogoEvaluador, loginPathForRole, normalizeRole } from "@/lib/roles";
-import { deniedUrl } from "@/auth.config";
+import {
+  esRolCatalogoEvaluador,
+  homeForRole,
+  loginPathForRole,
+  normalizeRole,
+  rolCoincideConIngreso,
+} from "@/lib/roles";
 
 type SessionUser = {
   id: string;
@@ -34,8 +39,8 @@ export async function requireUser(expected: Role) {
   if (!user) {
     redirect(loginPathForRole(expected));
   }
-  if (user.role !== expected) {
-    redirect(deniedUrl(expected));
+  if (!rolCoincideConIngreso(user.role, expected)) {
+    redirect(homeForRole(user.role));
   }
   return user;
 }
@@ -47,7 +52,7 @@ export async function requireCatalogoEvaluador() {
     redirect(loginPathForRole("EVALUADOR"));
   }
   if (!esRolCatalogoEvaluador(user.role)) {
-    redirect(deniedUrl("EVALUADOR"));
+    redirect(homeForRole(user.role));
   }
   return user;
 }

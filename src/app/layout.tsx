@@ -1,5 +1,5 @@
 import { Montserrat, Nunito_Sans } from "next/font/google";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { getAppBaseUrl } from "@/lib/app-url";
 import "./globals.css";
 
@@ -19,6 +19,11 @@ const APP_NAME = "Desafío MiPyme";
 const APP_TITLE = "Desafío MiPyme | Portal de Mentorías";
 const APP_DESCRIPTION =
   "Portal de mentorías del Desafío Nacional MiPyme AIEP";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(getAppBaseUrl()),

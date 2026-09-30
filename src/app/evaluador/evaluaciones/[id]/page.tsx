@@ -7,6 +7,7 @@ import { PanelObservacionGeneral, PanelSupervisionPendiente } from "@/components
 import { PreguntaCampo } from "@/components/pregunta-campo";
 import { prisma } from "@/lib/db";
 import { evaluadorPuedeEditar } from "@/lib/estado";
+import { avisoEntradaEvaluador } from "@/lib/aviso-entrada-caso";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { etiquetaNombreCaso, extraerNombreCaso } from "@/lib/nombre-caso";
 import { notasParaEvaluacionGeneral, parseEscalaNotas } from "@/lib/preguntas";
@@ -71,7 +72,7 @@ export default async function EvaluacionDetallePage({
       modoEvaluacion={modoEvaluacion}
       back={<BotonAtras href="/evaluador" />}
       title={
-        <h1 className="text-3xl font-extrabold text-navy">
+        <h1 className="formulario-caso-titulo text-3xl font-extrabold text-navy">
           {nombreCaso} · {asignacion.postulacion.convocatoria.titulo}
         </h1>
       }
@@ -81,21 +82,15 @@ export default async function EvaluacionDetallePage({
           ? `Revisión de ${asignacion.postulacion.supervision.supervisor.name}`
           : "Sin supervisor asignado"
       }
+      avisoEntrada={avisoEntradaEvaluador(asignacion.estado)}
       meta={
-        <div className="space-y-2">
-          <p className="text-muted">Participante: {asignacion.postulacion.postulante.name}</p>
-          {asignacion.estado === "EN_SUPERVISION" ? (
-            <p>Esperando que el supervisor revise esta evaluación.</p>
-          ) : null}
-          {asignacion.estado === "DEVUELTA_SUPERVISOR" ? (
-            <p>El supervisor devolvió esta evaluación. Revisa sus observaciones y vuelve a enviar.</p>
-          ) : null}
-          {asignacion.estado === "CON_OBSERVACIONES" ? (
-            <p>Esperando que el participante corrija las observaciones de esta evaluación.</p>
-          ) : null}
-          {asignacion.estado === "REPARADA" ? (
-            <p>El participante ya corrigió. Revisa los cambios en el historial de cada pregunta.</p>
-          ) : null}
+        <div className="ficha-caso-meta">
+          <p title={asignacion.postulacion.postulante.name}>
+            Particip.: {(asignacion.postulacion.postulante.name ?? "").slice(0, 14)}
+          </p>
+          <p title={asignacion.evaluador.name}>
+            Evaluador: {(asignacion.evaluador.name ?? "").slice(0, 14)}
+          </p>
         </div>
       }
       caso={asignacion.postulacion.convocatoria.formulario.preguntas.map((pregunta) => {

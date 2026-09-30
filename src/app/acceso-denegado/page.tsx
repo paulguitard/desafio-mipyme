@@ -1,11 +1,17 @@
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 import type { Role } from "@/lib/roles";
-import { ROLE_LABELS, loginPathForRole } from "@/lib/roles";
+import { ROLE_LABELS, homeForRole, loginPathForRole, normalizeRole } from "@/lib/roles";
 
 export default async function AccesoDenegadoPage({
   searchParams,
 }: {
   searchParams: Promise<{ esperaba?: string; login?: string }>;
 }) {
+  const session = await auth();
+  const sesionRol = normalizeRole(session?.user?.role ?? "");
+  if (sesionRol) redirect(homeForRole(sesionRol));
+
   const params = await searchParams;
   const esperaba = (params.esperaba as Role) || "EMPRENDEDOR";
   const login = params.login || loginPathForRole(esperaba);

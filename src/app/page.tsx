@@ -26,7 +26,7 @@ function FigureParticipante() {
 export default function HomePage() {
   return (
     <div className="hero-aiep relative flex min-h-screen flex-col pt-[20px]">
-      <header className="flex h-20 w-full shrink-0 items-center justify-between overflow-visible bg-black/10 px-32 md:px-52">
+      <header className="flex h-20 w-full shrink-0 items-center justify-between overflow-visible bg-black/10 px-4 md:px-52">
         <Image
           src="/aiep.png"
           alt="AIEP, Universidad Andrés Bello"
@@ -77,7 +77,7 @@ export default function HomePage() {
             </a>
             <a
               href="/ingresar/admin"
-              className="mr-[2px] self-end text-sm !text-white/50 hover:!text-white"
+              className="portal-admin-link mr-[2px] self-end text-sm !text-white/50 hover:!text-white"
             >
               admin
             </a>

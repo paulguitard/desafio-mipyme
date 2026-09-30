@@ -17,9 +17,28 @@ export const BANDA_PELOTA_LABEL: Record<BandaPelota, string> = {
   cerrados: "Cerrados",
 };
 
+export const BANDA_MOVIL_LABEL_EVALUADOR: Record<BandaPelota, string> = {
+  todas: "Todas",
+  "tu-turno": "Tu turno de evaluar",
+  evaluador: "Turno del evaluador",
+  supervisor: "Turno del supervisor",
+  participante: "Turno del participante",
+  cerrados: "Cerradas y finalizadas",
+};
+
+export const BANDA_MOVIL_LABEL_SUPERVISOR: Record<BandaPelota, string> = {
+  todas: "Todas",
+  "tu-turno": "Tu turno de supervisar",
+  evaluador: "Turno del evaluador",
+  supervisor: "Turno del supervisor",
+  participante: "Turno del participante",
+  cerrados: "Cerradas y finalizadas",
+};
+
 export type FiltroCaso = {
   id: string;
   label: string;
+  labelCorto?: string;
   banda: BandaPelota;
   estados?: readonly EstadoAsignacion[];
 };
@@ -32,18 +51,56 @@ export const FILTROS_EVALUADOR: FiltroCaso[] = [
     banda: "tu-turno",
     estados: ["PENDIENTE", "EN_REVISION", "DEVUELTA_SUPERVISOR"],
   },
-  { id: "reparadas", label: "Reparadas por el participante", banda: "tu-turno", estados: ["REPARADA"] },
-  { id: "supervision", label: "Esperando supervisión", banda: "supervisor", estados: ["EN_SUPERVISION"] },
-  { id: "observaciones", label: "Esperando respuesta", banda: "participante", estados: ["CON_OBSERVACIONES"] },
+  {
+    id: "reparadas",
+    label: "Reparadas por el participante",
+    labelCorto: "Reparadas",
+    banda: "tu-turno",
+    estados: ["REPARADA"],
+  },
+  {
+    id: "supervision",
+    label: "Esperando supervisión",
+    labelCorto: "Supervisión",
+    banda: "supervisor",
+    estados: ["EN_SUPERVISION"],
+  },
+  {
+    id: "observaciones",
+    label: "Esperando respuesta",
+    labelCorto: "Respuesta",
+    banda: "participante",
+    estados: ["CON_OBSERVACIONES"],
+  },
   { id: "finalizadas", label: "Finalizadas", banda: "cerrados", estados: ["FINALIZADA"] },
 ];
 
 export const FILTROS_SUPERVISOR: FiltroCaso[] = [
   { id: "todas", label: "Todas", banda: "todas" },
-  { id: "observaciones", label: "Observaciones por revisar", banda: "tu-turno" },
-  { id: "finalizar", label: "Finalización por revisar", banda: "tu-turno" },
-  { id: "esperando-evaluacion", label: "Esperando evaluación", banda: "evaluador" },
-  { id: "esperando-respuesta", label: "Esperando respuesta", banda: "participante" },
+  {
+    id: "observaciones",
+    label: "Observaciones por revisar",
+    labelCorto: "Observaciones",
+    banda: "tu-turno",
+  },
+  {
+    id: "finalizar",
+    label: "Finalización por revisar",
+    labelCorto: "Finalización",
+    banda: "tu-turno",
+  },
+  {
+    id: "esperando-evaluacion",
+    label: "Esperando evaluación",
+    labelCorto: "Evaluación",
+    banda: "evaluador",
+  },
+  {
+    id: "esperando-respuesta",
+    label: "Esperando respuesta",
+    labelCorto: "Respuesta",
+    banda: "participante",
+  },
   { id: "finalizadas", label: "Finalizadas", banda: "cerrados" },
 ];
 
@@ -145,11 +202,17 @@ export function gruposVisibles<T>(
   filtros: FiltroCaso[],
   activoId: string,
   itemsDe: (filtroId: string) => T[],
-): { id: string; label: string; banda: BandaPelota; items: T[] }[] {
+): { id: string; label: string; labelCorto?: string; banda: BandaPelota; items: T[] }[] {
   const secciones = filtros.filter((f) => f.id !== "todas");
   const fuente = activoId === "todas" ? secciones : secciones.filter((f) => f.id === activoId);
   return fuente
-    .map((f) => ({ id: f.id, label: f.label, banda: f.banda, items: itemsDe(f.id) }))
+    .map((f) => ({
+      id: f.id,
+      label: f.label,
+      labelCorto: f.labelCorto,
+      banda: f.banda,
+      items: itemsDe(f.id),
+    }))
     .filter((g) => activoId !== "todas" || g.items.length > 0);
 }
 

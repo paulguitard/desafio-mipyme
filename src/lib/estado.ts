@@ -33,6 +33,15 @@ export const ESTADO_POSTULACION_LABEL: Record<EstadoPostulacion, string> = {
   FINALIZADA: "Finalizada",
 };
 
+export const ESTADO_POSTULACION_LABEL_CORTO: Record<EstadoPostulacion, string> = {
+  BORRADOR: "Borrador",
+  ENVIADA: "Enviada",
+  EN_EVALUACION: "Evaluación",
+  CON_OBSERVACIONES: "Observaciones",
+  REPARADA_POR_EL_EMPRENDEDOR: "Reparada",
+  FINALIZADA: "Finalizada",
+};
+
 export const ESTADO_ASIGNACION_LABEL: Record<EstadoAsignacion, string> = {
   PENDIENTE: "Pendiente",
   EN_REVISION: "En revisión",

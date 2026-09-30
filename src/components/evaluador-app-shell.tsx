@@ -26,6 +26,7 @@ export function EvaluadorAppShell({
 
   return (
     <AppShell
+      className="rol-movil"
       tourRole={tourRole}
       maxWidthClass={maxWidthClass}
       header={

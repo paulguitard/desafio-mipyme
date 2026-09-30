@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   actualizarFormulario,
   actualizarPregunta,
@@ -228,16 +228,17 @@ function formDataPregunta(formularioId: string, preguntaId: string | null, borra
 export function FormularioBuilder({
   modo,
   formulario,
+  permitirEvaluacionPorPregunta,
 }: {
   modo: "nuevo" | "existente";
   formulario?: {
     id: string;
     titulo: string;
-    descripcion: string;
     modoEvaluacion?: string;
     puedeCambiarModo?: boolean;
     preguntas: PreguntaVista[];
   };
+  permitirEvaluacionPorPregunta: boolean;
 }) {
   const accion = useAccionOptimista();
   const preguntasIniciales = useMemo(() => {
@@ -248,14 +249,13 @@ export function FormularioBuilder({
   const preguntasState = useDatoOptimista(preguntasIniciales);
   const preguntas = preguntasState.dato;
   const [titulo, setTitulo] = useState(formulario?.titulo ?? "");
-  const [descripcion, setDescripcion] = useState(formulario?.descripcion ?? "");
-  const [modoEvaluacion, setModoEvaluacion] = useState<ModoEvaluacion>(
-    parseModoEvaluacion(formulario?.modoEvaluacion),
-  );
+  const [modoEvaluacion, setModoEvaluacion] = useState<ModoEvaluacion>(() => {
+    if (formulario?.modoEvaluacion) return parseModoEvaluacion(formulario.modoEvaluacion);
+    return permitirEvaluacionPorPregunta ? "POR_PREGUNTA" : "GENERAL";
+  });
   const [tituloDraft, setTituloDraft] = useState(formulario?.titulo ?? "");
-  const [descripcionDraft, setDescripcionDraft] = useState(formulario?.descripcion ?? "");
-  const [editandoTitulo, setEditandoTitulo] = useState(modo === "nuevo" || !formulario?.titulo);
-  const [editandoDescripcion, setEditandoDescripcion] = useState(modo === "nuevo");
+  const [editandoTitulo, setEditandoTitulo] = useState(false);
+  const tituloInputRef = useRef<HTMLInputElement>(null);
   const [agregando, setAgregando] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [obligatoria, setObligatoria] = useState(true);
@@ -267,6 +267,15 @@ export function FormularioBuilder({
 
   const esNuevo = modo === "nuevo";
   const puedeCambiarModo = esNuevo || Boolean(formulario?.puedeCambiarModo);
+
+  useEffect(() => {
+    if (esNuevo || !formulario?.titulo) setEditandoTitulo(true);
+  }, [esNuevo, formulario?.titulo]);
+
+  useEffect(() => {
+    if (editandoTitulo) tituloInputRef.current?.focus();
+  }, [editandoTitulo]);
+
   const preguntaEditando = editandoId ? preguntas.find((item) => item.id === editandoId) : undefined;
   const modalPreguntaAbierto = agregando || Boolean(preguntaEditando);
 
@@ -277,9 +286,8 @@ export function FormularioBuilder({
     setError(null);
   }
 
-  function persistirTituloDescripcion(
+  function persistirTitulo(
     siguienteTitulo: string,
-    siguienteDescripcion: string,
     siguienteModo: ModoEvaluacion = modoEvaluacion,
   ) {
     if (esNuevo || !formulario) return;
@@ -291,7 +299,6 @@ export function FormularioBuilder({
     const formData = new FormData();
     formData.set("id", formulario.id);
     formData.set("titulo", tituloFinal);
-    formData.set("descripcion", siguienteDescripcion);
     formData.set("modoEvaluacion", siguienteModo);
     void accion.ejecutar(() => actualizarFormulario(formData));
   }
@@ -305,20 +312,21 @@ export function FormularioBuilder({
     setTitulo(siguiente);
     setTituloDraft(siguiente);
     setEditandoTitulo(false);
-    persistirTituloDescripcion(siguiente, descripcion);
-  }
-
-  function guardarDescripcion() {
-    setDescripcion(descripcionDraft);
-    setEditandoDescripcion(false);
-    persistirTituloDescripcion(titulo, descripcionDraft);
+    persistirTitulo(siguiente);
   }
 
   function onCambiarModo(siguiente: ModoEvaluacion) {
     if (!puedeCambiarModo || siguiente === modoEvaluacion) return;
+    if (
+      siguiente === "POR_PREGUNTA" &&
+      !permitirEvaluacionPorPregunta &&
+      modoEvaluacion !== "POR_PREGUNTA"
+    ) {
+      return;
+    }
     setModoEvaluacion(siguiente);
     if (esNuevo) return;
-    persistirTituloDescripcion(titulo, descripcion, siguiente);
+    persistirTitulo(titulo, siguiente);
   }
 
   function onAgregar(borrador: PreguntaBorrador) {
@@ -438,7 +446,6 @@ export function FormularioBuilder({
     void accion.ejecutar(() =>
       crearFormularioCompleto({
         titulo: titulo.trim(),
-        descripcion: descripcion.trim(),
         modoEvaluacion,
         preguntas: preguntas.map((pregunta) => ({
           enunciado: pregunta.enunciado,
@@ -482,11 +489,11 @@ export function FormularioBuilder({
                   <div className="field">
                     <label htmlFor="titulo-formulario">Título</label>
                     <input
+                      ref={tituloInputRef}
                       id="titulo-formulario"
                       className="input w-full"
                       value={tituloDraft}
                       placeholder="Título del formulario"
-                      autoFocus={!editandoDescripcion}
                       onChange={(event) => setTituloDraft(event.target.value)}
                     />
                   </div>
@@ -512,12 +519,16 @@ export function FormularioBuilder({
             <p className="text-sm font-semibold text-navy">Tipo de evaluación</p>
             {MODOS_EVALUACION.map((modoItem) => {
               const activo = modoEvaluacion === modoItem;
+              const bloquearPorPregunta =
+                modoItem === "POR_PREGUNTA" &&
+                !permitirEvaluacionPorPregunta &&
+                modoEvaluacion !== "POR_PREGUNTA";
               return (
                 <button
                   key={modoItem}
                   className={`btn btn-sm ${activo ? "btn-primary" : "btn-secondary"}`}
                   type="button"
-                  disabled={!puedeCambiarModo}
+                  disabled={!puedeCambiarModo || bloquearPorPregunta}
                   onClick={() => onCambiarModo(modoItem)}
                 >
                   {MODO_EVALUACION_BOTON[modoItem]}
@@ -529,42 +540,13 @@ export function FormularioBuilder({
             <p className="text-right text-sm text-muted">
               El tipo queda fijo porque este formulario ya tiene mentorías asociadas.
             </p>
+          ) : !permitirEvaluacionPorPregunta && modoEvaluacion !== "POR_PREGUNTA" ? (
+            <p className="text-right text-sm text-muted">
+              El tipo pregunta por pregunta está desactivado. Puedes habilitarlo en
+              Configuración (engranaje).
+            </p>
           ) : null}
         </div>
-        <CampoEditable
-          editing={editandoDescripcion}
-          onEditar={() => {
-            setDescripcionDraft(descripcion);
-            setEditandoDescripcion(true);
-          }}
-          onCancelar={() => {
-            setDescripcionDraft(descripcion);
-            setEditandoDescripcion(false);
-            setError(null);
-          }}
-          onGuardar={guardarDescripcion}
-          lectura={
-            descripcion ? (
-              <p className="inline whitespace-pre-wrap">{descripcion}</p>
-            ) : (
-              <p className="inline text-muted">Sin descripción</p>
-            )
-          }
-          edicion={
-            <div className="field">
-              <label htmlFor="descripcion-formulario">Descripción</label>
-              <textarea
-                id="descripcion-formulario"
-                className="input w-full"
-                value={descripcionDraft}
-                placeholder="Descripción (opcional)"
-                rows={3}
-                autoFocus={!editandoTitulo}
-                onChange={(event) => setDescripcionDraft(event.target.value)}
-              />
-            </div>
-          }
-        />
       </div>
 
       <div className="page-scroll min-h-0 overflow-y-auto overscroll-contain space-y-8 pr-1">
@@ -650,6 +632,7 @@ export function FormularioBuilder({
         title={preguntaEditando ? "Editar pregunta" : "Nueva pregunta"}
         onClose={cerrarModalPregunta}
         wide
+        sinCerrar
         headerExtra={
           <InterruptorObligatoria checked={obligatoria} onChange={setObligatoria} />
         }

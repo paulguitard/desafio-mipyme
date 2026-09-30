@@ -10,6 +10,14 @@ export function selectorTour(ancla: string) {
   return `[data-tour="${ancla}"]`;
 }
 
+export function nodoTourVisible(ancla: string, raiz: ParentNode): HTMLElement | null {
+  const nodos = raiz.querySelectorAll(selectorTour(ancla));
+  for (const nodo of nodos) {
+    if (nodo instanceof HTMLElement && nodo.getClientRects().length > 0) return nodo;
+  }
+  return null;
+}
+
 const NAV: PasoTutorial = {
   ancla: "nav",
   titulo: "Navegación",
@@ -134,7 +142,12 @@ export function resolverTutorial(
           ancla: "formulario-caso",
           titulo: "Formulario del caso",
           descripcion:
-            "Responde cada pregunta. Si hay observaciones, ves tu caso a la izquierda y la evaluación a la derecha, sin el panel de supervisión.",
+            "Responde cada pregunta. Si hay observaciones, revisa también la evaluación de tu caso.",
+        },
+        {
+          ancla: "pestaña-evaluacion",
+          titulo: "Evaluación",
+          descripcion: "Cambia a esta pestaña para leer las observaciones de tu caso.",
         },
         {
           ancla: "observacion-pregunta",
@@ -179,15 +192,47 @@ export function resolverTutorial(
     if (bajo(path, "/evaluador/evaluaciones")) {
       return [
         {
+          ancla: "volver",
+          titulo: "Volver al panel",
+          descripcion: "Este control te lleva de vuelta a tus evaluaciones asignadas.",
+        },
+        {
+          ancla: "nav",
+          titulo: "Menú",
+          descripcion: "Desde aquí vuelves al panel o cierras sesión.",
+        },
+        {
+          ancla: "pestaña-caso",
+          titulo: "Caso",
+          descripcion: "Aquí están las respuestas del participante. Revisa cada pregunta y sus adjuntos.",
+        },
+        {
           ancla: "ficha-caso",
-          titulo: "Ficha del caso",
+          titulo: "Respuestas del caso",
           descripcion: "A la izquierda ves las respuestas del participante. Revisa cada pregunta con calma.",
+        },
+        {
+          ancla: "historial-versiones",
+          titulo: "Versiones",
+          descripcion:
+            "Si el participante corrigió, el historial muestra cómo cambió la respuesta en cada ronda.",
+        },
+        {
+          ancla: "pestaña-evaluacion",
+          titulo: "Evaluación",
+          descripcion:
+            "Cambia a esta pestaña para marcar observaciones, comentar y, si corresponde, asignar una nota.",
         },
         {
           ancla: "observacion-pregunta",
           titulo: "Tu revisión",
           descripcion:
             "Marca si hay observaciones, deja un comentario y, si corresponde, asigna una nota.",
+        },
+        {
+          ancla: "pestaña-supervision",
+          titulo: "Supervisión",
+          descripcion: "Consulta lo que observó el supervisor sobre tu evaluación.",
         },
         {
           ancla: "guardar-revision",
@@ -197,7 +242,13 @@ export function resolverTutorial(
         {
           ancla: "enviar-supervisor",
           titulo: "Enviar a supervisor",
-          descripcion: "Cuando las observaciones estén listas, envíalas. También puedes finalizar la evaluación.",
+          descripcion: "Cuando las observaciones estén listas, envíalas para que el supervisor las revise.",
+        },
+        {
+          ancla: "finalizar-evaluacion",
+          titulo: "Finalizar evaluación",
+          descripcion:
+            "Cierra el caso sin devolver observaciones. El supervisor debe confirmar si corresponde finalizar.",
         },
       ];
     }
@@ -225,9 +276,39 @@ export function resolverTutorial(
     if (bajo(path, "/evaluador/supervision")) {
       return [
         {
+          ancla: "volver",
+          titulo: "Volver al panel",
+          descripcion: "Este control te lleva de vuelta a los casos que supervisas.",
+        },
+        {
+          ancla: "nav",
+          titulo: "Menú",
+          descripcion: "Desde aquí vuelves al panel o cierras sesión.",
+        },
+        {
+          ancla: "pestaña-caso",
+          titulo: "Caso",
+          descripcion: "Consulta las respuestas del participante. Si hay varios evaluadores, cámbialos en el selector.",
+        },
+        {
           ancla: "ficha-caso",
           titulo: "Revisión del caso",
           descripcion: "Consulta las respuestas y la evaluación. Si hay varios evaluadores, cámbialos en el selector.",
+        },
+        {
+          ancla: "historial-versiones",
+          titulo: "Versiones",
+          descripcion: "Abre el historial para ver cómo cambió una respuesta entre rondas.",
+        },
+        {
+          ancla: "pestaña-evaluacion",
+          titulo: "Evaluación",
+          descripcion: "Revisa lo que marcó el evaluador en cada pregunta o en la revisión general.",
+        },
+        {
+          ancla: "pestaña-supervision",
+          titulo: "Supervisión",
+          descripcion: "En esta pestaña dejas tus comentarios de supervisión.",
         },
         {
           ancla: "guardar-revision",
@@ -271,7 +352,7 @@ export function resolverTutorial(
       {
         ancla: "admin-config",
         titulo: "Configuración",
-        descripcion: "Desde el engranaje del encabezado ajustas el correo de recuperación y otros ajustes.",
+        descripcion: "Desde el engranaje del encabezado ajustas formularios, el correo de recuperación y otros avisos.",
       },
     ];
   }

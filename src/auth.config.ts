@@ -1,6 +1,6 @@
 import "@/lib/env";
 import type { NextAuthConfig } from "next-auth";
-import { esRolCatalogoEvaluador, loginPathForRole, normalizeRole, type Role } from "@/lib/roles";
+import { loginPathForRole, normalizeRole, type Role } from "@/lib/roles";
 
 export const authConfig = {
   trustHost: true,
@@ -35,24 +35,14 @@ export const authConfig = {
     authorized({ auth, request }) {
       const pathname = request.nextUrl.pathname;
       const role = normalizeRole((auth?.user?.role as string) ?? "");
-      if (!auth?.user?.id) {
-        const guarded =
-          pathname.startsWith("/admin") ||
-          pathname.startsWith("/evaluador") ||
-          pathname.startsWith("/participante") ||
-          pathname.startsWith("/emprendedor");
-        if (guarded) return false;
-      }
-
-      const needsAdmin = pathname.startsWith("/admin");
-      const needsEval = pathname.startsWith("/evaluador");
-      const needsParticipante =
-        pathname.startsWith("/participante") || pathname.startsWith("/emprendedor");
-      if (!needsAdmin && !needsEval && !needsParticipante) return true;
-      if (!role) return false;
-      if (needsAdmin) return role === "ADMIN";
-      if (needsEval) return esRolCatalogoEvaluador(role);
-      if (needsParticipante) return role === "EMPRENDEDOR";
+      const guarded =
+        pathname.startsWith("/admin") ||
+        pathname.startsWith("/evaluador") ||
+        pathname.startsWith("/participante") ||
+        pathname.startsWith("/emprendedor");
+      if (!guarded) return true;
+      // Sesión de otro rol: deja pasar; proxy.ts manda al panel correcto.
+      if (!auth?.user?.id || !role) return false;
       return true;
     },
   },

@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { deleteUpload, saveUpload } from "@/lib/storage";
@@ -18,6 +19,12 @@ import {
   type TextosCorreoNotificacion,
   type TipoCorreoNotificacion,
 } from "@/lib/correo-notificacion";
+import {
+  CONFIG_APP_ID,
+  DEFAULT_CONFIG_APP,
+  type ConfigAppData,
+  leerConfigApp,
+} from "@/lib/config-app";
 
 function isHexColor(value: string) {
   return /^#[0-9a-fA-F]{6}$/.test(value.trim());
@@ -203,4 +210,41 @@ export async function guardarConfigCorreoNotificacion(formData: FormData) {
   const loaded = await getConfigCorreoNotificaciones();
   if (!loaded.ok) return { error: loaded.error };
   return { ok: true as const, textos: loaded.textos };
+}
+
+export async function getConfigApp(): Promise<
+  { ok: true; config: ConfigAppData } | { ok: false; error: string; config: ConfigAppData }
+> {
+  await requireUser("ADMIN");
+  try {
+    return { ok: true, config: await leerConfigApp() };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Error desconocido";
+    return {
+      ok: false,
+      error: `No se pudo cargar la configuración. ${message.slice(0, 160)}`,
+      config: { ...DEFAULT_CONFIG_APP },
+    };
+  }
+}
+
+export async function guardarConfigApp(formData: FormData) {
+  await requireUser("ADMIN");
+  const permitirEvaluacionPorPregunta =
+    String(formData.get("permitirEvaluacionPorPregunta") ?? "") === "1";
+
+  await prisma.configApp.upsert({
+    where: { id: CONFIG_APP_ID },
+    create: {
+      id: CONFIG_APP_ID,
+      permitirEvaluacionPorPregunta,
+    },
+    update: { permitirEvaluacionPorPregunta },
+  });
+
+  const loaded = await getConfigApp();
+  if (!loaded.ok) return { error: loaded.error };
+  revalidatePath("/admin/formularios");
+  revalidatePath("/admin/formularios/nuevo");
+  return { ok: true as const, config: loaded.config };
 }

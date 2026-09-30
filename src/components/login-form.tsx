@@ -12,7 +12,7 @@ export function LoginForm({ expectedRole }: { expectedRole: Role }) {
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <div className="mx-auto w-full max-w-md space-y-4">
+    <div className="login-panel mx-auto w-full max-w-md space-y-4">
       {expectedRole === "EMPRENDEDOR" ? (
         <div className="flex items-center justify-end gap-3 px-1">
           <p className="font-semibold text-white">No tengo cuenta:</p>

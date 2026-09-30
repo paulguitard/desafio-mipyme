@@ -13,6 +13,12 @@ import {
 } from "@/lib/convocatoria";
 import { directStoredImageUrl } from "@/lib/storage/image-url";
 
+function truncar(texto: string, max: number) {
+  const limpio = texto.trim();
+  if (limpio.length <= max) return limpio;
+  return `${limpio.slice(0, max).trimEnd()}…`;
+}
+
 export default async function ParticipanteHomePage() {
   const user = await requireUser("EMPRENDEDOR");
   const [convocatorias, postulaciones] = await Promise.all([
@@ -68,10 +74,16 @@ export default async function ParticipanteHomePage() {
                 className="card card-link caso-fila"
               >
                 <div className="caso-fila-textos">
-                  <h3 className="caso-fila-nombre">{nombreCaso}</h3>
-                  <p className="caso-fila-mentoria">{item.convocatoria.titulo}</p>
+                  <h3 className="caso-fila-nombre">
+                    <span className="caso-fila-texto-largo">{nombreCaso}</span>
+                    <span className="caso-fila-texto-corto">{truncar(nombreCaso, 20)}</span>
+                  </h3>
+                  <p className="caso-fila-mentoria">
+                    <span className="caso-fila-texto-largo">{item.convocatoria.titulo}</span>
+                    <span className="caso-fila-texto-corto">{truncar(item.convocatoria.titulo, 30)}</span>
+                  </p>
                 </div>
-                <BadgePostulacion estado={item.estado} />
+                <BadgePostulacion estado={item.estado} cortoMovil />
                 <svg className="caso-fila-flecha" viewBox="0 0 16 16" aria-hidden="true">
                   <path
                     fill="currentColor"

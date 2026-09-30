@@ -1,4 +1,3 @@
-import { BadgePostulacion } from "@/components/badges";
 import { BotonAtras } from "@/components/boton-atras";
 import { FormularioPostulante } from "@/components/formulario-postulante";
 import { PreguntaCampo } from "@/components/pregunta-campo";
@@ -8,6 +7,7 @@ import { postulacionEditable, type EstadoPostulacion } from "@/lib/estado";
 import { convocatoriaAbiertaParaPostular } from "@/lib/convocatoria";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { coincideRevisionCiclo, revisionesParaParticipante } from "@/lib/revision-ciclo";
+import { avisoEntradaParticipante } from "@/lib/aviso-entrada-caso";
 import { requireUser } from "@/lib/session";
 import { notFound } from "next/navigation";
 
@@ -105,19 +105,17 @@ export default async function PostulacionPage({
       esCorreccion={esCorreccion}
       layout={esCorreccion ? "paneles" : "formulario"}
       back={<BotonAtras href="/participante" />}
-      title={<h1 className="text-3xl font-extrabold text-navy">{postulacion.convocatoria.formulario.titulo}</h1>}
-      meta={
-        <div className="space-y-2">
-          <p className="text-muted">{postulacion.convocatoria.titulo}</p>
-          {!esCorreccion && postulacion.convocatoria.formulario.descripcion ? (
-            <p>{postulacion.convocatoria.formulario.descripcion}</p>
-          ) : null}
-          <BadgePostulacion estado={postulacion.estado} />
-          {!canEdit && !abierta ? (
-            <p className="font-semibold text-danger">La mentoría está cerrada. Solo puedes consultar.</p>
-          ) : null}
-        </div>
+      title={
+        <h1 className="formulario-caso-titulo text-3xl font-extrabold text-navy">
+          {postulacion.convocatoria.titulo}
+        </h1>
       }
+      avisoEntrada={avisoEntradaParticipante({
+        estado,
+        esCorreccion,
+        canEdit,
+        mentoriaAbierta: abierta,
+      })}
     >
       {esCorreccion ? (
         <VistaCorreccionParticipante
