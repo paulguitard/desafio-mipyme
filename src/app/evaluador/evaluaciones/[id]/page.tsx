@@ -1,5 +1,6 @@
 import { BotonAtras } from "@/components/boton-atras";
 import { EvalDetalleCelda } from "@/components/eval-detalle-head";
+import { FichaCasoMeta } from "@/components/ficha-caso-meta";
 import { FormularioEvaluacion } from "@/components/formulario-evaluacion";
 import { HistorialVersionesRespuesta } from "@/components/historial-versiones-respuesta";
 import { PanelEvaluacionPregunta } from "@/components/panel-evaluacion-pregunta";
@@ -84,14 +85,10 @@ export default async function EvaluacionDetallePage({
       }
       avisoEntrada={avisoEntradaEvaluador(asignacion.estado)}
       meta={
-        <div className="ficha-caso-meta">
-          <p title={asignacion.postulacion.postulante.name}>
-            Particip.: {(asignacion.postulacion.postulante.name ?? "").slice(0, 14)}
-          </p>
-          <p title={asignacion.evaluador.name}>
-            Evaluador: {(asignacion.evaluador.name ?? "").slice(0, 14)}
-          </p>
-        </div>
+        <FichaCasoMeta
+          participante={asignacion.postulacion.postulante.name}
+          evaluador={asignacion.evaluador.name}
+        />
       }
       caso={asignacion.postulacion.convocatoria.formulario.preguntas.map((pregunta) => {
         const respuesta = asignacion.postulacion.respuestas.find((r) => r.preguntaId === pregunta.id);

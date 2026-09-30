@@ -33,11 +33,11 @@ function slotTutorialHeader() {
 }
 
 function destinoTutorial() {
-  const dialog = dialogAbiertoMasAlto();
-  if (dialog) return dialog;
   if (esTourMovil()) {
     return slotTutorialHeader() ?? document.body;
   }
+  const dialog = dialogAbiertoMasAlto();
+  if (dialog) return dialog;
   return document.body;
 }
 

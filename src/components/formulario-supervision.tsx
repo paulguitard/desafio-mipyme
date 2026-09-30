@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { AvisoEntradaCaso } from "@/components/aviso-entrada-caso";
 import { BotonAtras } from "@/components/boton-atras";
 import { EvalDetalleCelda } from "@/components/eval-detalle-head";
+import { FichaCasoMeta } from "@/components/ficha-caso-meta";
 import { FormularioEvaluacion } from "@/components/formulario-evaluacion";
 import { HistorialVersionesRespuesta } from "@/components/historial-versiones-respuesta";
 import { PanelEvaluacionPregunta } from "@/components/panel-evaluacion-pregunta";
@@ -69,14 +70,10 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
       }
       meta={
         <div className="space-y-3">
-          <div className="ficha-caso-meta">
-            <p title={data.emprendedorNombre}>
-              Particip.: {(data.emprendedorNombre ?? "").slice(0, 14)}
-            </p>
-            <p title={asignacion.evaluadorNombre}>
-              Evaluador: {(asignacion.evaluadorNombre ?? "").slice(0, 14)}
-            </p>
-          </div>
+          <FichaCasoMeta
+            participante={data.emprendedorNombre}
+            evaluador={asignacion.evaluadorNombre}
+          />
           {data.asignaciones.length > 1 ? (
             <div className="ficha-detalle-admin-eval">
               <label htmlFor="supervision-evaluador">Evaluación de</label>

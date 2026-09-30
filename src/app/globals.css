@@ -1682,18 +1682,23 @@ html:has(.app-shell) body {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 0.75rem 1rem;
+  gap: 0.75rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .ficha-caso-meta p {
   margin: 0;
   min-width: 0;
-  flex: 1 1 0;
   color: var(--muted);
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  white-space: nowrap;
+  text-align: left;
+  flex: 0 1 auto;
 }
 
 .ficha-caso-meta p:last-child {
+  margin-left: auto;
   text-align: right;
 }
 
@@ -4363,6 +4368,7 @@ html:has(.app-shell) body {
     font-size: 1.05rem;
     line-height: 1.25;
     overflow-wrap: anywhere;
+    text-align: left;
   }
 
   .rol-movil .page-workspace.is-formulario-caso {
@@ -4376,6 +4382,25 @@ html:has(.app-shell) body {
   .rol-movil .is-formulario-caso > .shrink-0 p {
     font-size: 0.8rem;
     line-height: 1.35;
+  }
+
+  .rol-movil .ficha-caso-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    width: 100%;
+    column-gap: 0.5rem;
+  }
+
+  .rol-movil .ficha-caso-meta p {
+    width: auto;
+    max-width: calc(50% - 0.25rem);
+    text-align: left;
+  }
+
+  .rol-movil .ficha-caso-meta p:last-child {
+    text-align: right;
+    margin-left: auto;
   }
 
   .rol-movil .is-formulario-caso .eval-detalle-shell {
@@ -4423,8 +4448,11 @@ html:has(.app-shell) body {
     padding-bottom: 3.6rem;
   }
 
-  .rol-movil .is-formulario-caso h3.text-xl {
-    font-size: 1.05rem;
+  .rol-movil .is-formulario-caso h3.text-xl,
+  .rol-movil.rol-participante h3.text-xl,
+  .rol-movil .pregunta-lectura-enunciado h3,
+  .rol-movil .pregunta-edicion-enunciado h3 {
+    font-size: 0.9rem;
     line-height: 1.3;
   }
 
@@ -5041,26 +5069,13 @@ html:has(.app-shell) body {
   }
 
   html:has(.rol-movil) .tutorial-launcher {
-    inset: auto 0.85rem 0.85rem auto;
-    width: 2.1rem;
-    height: 2.1rem;
-    min-width: 2.1rem;
-    min-height: 2.1rem;
-    font-size: 1rem;
-    background: var(--navy);
-    border-color: rgba(255, 255, 255, 0.45);
-    box-shadow: 0 2px 8px rgba(6, 21, 54, 0.32);
-  }
-
-  html:has(.rol-movil) .tutorial-launcher:hover,
-  html:has(.rol-movil) .tutorial-launcher:focus-visible {
-    background: #1a3d7a;
+    display: none;
   }
 
   .rol-movil .site-header .tutorial-launcher {
+    display: inline-flex;
     position: static;
     inset: auto;
-    z-index: 1;
     width: 2.75rem;
     height: 2.75rem;
     min-width: 2.75rem;

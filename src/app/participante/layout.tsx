@@ -12,7 +12,7 @@ export default async function ParticipanteLayout({ children }: { children: React
 
   return (
     <AppShell
-      className="rol-movil"
+      className="rol-movil rol-participante"
       tourRole="EMPRENDEDOR"
       maxWidthClass="max-w-none"
       header={

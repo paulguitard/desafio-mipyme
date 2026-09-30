@@ -1,4 +1,5 @@
 import { BotonAtras } from "@/components/boton-atras";
+import { FichaCasoMeta } from "@/components/ficha-caso-meta";
 import { FormularioPostulante } from "@/components/formulario-postulante";
 import { PreguntaCampo } from "@/components/pregunta-campo";
 import { VistaCorreccionParticipante } from "@/components/vista-correccion-participante";
@@ -6,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { postulacionEditable, type EstadoPostulacion } from "@/lib/estado";
 import { convocatoriaAbiertaParaPostular } from "@/lib/convocatoria";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
+import { etiquetaNombreCaso, extraerNombreCaso } from "@/lib/nombre-caso";
 import { coincideRevisionCiclo, revisionesParaParticipante } from "@/lib/revision-ciclo";
 import { avisoEntradaParticipante } from "@/lib/aviso-entrada-caso";
 import { requireUser } from "@/lib/session";
@@ -64,6 +66,12 @@ export default async function PostulacionPage({
     }
   }
 
+  const nombreCaso = etiquetaNombreCaso(
+    postulacion.nombreCaso ||
+      extraerNombreCaso(postulacion.convocatoria.formulario.preguntas, postulacion.respuestas),
+  );
+  const evaluadorNombre = postulacion.asignaciones[0]?.evaluador.name ?? "";
+
   const asignacionesVista = postulacion.asignaciones
     .map((asignacion) => ({
       id: asignacion.id,
@@ -107,8 +115,11 @@ export default async function PostulacionPage({
       back={<BotonAtras href="/participante" />}
       title={
         <h1 className="formulario-caso-titulo text-3xl font-extrabold text-navy">
-          {postulacion.convocatoria.titulo}
+          {nombreCaso} · {postulacion.convocatoria.titulo}
         </h1>
+      }
+      meta={
+        <FichaCasoMeta participante={user.name} evaluador={evaluadorNombre} />
       }
       avisoEntrada={avisoEntradaParticipante({
         estado,
