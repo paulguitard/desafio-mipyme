@@ -281,9 +281,9 @@ export function agruparAdjuntos(archivos: StoredAttachment[]) {
   const documentos: StoredFile[] = [];
   const videos: StoredVideoLink[] = [];
   for (const item of archivos) {
-    if (item.kind === "image") imagenes.push(item);
-    else if (item.kind === "file") documentos.push(item);
-    else videos.push(item);
+    if (isStoredVideoLink(item)) videos.push(item);
+    else if (item.kind === "image") imagenes.push(item);
+    else documentos.push(item);
   }
   return { imagenes, documentos, videos };
 }
