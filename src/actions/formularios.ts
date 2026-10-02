@@ -31,12 +31,18 @@ import {
   TIPOS_PREGUNTA,
   tipoTieneOpciones,
   validarEscalaNotas,
+  validarVideoLink,
+  resolveVideoEmbed,
   type ConfigGantt,
   type ConfigLimites,
   type ConfigObjetivos,
   type ConfigPresupuesto,
   type TipoPregunta,
 } from "@/lib/preguntas";
+import { deleteUpload, saveUpload } from "@/lib/storage";
+import { parseClaseMedio, parseMedioPayload, serializeMedioPayload } from "@/lib/contenido";
+import { esMentoriaContenido, parseTipoFormulario, type TipoFormulario } from "@/lib/tipo-formulario";
+import { randomUUID } from "node:crypto";
 
 function isTipo(value: string): value is TipoPregunta {
   return (TIPOS_PREGUNTA as readonly string[]).includes(value);
@@ -157,6 +163,7 @@ function leerOpcionesGuardadas(tipo: TipoPregunta, formData: FormData): { opcion
 export async function crearFormulario(formData: FormData) {
   const admin = await requireUser("ADMIN");
   const titulo = String(formData.get("titulo") ?? "").trim();
+  const tipo = parseTipoFormulario(String(formData.get("tipo") ?? ""));
   const { permitirEvaluacionPorPregunta } = await leerConfigApp();
   const modoEvaluacion = modoEvaluacionAlCrear(
     formData.get("modoEvaluacion"),
@@ -167,11 +174,15 @@ export async function crearFormulario(formData: FormData) {
   const form = await prisma.formulario.create({
     data: {
       titulo,
+      tipo,
       modoEvaluacion,
       creadoPorId: admin.id,
-      preguntas: {
-        create: [{ orden: 1, ...datosPreguntaNombreCaso() }],
-      },
+      preguntas:
+        tipo === "CONTENIDO"
+          ? undefined
+          : {
+              create: [{ orden: 1, ...datosPreguntaNombreCaso() }],
+            },
     },
   });
 
@@ -216,7 +227,9 @@ export async function actualizarFormulario(formData: FormData) {
     where: { id },
     data,
   });
-  await asegurarPreguntaNombreCaso(id);
+  if (!esMentoriaContenido(existente.tipo)) {
+    await asegurarPreguntaNombreCaso(id);
+  }
   revalidatePath(`/admin/formularios/${id}`);
   revalidatePath("/admin/formularios");
   return { ok: true };
@@ -235,6 +248,15 @@ export async function agregarPregunta(formData: FormData) {
 
   if (!formularioId || !enunciado || !isTipo(tipo)) {
     return { error: "Completa el enunciado y el tipo de pregunta." };
+  }
+
+  const formulario = await prisma.formulario.findUnique({
+    where: { id: formularioId },
+    select: { tipo: true },
+  });
+  if (!formulario) return { error: "Formulario no encontrado." };
+  if (esMentoriaContenido(formulario.tipo)) {
+    return { error: "Este formulario de contenido no admite preguntas." };
   }
 
   const opcionesLeidas = leerOpcionesGuardadas(tipo, formData);
@@ -361,6 +383,7 @@ export async function actualizarPregunta(formData: FormData) {
 
 export async function crearFormularioCompleto(payload: {
   titulo: string;
+  tipo?: TipoFormulario;
   modoEvaluacion?: string;
   preguntas: {
     enunciado: string;
@@ -405,9 +428,15 @@ export async function crearFormularioCompleto(payload: {
     }
   }
 
+  const tipo = parseTipoFormulario(payload.tipo);
+  if (tipo === "CONTENIDO") {
+    return { error: "Usa el compositor de contenido para este tipo de formulario." };
+  }
+
   const form = await prisma.formulario.create({
     data: {
       titulo,
+      tipo,
       modoEvaluacion,
       creadoPorId: admin.id,
       preguntas: {
@@ -429,6 +458,252 @@ export async function crearFormularioCompleto(payload: {
   });
 
   redirect(`/admin/formularios/${form.id}`);
+}
+
+async function formularioContenido(formularioId: string) {
+  const formulario = await prisma.formulario.findUnique({
+    where: { id: formularioId },
+    select: { id: true, tipo: true },
+  });
+  if (!formulario) return { error: "Formulario no encontrado." };
+  if (!esMentoriaContenido(formulario.tipo)) {
+    return { error: "Este formulario no es de contenido." };
+  }
+  return { formulario };
+}
+
+async function guardarMedioDesdeFormData(formData: FormData): Promise<
+  { error: string } | { clase: "imagen" | "video" | "archivo"; payload: string }
+> {
+  const clase = parseClaseMedio(String(formData.get("clase") ?? ""));
+  if (!clase) return { error: "Indica si es foto, video o archivo." };
+
+  if (clase === "video") {
+    const url = String(formData.get("videoUrl") ?? "").trim();
+    const errorLink = validarVideoLink(url);
+    if (!url) return { error: "Pega un link de video." };
+    if (errorLink) return { error: errorLink };
+    const resolved = resolveVideoEmbed(url);
+    if (!resolved) return { error: errorLink ?? "El link de video no es válido." };
+    return {
+      clase,
+      payload: serializeMedioPayload({
+        id: randomUUID(),
+        kind: "video_link",
+        url: resolved.url,
+        provider: resolved.provider,
+      }),
+    };
+  }
+
+  const file = formData.get("archivo");
+  if (!(file instanceof File) || file.size <= 0) {
+    return { error: clase === "imagen" ? "Sube una foto." : "Sube un archivo." };
+  }
+  if (clase === "imagen" && !file.type.startsWith("image/")) {
+    return { error: "La foto debe ser un archivo de imagen." };
+  }
+  const stored = await saveUpload(file, clase === "imagen" ? "image" : "file");
+  return { clase, payload: serializeMedioPayload(stored) };
+}
+
+export async function crearFormularioContenido(formData: FormData) {
+  const admin = await requireUser("ADMIN");
+  const titulo = String(formData.get("titulo") ?? "").trim();
+  if (!titulo) return { error: "El título es obligatorio." };
+
+  let piezasMeta: { titulo: string; descripcion: string; medios: number }[] = [];
+  try {
+    const parsed = JSON.parse(String(formData.get("piezas") ?? "[]")) as unknown;
+    if (!Array.isArray(parsed)) throw new Error("invalid");
+    piezasMeta = parsed.map((item) => {
+      const row = item as { titulo?: unknown; descripcion?: unknown; medios?: unknown };
+      return {
+        titulo: String(row.titulo ?? "").trim(),
+        descripcion: String(row.descripcion ?? "").trim(),
+        medios: Math.max(0, Number(row.medios) || 0),
+      };
+    });
+  } catch {
+    return { error: "Las casillas de contenido no son válidas." };
+  }
+
+  if (piezasMeta.length === 0) return { error: "Agrega al menos una casilla de contenido." };
+  if (piezasMeta.some((pieza) => !pieza.titulo)) {
+    return { error: "Cada casilla necesita un título." };
+  }
+
+  const form = await prisma.formulario.create({
+    data: {
+      titulo,
+      tipo: "CONTENIDO",
+      modoEvaluacion: "GENERAL",
+      creadoPorId: admin.id,
+    },
+  });
+
+  try {
+    for (let i = 0; i < piezasMeta.length; i += 1) {
+      const pieza = await prisma.piezaContenido.create({
+        data: {
+          formularioId: form.id,
+          titulo: piezasMeta[i].titulo,
+          descripcion: piezasMeta[i].descripcion,
+          orden: i + 1,
+        },
+      });
+      for (let j = 0; j < piezasMeta[i].medios; j += 1) {
+        const medioData = new FormData();
+        medioData.set("clase", String(formData.get(`medio-${i}-${j}-clase`) ?? ""));
+        medioData.set("videoUrl", String(formData.get(`medio-${i}-${j}-videoUrl`) ?? ""));
+        const archivo = formData.get(`medio-${i}-${j}-archivo`);
+        if (archivo instanceof File) medioData.set("archivo", archivo);
+        const medio = await guardarMedioDesdeFormData(medioData);
+        if ("error" in medio) throw new Error(medio.error);
+        await prisma.medioContenido.create({
+          data: {
+            piezaId: pieza.id,
+            orden: j + 1,
+            clase: medio.clase,
+            payload: medio.payload,
+          },
+        });
+      }
+    }
+  } catch (error) {
+    await prisma.formulario.delete({ where: { id: form.id } }).catch(() => undefined);
+    return { error: error instanceof Error ? error.message : "No se pudo guardar el formulario." };
+  }
+
+  redirect(`/admin/formularios/${form.id}`);
+}
+
+export async function agregarPiezaContenido(formData: FormData) {
+  await requireUser("ADMIN");
+  const formularioId = String(formData.get("formularioId") ?? "");
+  const titulo = String(formData.get("titulo") ?? "").trim();
+  const descripcion = String(formData.get("descripcion") ?? "").trim();
+  if (!formularioId || !titulo) return { error: "El título de la casilla es obligatorio." };
+  const formOk = await formularioContenido(formularioId);
+  if ("error" in formOk) return formOk;
+
+  const last = await prisma.piezaContenido.findFirst({
+    where: { formularioId },
+    orderBy: { orden: "desc" },
+  });
+  const pieza = await prisma.piezaContenido.create({
+    data: { formularioId, titulo, descripcion, orden: (last?.orden ?? 0) + 1 },
+  });
+  revalidatePath(`/admin/formularios/${formularioId}`);
+  return { ok: true, id: pieza.id };
+}
+
+export async function actualizarPiezaContenido(formData: FormData) {
+  await requireUser("ADMIN");
+  const id = String(formData.get("id") ?? "");
+  const formularioId = String(formData.get("formularioId") ?? "");
+  const titulo = String(formData.get("titulo") ?? "").trim();
+  const descripcion = String(formData.get("descripcion") ?? "").trim();
+  if (!id || !formularioId || !titulo) return { error: "El título de la casilla es obligatorio." };
+  const formOk = await formularioContenido(formularioId);
+  if ("error" in formOk) return formOk;
+
+  const actual = await prisma.piezaContenido.findFirst({ where: { id, formularioId } });
+  if (!actual) return { error: "Casilla no encontrada." };
+  await prisma.piezaContenido.update({ where: { id }, data: { titulo, descripcion } });
+  revalidatePath(`/admin/formularios/${formularioId}`);
+  return { ok: true };
+}
+
+export async function eliminarPiezaContenido(formData: FormData) {
+  await requireUser("ADMIN");
+  const id = String(formData.get("id") ?? "");
+  const formularioId = String(formData.get("formularioId") ?? "");
+  if (!id) return { error: "Casilla no encontrada." };
+  const actual = await prisma.piezaContenido.findUnique({
+    where: { id },
+    include: { medios: true },
+  });
+  if (!actual) return { error: "Casilla no encontrada." };
+  for (const medio of actual.medios) {
+    const parsed = parseMedioPayload(medio.payload);
+    if (parsed && "relativePath" in parsed && parsed.relativePath) {
+      await deleteUpload(parsed.relativePath);
+    }
+  }
+  await prisma.piezaContenido.delete({ where: { id } });
+  revalidatePath(`/admin/formularios/${formularioId}`);
+  return { ok: true };
+}
+
+export async function moverPiezaContenido(formData: FormData) {
+  await requireUser("ADMIN");
+  const id = String(formData.get("id") ?? "");
+  const formularioId = String(formData.get("formularioId") ?? "");
+  const direccion = String(formData.get("direccion") ?? "");
+  const piezas = await prisma.piezaContenido.findMany({
+    where: { formularioId },
+    orderBy: { orden: "asc" },
+  });
+  const index = piezas.findIndex((p) => p.id === id);
+  if (index < 0) return { error: "Casilla no encontrada." };
+  const swapWith = direccion === "up" ? index - 1 : index + 1;
+  if (swapWith < 0 || swapWith >= piezas.length) return { ok: true };
+  const a = piezas[index];
+  const b = piezas[swapWith];
+  await prisma.$transaction([
+    prisma.piezaContenido.update({ where: { id: a.id }, data: { orden: b.orden } }),
+    prisma.piezaContenido.update({ where: { id: b.id }, data: { orden: a.orden } }),
+  ]);
+  revalidatePath(`/admin/formularios/${formularioId}`);
+  return { ok: true };
+}
+
+export async function agregarMedioContenido(formData: FormData) {
+  await requireUser("ADMIN");
+  const piezaId = String(formData.get("piezaId") ?? "");
+  const formularioId = String(formData.get("formularioId") ?? "");
+  if (!piezaId || !formularioId) return { error: "Casilla no encontrada." };
+  const formOk = await formularioContenido(formularioId);
+  if ("error" in formOk) return formOk;
+  const pieza = await prisma.piezaContenido.findFirst({ where: { id: piezaId, formularioId } });
+  if (!pieza) return { error: "Casilla no encontrada." };
+
+  const medio = await guardarMedioDesdeFormData(formData);
+  if ("error" in medio) return medio;
+
+  const last = await prisma.medioContenido.findFirst({
+    where: { piezaId },
+    orderBy: { orden: "desc" },
+  });
+  const creado = await prisma.medioContenido.create({
+    data: {
+      piezaId,
+      orden: (last?.orden ?? 0) + 1,
+      clase: medio.clase,
+      payload: medio.payload,
+    },
+  });
+  revalidatePath(`/admin/formularios/${formularioId}`);
+  return { ok: true, id: creado.id, clase: medio.clase, payload: medio.payload };
+}
+
+export async function eliminarMedioContenido(formData: FormData) {
+  await requireUser("ADMIN");
+  const id = String(formData.get("id") ?? "");
+  const formularioId = String(formData.get("formularioId") ?? "");
+  const medio = await prisma.medioContenido.findUnique({
+    where: { id },
+    include: { pieza: { select: { formularioId: true } } },
+  });
+  if (!medio) return { error: "Archivo no encontrado." };
+  const parsed = parseMedioPayload(medio.payload);
+  if (parsed && "relativePath" in parsed && parsed.relativePath) {
+    await deleteUpload(parsed.relativePath);
+  }
+  await prisma.medioContenido.delete({ where: { id } });
+  revalidatePath(`/admin/formularios/${formularioId || medio.pieza.formularioId}`);
+  return { ok: true };
 }
 
 export async function crearFormularioForm(formData: FormData): Promise<void> {

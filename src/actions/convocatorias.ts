@@ -12,6 +12,7 @@ import {
   parseImagenConvocatoria,
 } from "@/lib/convocatoria";
 import { isStoredFile, parseArchivos } from "@/lib/preguntas";
+import { esMentoriaContenido, parseTipoFormulario, type TipoFormulario } from "@/lib/tipo-formulario";
 import { asignarEvaluadoresAutomaticoEnConvocatoria } from "@/lib/asignacion-automatica";
 import { asignarSupervisoresAutomaticoEnConvocatoria } from "@/lib/asignacion-supervisor";
 import { cupoAlcanzado, mensajeCupoPersona } from "@/lib/cupo-asignacion";
@@ -21,16 +22,42 @@ import {
   getRespuestasConvocatoria,
 } from "@/lib/convocatoria-admin-data";
 
-async function validarFormulario(formularioId: string) {
+async function validarFormulario(formularioId: string, tipoMentoria: TipoFormulario) {
   const form = await prisma.formulario.findUnique({
     where: { id: formularioId },
-    include: { _count: { select: { preguntas: true } } },
+    include: {
+      _count: { select: { preguntas: true, piezasContenido: true } },
+      piezasContenido: { include: { _count: { select: { medios: true } } } },
+    },
   });
   if (!form) return { error: "Formulario no encontrado." };
-  if (form._count.preguntas === 0) {
+  const tipoForm = parseTipoFormulario(form.tipo);
+  if (tipoForm !== tipoMentoria) {
+    return { error: "El formulario debe ser del mismo tipo que la mentoría." };
+  }
+  if (tipoForm === "CONTENIDO") {
+    if (form._count.piezasContenido === 0) {
+      return { error: "El formulario aún no tiene casillas de contenido." };
+    }
+    if (form.piezasContenido.some((pieza) => pieza._count.medios === 0)) {
+      return { error: "Cada casilla de contenido necesita al menos una foto, video o archivo." };
+    }
+  } else if (form._count.preguntas === 0) {
     return { error: "El formulario aún no tiene preguntas." };
   }
   return { form };
+}
+
+async function exigirMentoriaFeedback(convocatoriaId: string) {
+  const convocatoria = await prisma.convocatoria.findUnique({
+    where: { id: convocatoriaId },
+    select: { tipo: true },
+  });
+  if (!convocatoria) return { error: "Mentoría no encontrada." };
+  if (esMentoriaContenido(convocatoria.tipo)) {
+    return { error: "Las mentorías de contenido no tienen evaluación ni supervisión." };
+  }
+  return { ok: true as const };
 }
 
 function leerFechas(formData: FormData) {
@@ -74,11 +101,12 @@ export async function crearConvocatoria(formData: FormData) {
   const titulo = String(formData.get("titulo") ?? "").trim();
   const descripcion = String(formData.get("descripcion") ?? "").trim();
   const formularioId = String(formData.get("formularioId") ?? "");
+  const tipo = parseTipoFormulario(String(formData.get("tipo") ?? ""));
   if (!titulo || !formularioId) {
     return { error: "Título y formulario son obligatorios." };
   }
 
-  const formOk = await validarFormulario(formularioId);
+  const formOk = await validarFormulario(formularioId, tipo);
   if ("error" in formOk && formOk.error) return { error: formOk.error };
 
   const fechas = leerFechas(formData);
@@ -110,6 +138,7 @@ export async function crearConvocatoria(formData: FormData) {
     data: {
       titulo,
       descripcion,
+      tipo,
       formularioId,
       estado: "ABIERTA",
       imagen,
@@ -137,10 +166,17 @@ export async function actualizarConvocatoria(formData: FormData) {
   });
   if (!convocatoria) return { error: "Mentoría no encontrada." };
 
+  const tipoFinal =
+    convocatoria._count.postulaciones > 0
+      ? parseTipoFormulario(convocatoria.tipo)
+      : parseTipoFormulario(String(formData.get("tipo") ?? convocatoria.tipo));
   const formIdFinal =
     convocatoria._count.postulaciones > 0 ? convocatoria.formularioId : formularioId;
-  if (formIdFinal !== convocatoria.formularioId) {
-    const formOk = await validarFormulario(formIdFinal);
+  if (formIdFinal !== convocatoria.formularioId || tipoFinal !== parseTipoFormulario(convocatoria.tipo)) {
+    const formOk = await validarFormulario(formIdFinal, tipoFinal);
+    if ("error" in formOk && formOk.error) return { error: formOk.error };
+  } else if (formIdFinal === convocatoria.formularioId) {
+    const formOk = await validarFormulario(formIdFinal, tipoFinal);
     if ("error" in formOk && formOk.error) return { error: formOk.error };
   }
 
@@ -155,6 +191,7 @@ export async function actualizarConvocatoria(formData: FormData) {
     data: {
       titulo,
       descripcion,
+      tipo: tipoFinal,
       formularioId: formIdFinal,
       imagen,
       fechaInicio: fechas.fechaInicio,
@@ -185,6 +222,8 @@ export async function guardarConfigEvaluacion(formData: FormData) {
   const convocatoriaId = String(formData.get("convocatoriaId") ?? "");
   const n = Number.parseInt(String(formData.get("evaluacionesPorPostulacion") ?? "1"), 10);
   if (!convocatoriaId) return { error: "Mentoría no encontrada." };
+  const feedback = await exigirMentoriaFeedback(convocatoriaId);
+  if ("error" in feedback) return feedback;
   if (!Number.isFinite(n) || n < 1) {
     return { error: "Las evaluaciones por caso deben ser al menos 1." };
   }
@@ -258,6 +297,8 @@ export async function agregarEvaluadorAlPool(formData: FormData) {
   const convocatoriaId = String(formData.get("convocatoriaId") ?? "");
   const evaluadorId = String(formData.get("evaluadorId") ?? "");
   if (!convocatoriaId || !evaluadorId) return { error: "Datos incompletos." };
+  const feedback = await exigirMentoriaFeedback(convocatoriaId);
+  if ("error" in feedback) return feedback;
 
   const user = await prisma.user.findUnique({ where: { id: evaluadorId } });
   if (!user || user.role !== "EVALUADOR") return { error: "Evaluador no válido." };
@@ -276,6 +317,8 @@ export async function agregarEvaluadoresAlPool(formData: FormData) {
   const convocatoriaId = String(formData.get("convocatoriaId") ?? "");
   const evaluadorIds = [...new Set(formData.getAll("evaluadorId").map(String).filter(Boolean))];
   if (!convocatoriaId) return { error: "Datos incompletos." };
+  const feedback = await exigirMentoriaFeedback(convocatoriaId);
+  if ("error" in feedback) return feedback;
   if (evaluadorIds.length === 0) return { error: "Selecciona al menos un evaluador." };
 
   const usuarios = await prisma.user.findMany({
@@ -329,6 +372,9 @@ export async function asignarEvaluadorAPostulacion(formData: FormData) {
     },
   });
   if (!postulacion) return { error: "Caso no encontrado." };
+  if (esMentoriaContenido(postulacion.convocatoria.tipo)) {
+    return { error: "Las mentorías de contenido no tienen evaluación ni supervisión." };
+  }
   if (postulacion.estado === "FINALIZADA" || !postulacion.enviadaAt) {
     return { error: "Solo se asignan respuestas enviadas y no finalizadas." };
   }
@@ -391,6 +437,9 @@ export async function asignarEvaluadores(formData: FormData) {
     },
   });
   if (!postulacion) return { error: "Caso no encontrado." };
+  if (esMentoriaContenido(postulacion.convocatoria.tipo)) {
+    return { error: "Las mentorías de contenido no tienen evaluación ni supervisión." };
+  }
   if (postulacion.estado === "FINALIZADA" || !postulacion.enviadaAt) {
     return { error: "Solo se asignan casos enviados y no finalizados." };
   }
@@ -541,6 +590,8 @@ export async function asignarEvaluadoresAutomatico(formData: FormData) {
   await requireUser("ADMIN");
   const convocatoriaId = String(formData.get("convocatoriaId") ?? "");
   if (!convocatoriaId) return { error: "Mentoría no encontrada." };
+  const feedback = await exigirMentoriaFeedback(convocatoriaId);
+  if ("error" in feedback) return feedback;
   const result = await asignarEvaluadoresAutomaticoEnConvocatoria(convocatoriaId);
   revalidateConvocatorias(convocatoriaId);
   revalidatePath("/evaluador");
@@ -552,6 +603,8 @@ export async function agregarSupervisorAlPool(formData: FormData) {
   const convocatoriaId = String(formData.get("convocatoriaId") ?? "");
   const supervisorId = String(formData.get("supervisorId") ?? formData.get("evaluadorId") ?? "");
   if (!convocatoriaId || !supervisorId) return { error: "Datos incompletos." };
+  const feedback = await exigirMentoriaFeedback(convocatoriaId);
+  if ("error" in feedback) return feedback;
 
   const user = await prisma.user.findUnique({ where: { id: supervisorId } });
   if (!user || user.role !== "SUPERVISOR") return { error: "Supervisor no válido." };
@@ -576,6 +629,8 @@ export async function agregarSupervisoresAlPool(formData: FormData) {
     ),
   ];
   if (!convocatoriaId) return { error: "Datos incompletos." };
+  const feedback = await exigirMentoriaFeedback(convocatoriaId);
+  if ("error" in feedback) return feedback;
   if (supervisorIds.length === 0) return { error: "Selecciona al menos un supervisor." };
 
   const usuarios = await prisma.user.findMany({
@@ -629,6 +684,9 @@ export async function asignarSupervisorAPostulacion(formData: FormData) {
     },
   });
   if (!postulacion) return { error: "Caso no encontrado." };
+  if (esMentoriaContenido(postulacion.convocatoria.tipo)) {
+    return { error: "Las mentorías de contenido no tienen evaluación ni supervisión." };
+  }
   if (postulacion.estado === "FINALIZADA" || !postulacion.enviadaAt) {
     return { error: "Solo se asignan respuestas enviadas y no finalizadas." };
   }
@@ -667,6 +725,8 @@ export async function asignarSupervisoresAutomatico(formData: FormData) {
   await requireUser("ADMIN");
   const convocatoriaId = String(formData.get("convocatoriaId") ?? "");
   if (!convocatoriaId) return { error: "Mentoría no encontrada." };
+  const feedback = await exigirMentoriaFeedback(convocatoriaId);
+  if ("error" in feedback) return feedback;
   const result = await asignarSupervisoresAutomaticoEnConvocatoria(convocatoriaId);
   revalidateConvocatorias(convocatoriaId);
   revalidatePath("/evaluador");

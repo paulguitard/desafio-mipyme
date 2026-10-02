@@ -3,11 +3,14 @@ import { FichaCasoMeta } from "@/components/ficha-caso-meta";
 import { FormularioPostulante } from "@/components/formulario-postulante";
 import { PreguntaCampo } from "@/components/pregunta-campo";
 import { VistaCorreccionParticipante } from "@/components/vista-correccion-participante";
+import { VisorContenidoParticipante } from "@/components/visor-contenido-participante";
 import { prisma } from "@/lib/db";
 import { postulacionEditable, type EstadoPostulacion } from "@/lib/estado";
 import { convocatoriaAbiertaParaPostular } from "@/lib/convocatoria";
+import { medioDesdeFila } from "@/lib/contenido";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { etiquetaNombreCaso, extraerNombreCaso } from "@/lib/nombre-caso";
+import { esMentoriaContenido } from "@/lib/tipo-formulario";
 import { coincideRevisionCiclo, revisionesParaParticipante } from "@/lib/revision-ciclo";
 import { avisoEntradaParticipante } from "@/lib/aviso-entrada-caso";
 import { requireUser } from "@/lib/session";
@@ -22,15 +25,61 @@ export default async function PostulacionPage({
   const { id } = await params;
   const previa = await prisma.postulacion.findUnique({
     where: { id },
-    select: { postulanteId: true, convocatoria: { select: { formularioId: true } } },
+    select: { postulanteId: true, convocatoria: { select: { tipo: true } } },
   });
   if (!previa || previa.postulanteId !== user.id) notFound();
+
+  if (esMentoriaContenido(previa.convocatoria.tipo)) {
+    const postulacion = await prisma.postulacion.findUnique({
+      where: { id },
+      include: {
+        convocatoria: {
+          include: {
+            formulario: {
+              include: {
+                preguntas: { orderBy: { orden: "asc" } },
+                piezasContenido: {
+                  orderBy: { orden: "asc" },
+                  include: { medios: { orderBy: { orden: "asc" } } },
+                },
+              },
+            },
+          },
+        },
+        vistasContenido: { select: { piezaId: true } },
+      },
+    });
+    if (!postulacion || postulacion.postulanteId !== user.id) notFound();
+    const vistas = new Set(postulacion.vistasContenido.map((item) => item.piezaId));
+    return (
+      <VisorContenidoParticipante
+        postulacionId={postulacion.id}
+        titulo={postulacion.convocatoria.titulo}
+        piezas={postulacion.convocatoria.formulario.piezasContenido.map((pieza) => ({
+          id: pieza.id,
+          orden: pieza.orden,
+          titulo: pieza.titulo,
+          descripcion: pieza.descripcion,
+          marcada: vistas.has(pieza.id),
+          medios: pieza.medios
+            .map(medioDesdeFila)
+            .filter((item): item is NonNullable<typeof item> => Boolean(item)),
+        }))}
+      />
+    );
+  }
 
   const postulacion = await prisma.postulacion.findUnique({
     where: { id },
     include: {
       convocatoria: {
-        include: { formulario: { include: { preguntas: { orderBy: { orden: "asc" } } } } },
+        include: {
+          formulario: {
+            include: {
+              preguntas: { orderBy: { orden: "asc" } },
+            },
+          },
+        },
       },
       respuestas: {
         include: { versiones: { orderBy: { createdAt: "desc" } } },
@@ -126,6 +175,7 @@ export default async function PostulacionPage({
         esCorreccion,
         canEdit,
         mentoriaAbierta: abierta,
+        descripcionMentoria: postulacion.convocatoria.descripcion,
       })}
     >
       {esCorreccion ? (

@@ -1,5 +1,6 @@
 import type { EstadoAsignacion, EstadoPostulacion } from "@/lib/estado";
 import { ESTADO_ASIGNACION_LABEL, ESTADO_POSTULACION_LABEL, ESTADO_POSTULACION_LABEL_CORTO } from "@/lib/estado";
+import { etiquetaAvanceContenido, porcentajeVistoContenido } from "@/lib/contenido";
 
 const POSTULACION_CLASS: Record<EstadoPostulacion, string> = {
   BORRADOR: "bg-slate-100 text-navy",
@@ -29,6 +30,30 @@ const ASIGNACION_CLASS: Record<EstadoAsignacion, string> = {
   REPARADA: "bg-violet-100 text-violet-950",
   FINALIZADA: "bg-emerald-100 text-emerald-900",
 };
+
+export function BadgeAvanceContenido({
+  vistas,
+  total,
+  cortoMovil = false,
+}: {
+  vistas: number;
+  total: number;
+  cortoMovil?: boolean;
+}) {
+  const pct = porcentajeVistoContenido(vistas, total);
+  const label = etiquetaAvanceContenido(vistas, total);
+  const cls =
+    pct >= 100 ? "bg-emerald-100 text-emerald-900" : pct > 0 ? "bg-sky-100 text-sky-950" : "bg-slate-100 text-navy";
+  if (!cortoMovil) {
+    return <span className={`badge ${cls}`}>{label}</span>;
+  }
+  return (
+    <span className={`badge ${cls}`}>
+      <span className="badge-texto-largo">{label}</span>
+      <span className="badge-texto-corto">{label}</span>
+    </span>
+  );
+}
 
 export function BadgePostulacion({
   estado,

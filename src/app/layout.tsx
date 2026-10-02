@@ -1,6 +1,8 @@
 import { Montserrat, Nunito_Sans } from "next/font/google";
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { getAppBaseUrl } from "@/lib/app-url";
+import { DESKTOP_SCALE_SCRIPT } from "@/lib/desktop-scale-script";
 import "./globals.css";
 
 const nunito = Nunito_Sans({
@@ -23,6 +25,8 @@ const APP_DESCRIPTION =
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 10,
+  userScalable: true,
 };
 
 export const metadata: Metadata = {
@@ -46,8 +50,19 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="es" className={`${nunito.variable} ${montserrat.variable} h-full antialiased`}>
-      <body className="page-shell h-full min-h-full font-sans">{children}</body>
+    <html
+      lang="es"
+      className={`${nunito.variable} ${montserrat.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
+      <body className="page-shell h-full min-h-full font-sans">
+        <Script
+          id="desktop-scale"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: DESKTOP_SCALE_SCRIPT }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

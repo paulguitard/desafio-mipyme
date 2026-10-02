@@ -1,7 +1,14 @@
 export type AvisoEntradaCaso = {
   title: string;
   parrafos: string[];
+  claseModal?: string;
 };
+
+export function parrafosDescripcionMentoria(descripcion: string): string[] {
+  const texto = descripcion.trim();
+  if (!texto) return ["Esta mentoría no tiene descripción."];
+  return [texto];
+}
 
 const EXTRA_HISTORIAL =
   "En cada pregunta, Versiones abre el historial de cambios de la respuesta.";
@@ -123,6 +130,7 @@ export function avisoEntradaParticipante(args: {
   esCorreccion: boolean;
   canEdit: boolean;
   mentoriaAbierta: boolean;
+  descripcionMentoria?: string;
 }): AvisoEntradaCaso {
   if (!args.mentoriaAbierta && !args.canEdit) {
     return {
@@ -146,10 +154,8 @@ export function avisoEntradaParticipante(args: {
   if (args.canEdit) {
     return {
       title: "Completa tu caso",
-      parrafos: [
-        "Completa las preguntas y envía el caso cuando esté listo.",
-        "Puedes guardar un borrador y volver más tarde. Los campos con * son obligatorios.",
-      ],
+      parrafos: parrafosDescripcionMentoria(args.descripcionMentoria ?? ""),
+      claseModal: "modal-aviso-completa-caso",
     };
   }
   if (args.estado === "FINALIZADA") {

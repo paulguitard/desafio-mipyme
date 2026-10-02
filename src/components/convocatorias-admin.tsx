@@ -25,12 +25,19 @@ import {
   toDatetimeLocalValue,
   type PosicionImagen,
 } from "@/lib/convocatoria";
+import {
+  TIPO_FORMULARIO_LABEL,
+  esMentoriaContenido,
+  parseTipoFormulario,
+  type TipoFormulario,
+} from "@/lib/tipo-formulario";
 
 export type ConvocatoriaListaItem = {
   id: string;
   titulo: string;
   descripcion: string;
   estado: string;
+  tipo: TipoFormulario;
   formularioId: string;
   formularioTitulo: string;
   postulaciones: number;
@@ -40,7 +47,7 @@ export type ConvocatoriaListaItem = {
   imagenPos: PosicionImagen;
 };
 
-export type FormularioOpcion = { id: string; titulo: string };
+export type FormularioOpcion = { id: string; titulo: string; tipo: TipoFormulario };
 
 export function ConvocatoriasAdmin({
   convocatorias,
@@ -68,7 +75,10 @@ export function ConvocatoriasAdmin({
   const [evaluacion, setEvaluacion] = useState<PanelEvaluacion | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
   const [panelLoading, setPanelLoading] = useState(false);
+  const [tipoMentoria, setTipoMentoria] = useState<TipoFormulario>("FEEDBACK");
   const tituloModal = editing ? "Editar mentoría" : "Crear mentoría";
+  const tipoBloqueado = Boolean(editing && editing.postulaciones > 0);
+  const formulariosDelTipo = formularios.filter((form) => form.tipo === tipoMentoria);
 
   useEffect(() => {
     return () => {
@@ -88,6 +98,7 @@ export function ConvocatoriasAdmin({
   function abrirCrear() {
     setEditing(null);
     setError(null);
+    setTipoMentoria("FEEDBACK");
     setImagenPreview(null);
     setImagenPos({ x: 50, y: 50 });
     setVistaEmprendedor(false);
@@ -98,6 +109,7 @@ export function ConvocatoriasAdmin({
   function abrirEditar(item: ConvocatoriaListaItem) {
     setEditing(item);
     setError(null);
+    setTipoMentoria(parseTipoFormulario(item.tipo));
     setImagenPreview(null);
     setImagenPos(item.imagenPos);
     setVistaEmprendedor(false);
@@ -165,6 +177,7 @@ export function ConvocatoriasAdmin({
       titulo: String(formData.get("titulo") ?? "").trim(),
       descripcion: String(formData.get("descripcion") ?? "").trim(),
       estado: actual?.estado ?? "ABIERTA",
+      tipo: parseTipoFormulario(String(formData.get("tipo") ?? actual?.tipo ?? "FEEDBACK")),
       formularioId,
       formularioTitulo:
         formularios.find((form) => form.id === formularioId)?.titulo ?? actual?.formularioTitulo ?? "",
@@ -216,7 +229,7 @@ export function ConvocatoriasAdmin({
                 <div className="min-w-0">
                   <p className="text-xl font-semibold">{item.titulo}</p>
                   <p className="text-muted">
-                    {item.formularioTitulo} · {item.postulaciones} casos · {item.estado}
+                    {TIPO_FORMULARIO_LABEL[parseTipoFormulario(item.tipo)]} · {item.formularioTitulo} · {item.postulaciones} casos · {item.estado}
                   </p>
                   {rango ? <p className="text-muted">{rango}</p> : null}
                 </div>
@@ -294,7 +307,9 @@ export function ConvocatoriasAdmin({
                   ----
                 </span>
                 <span className="modal-title-meta">
-                  ({evaluacion.postulaciones.length}) Respuestas
+                  {esMentoriaContenido(evaluacion.tipo)
+                    ? `(${evaluacion.postulaciones.length}) Participantes`
+                    : `(${evaluacion.postulaciones.length}) Respuestas`}
                 </span>
               </>
             ) : null}
@@ -318,6 +333,8 @@ export function ConvocatoriasAdmin({
           <ConvocatoriaEvaluacion
             convocatoriaId={evaluacion.id}
             estadoConvocatoria={evaluacion.estado}
+            tipo={evaluacion.tipo}
+            piezas={evaluacion.piezas}
             evaluacionesPorPostulacion={evaluacion.evaluacionesPorPostulacion}
             preguntas={evaluacion.preguntas}
             pool={evaluacion.pool}
@@ -425,17 +442,42 @@ export function ConvocatoriasAdmin({
             />
           </div>
           <div className="field">
+            <label htmlFor="tipo">Tipo de mentoría</label>
+            <select
+              className="input"
+              id="tipo"
+              name="tipo"
+              value={tipoMentoria}
+              disabled={tipoBloqueado}
+              onChange={(event) => setTipoMentoria(parseTipoFormulario(event.target.value))}
+            >
+              <option value="FEEDBACK">{TIPO_FORMULARIO_LABEL.FEEDBACK}</option>
+              <option value="CONTENIDO">{TIPO_FORMULARIO_LABEL.CONTENIDO}</option>
+            </select>
+            {tipoBloqueado ? (
+              <>
+                <input type="hidden" name="tipo" value={tipoMentoria} />
+                <p className="text-muted">No se puede cambiar el tipo porque ya hay participaciones.</p>
+              </>
+            ) : null}
+          </div>
+          <div className="field">
             <label htmlFor="formularioId">Formulario</label>
             <select
               className="input"
               id="formularioId"
               name="formularioId"
               required
-              defaultValue={editing?.formularioId ?? ""}
+              defaultValue={
+                editing && formulariosDelTipo.some((form) => form.id === editing.formularioId)
+                  ? editing.formularioId
+                  : ""
+              }
+              key={`${tipoMentoria}-${editing?.id ?? "nuevo"}`}
               disabled={Boolean(editing && editing.postulaciones > 0)}
             >
               <option value="">Selecciona un formulario</option>
-              {formularios.map((form) => (
+              {formulariosDelTipo.map((form) => (
                 <option key={form.id} value={form.id}>
                   {form.titulo}
                 </option>

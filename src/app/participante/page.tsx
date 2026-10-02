@@ -1,4 +1,4 @@
-import { BadgePostulacion } from "@/components/badges";
+import { BadgeAvanceContenido, BadgePostulacion } from "@/components/badges";
 import { ReelMentoriasAbiertas, type MentoriaAbiertaVista } from "@/components/reel-mentorias-abiertas";
 import { prisma } from "@/lib/db";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
@@ -12,6 +12,7 @@ import {
   parseImagenPosicion,
 } from "@/lib/convocatoria";
 import { directStoredImageUrl } from "@/lib/storage/image-url";
+import { esMentoriaContenido, parseTipoFormulario } from "@/lib/tipo-formulario";
 
 function truncar(texto: string, max: number) {
   const limpio = texto.trim();
@@ -29,7 +30,14 @@ export default async function ParticipanteHomePage() {
     prisma.postulacion.findMany({
       where: { postulanteId: user.id },
       include: {
-        convocatoria: { select: { titulo: true } },
+        convocatoria: {
+          select: {
+            titulo: true,
+            tipo: true,
+            formulario: { select: { _count: { select: { piezasContenido: true } } } },
+          },
+        },
+        _count: { select: { vistasContenido: true } },
       },
       orderBy: { updatedAt: "desc" },
     }),
@@ -44,6 +52,7 @@ export default async function ParticipanteHomePage() {
         id: item.id,
         titulo: item.titulo,
         descripcion: item.descripcion,
+        tipo: parseTipoFormulario(item.tipo),
         imagenUrl: imagen ? directStoredImageUrl(imagen) : null,
         imagenPos: parseImagenPosicion(item.imagen),
         cierre: etiquetaCierreAbierto(item.fechaCierre),
@@ -67,6 +76,7 @@ export default async function ParticipanteHomePage() {
           {postulaciones.length === 0 ? <p className="text-muted">Aún no tienes casos.</p> : null}
           {postulaciones.map((item) => {
             const nombreCaso = etiquetaNombreCaso(item.nombreCaso);
+            const esContenido = esMentoriaContenido(item.convocatoria.tipo);
             return (
               <a
                 key={item.id}
@@ -83,7 +93,15 @@ export default async function ParticipanteHomePage() {
                     <span className="caso-fila-texto-corto">{truncar(item.convocatoria.titulo, 30)}</span>
                   </p>
                 </div>
-                <BadgePostulacion estado={item.estado} cortoMovil />
+                {esContenido ? (
+                  <BadgeAvanceContenido
+                    vistas={item._count.vistasContenido}
+                    total={item.convocatoria.formulario._count.piezasContenido}
+                    cortoMovil
+                  />
+                ) : (
+                  <BadgePostulacion estado={item.estado} cortoMovil />
+                )}
                 <svg className="caso-fila-flecha" viewBox="0 0 16 16" aria-hidden="true">
                   <path
                     fill="currentColor"

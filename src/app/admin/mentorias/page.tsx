@@ -2,6 +2,7 @@ import { ConvocatoriasAdmin } from "@/components/convocatorias-admin";
 import { prisma } from "@/lib/db";
 import { parseImagenConvocatoria, parseImagenPosicion } from "@/lib/convocatoria";
 import { directStoredImageUrl } from "@/lib/storage/image-url";
+import { parseTipoFormulario } from "@/lib/tipo-formulario";
 
 export default async function MentoriasPage() {
   const [convocatorias, formularios] = await Promise.all([
@@ -24,6 +25,7 @@ export default async function MentoriasPage() {
           titulo: item.titulo,
           descripcion: item.descripcion,
           estado: item.estado,
+          tipo: parseTipoFormulario(item.tipo),
           formularioId: item.formularioId,
           formularioTitulo: item.formulario.titulo,
           postulaciones: item._count.postulaciones,
@@ -33,7 +35,11 @@ export default async function MentoriasPage() {
           imagenPos: parseImagenPosicion(item.imagen),
         };
       })}
-      formularios={formularios.map((form) => ({ id: form.id, titulo: form.titulo }))}
+      formularios={formularios.map((form) => ({
+        id: form.id,
+        titulo: form.titulo,
+        tipo: parseTipoFormulario(form.tipo),
+      }))}
     />
   );
 }

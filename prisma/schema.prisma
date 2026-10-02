@@ -94,14 +94,17 @@ model Formulario {
   id             String   @id @default(cuid())
   titulo         String
   descripcion    String   @default("")
+  /// FEEDBACK | CONTENIDO
+  tipo           String   @default("FEEDBACK")
   modoEvaluacion String   @default("GENERAL") // POR_PREGUNTA | GENERAL
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   creadoPorId    String
   creadoPor      User     @relation(fields: [creadoPorId], references: [id])
 
-  preguntas     Pregunta[]
-  convocatorias Convocatoria[]
+  preguntas        Pregunta[]
+  piezasContenido  PiezaContenido[]
+  convocatorias    Convocatoria[]
 }
 
 model Pregunta {
@@ -127,10 +130,54 @@ model Pregunta {
   @@index([formularioId])
 }
 
+model PiezaContenido {
+  id           String     @id @default(cuid())
+  formularioId String
+  formulario   Formulario @relation(fields: [formularioId], references: [id], onDelete: Cascade)
+  orden        Int
+  titulo       String
+  descripcion  String     @default("")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  medios MedioContenido[]
+  vistas VistaContenido[]
+
+  @@index([formularioId])
+}
+
+model MedioContenido {
+  id      String         @id @default(cuid())
+  piezaId String
+  pieza   PiezaContenido @relation(fields: [piezaId], references: [id], onDelete: Cascade)
+  orden   Int
+  /// imagen | video | archivo
+  clase   String
+  /// JSON StoredFile o StoredVideoLink
+  payload String         @default("{}")
+  createdAt DateTime     @default(now())
+
+  @@index([piezaId])
+}
+
+model VistaContenido {
+  id            String         @id @default(cuid())
+  postulacionId String
+  postulacion   Postulacion    @relation(fields: [postulacionId], references: [id], onDelete: Cascade)
+  piezaId       String
+  pieza         PiezaContenido @relation(fields: [piezaId], references: [id], onDelete: Cascade)
+  vistaAt       DateTime       @default(now())
+
+  @@unique([postulacionId, piezaId])
+  @@index([piezaId])
+}
+
 model Convocatoria {
   id                         String    @id @default(cuid())
   titulo                     String
   descripcion                String    @default("")
+  /// FEEDBACK | CONTENIDO
+  tipo                       String    @default("FEEDBACK")
   formularioId               String
   formulario                 Formulario @relation(fields: [formularioId], references: [id])
   estado                     String    @default("ABIERTA")
@@ -185,9 +232,10 @@ model Postulacion {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  respuestas   Respuesta[]
-  asignaciones AsignacionEvaluador[]
-  supervision  AsignacionSupervisor?
+  respuestas      Respuesta[]
+  asignaciones    AsignacionEvaluador[]
+  supervision     AsignacionSupervisor?
+  vistasContenido VistaContenido[]
 
   @@unique([convocatoriaId, postulanteId])
   @@index([postulanteId])

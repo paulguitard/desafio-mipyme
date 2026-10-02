@@ -27,6 +27,7 @@ import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { coincideRevisionCiclo } from "@/lib/revision-ciclo";
 import { sanitizeRichText } from "@/lib/html";
 import { extraerNombreCaso } from "@/lib/nombre-caso";
+import { esMentoriaContenido } from "@/lib/tipo-formulario";
 import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
 import { avisarEvaluadoresRespuestaReenviada } from "@/lib/correo-notificacion";
 import { randomUUID } from "node:crypto";
@@ -116,6 +117,7 @@ export async function iniciarPostulacion(formData: FormData) {
       convocatoriaId,
       postulanteId: user.id,
       estado: "BORRADOR",
+      nombreCaso: esMentoriaContenido(convocatoria.tipo) ? user.name ?? "" : "",
     },
   });
   redirect(`/participante/postulaciones/${postulacion.id}`);
@@ -369,6 +371,9 @@ export async function guardarBorrador(formData: FormData) {
   const id = String(formData.get("postulacionId") ?? "");
   const postulacion = await cargaPostulacionDelUsuario(id, user.id);
   if (!postulacion) return { error: "Caso no encontrado." };
+  if (esMentoriaContenido(postulacion.convocatoria.tipo)) {
+    return { error: "Esta mentoría de contenido no se responde." };
+  }
 
   const estado = postulacion.estado as EstadoPostulacion;
   if (!postulacionEditable(estado, convocatoriaAbiertaParaPostular(postulacion.convocatoria))) {
@@ -399,6 +404,9 @@ export async function enviarPostulacion(formData: FormData) {
   const id = String(formData.get("postulacionId") ?? "");
   const postulacion = await cargaPostulacionDelUsuario(id, user.id);
   if (!postulacion) return { error: "Caso no encontrado." };
+  if (esMentoriaContenido(postulacion.convocatoria.tipo)) {
+    return { error: "Esta mentoría de contenido no se responde." };
+  }
 
   const estado = postulacion.estado as EstadoPostulacion;
   if (!postulacionEditable(estado, convocatoriaAbiertaParaPostular(postulacion.convocatoria))) {
@@ -481,5 +489,34 @@ export async function enviarPostulacion(formData: FormData) {
   revalidatePath(`/participante/postulaciones/${id}`);
   revalidatePath("/participante");
   revalidatePath("/evaluador");
+  return { ok: true };
+}
+
+export async function marcarVistaPieza(postulacionId: string, piezaId: string) {
+  const user = await requireUser("EMPRENDEDOR");
+  if (!postulacionId || !piezaId) return { error: "Casilla no encontrada." };
+  const postulacion = await prisma.postulacion.findUnique({
+    where: { id: postulacionId },
+    include: { convocatoria: { select: { tipo: true, formularioId: true, id: true } } },
+  });
+  if (!postulacion || postulacion.postulanteId !== user.id) {
+    return { error: "Participación no encontrada." };
+  }
+  if (!esMentoriaContenido(postulacion.convocatoria.tipo)) {
+    return { error: "Esta mentoría no registra visualizaciones de contenido." };
+  }
+  const pieza = await prisma.piezaContenido.findFirst({
+    where: { id: piezaId, formularioId: postulacion.convocatoria.formularioId },
+    select: { id: true },
+  });
+  if (!pieza) return { error: "Casilla no encontrada." };
+  await prisma.vistaContenido.upsert({
+    where: { postulacionId_piezaId: { postulacionId, piezaId } },
+    update: {},
+    create: { postulacionId, piezaId },
+  });
+  revalidatePath(`/participante/postulaciones/${postulacionId}`);
+  revalidatePath(`/admin/mentorias/${postulacion.convocatoria.id}`);
+  revalidatePath("/admin/mentorias");
   return { ok: true };
 }

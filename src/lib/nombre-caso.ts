@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { parseValor } from "@/lib/preguntas";
+import { esMentoriaContenido } from "@/lib/tipo-formulario";
 
 export const CLAVE_NOMBRE_CASO = "nombre_caso";
 export const ENUNCIADO_NOMBRE_CASO = "Nombre del caso";
@@ -69,6 +70,12 @@ export function etiquetaNombreCaso(nombre: string | null | undefined): string {
 }
 
 export async function asegurarPreguntaNombreCaso(formularioId: string) {
+  const formulario = await prisma.formulario.findUnique({
+    where: { id: formularioId },
+    select: { tipo: true },
+  });
+  if (!formulario || esMentoriaContenido(formulario.tipo)) return;
+
   const preguntas = await prisma.pregunta.findMany({
     where: { formularioId },
     orderBy: { orden: "asc" },

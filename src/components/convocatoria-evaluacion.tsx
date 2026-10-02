@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { createPortal } from "react-dom";
 import { IndicadorGuardando } from "@/components/indicador-guardando";
 import { useDatoOptimista } from "@/lib/use-dato-optimista";
@@ -30,6 +30,7 @@ import { normalizarCorreo } from "@/lib/correo";
 import { parseValor } from "@/lib/preguntas";
 import { ESCUELAS } from "@/lib/escuelas";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
+import { esMentoriaContenido, parseTipoFormulario, type TipoFormulario } from "@/lib/tipo-formulario";
 import {
   contiene,
   estadoAsignacionFicha,
@@ -83,6 +84,7 @@ type PostulacionItem = {
   emprendedorEmail: string;
   nombreCaso: string;
   respuestas: RespuestaFiltro[];
+  vistasPiezaIds?: string[];
   asignaciones: Asignacion[];
   supervision?: SupervisionFicha | null;
 };
@@ -349,6 +351,8 @@ export function ConvocatoriaEvaluacion({
   pageSize = 40,
   totalPostulaciones,
   onMutated,
+  tipo = "FEEDBACK",
+  piezas = [],
 }: {
   convocatoriaId: string;
   estadoConvocatoria: string;
@@ -363,6 +367,8 @@ export function ConvocatoriaEvaluacion({
   pageSize?: number;
   totalPostulaciones?: number;
   onMutated?: () => Promise<void> | void;
+  tipo?: TipoFormulario;
+  piezas?: { id: string; titulo: string }[];
 }) {
   const servidor = useMemo(
     () => ({
@@ -401,6 +407,9 @@ export function ConvocatoriaEvaluacion({
   const [filtroEvaluadorId, setFiltroEvaluadorId] = useState("");
   const [filtroEstadoSupervision, setFiltroEstadoSupervision] = useState("");
   const [filtroSupervisorId, setFiltroSupervisorId] = useState("");
+  const [filtroPiezas, setFiltroPiezas] = useState<Record<string, string>>({});
+  const esContenido = esMentoriaContenido(parseTipoFormulario(tipo));
+  const columnasContenido = { "--casillas": String(piezas.length) } as CSSProperties;
   const [panelLateral, setPanelLateral] = useState<"evaluadores" | "supervisores">("evaluadores");
   const [portalListo, setPortalListo] = useState(false);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -434,6 +443,16 @@ export function ConvocatoriaEvaluacion({
         return false;
       }
       if (!contiene(postulacion.emprendedorEmail, filtroCorreo)) return false;
+      if (esContenido) {
+        for (const pieza of piezas) {
+          const modo = filtroPiezas[pieza.id];
+          if (!modo) continue;
+          const marcada = (postulacion.vistasPiezaIds ?? []).includes(pieza.id);
+          if (modo === "marcada" && !marcada) return false;
+          if (modo === "sin" && marcada) return false;
+        }
+        return true;
+      }
       if (filtroEstadoRespuesta) {
         if (estadoRespuestaFicha(postulacion, preguntas) !== filtroEstadoRespuesta) return false;
       }
@@ -478,6 +497,9 @@ export function ConvocatoriaEvaluacion({
     filtroPreguntaId,
     preguntas,
     respuestas,
+    esContenido,
+    piezas,
+    filtroPiezas,
   ]);
 
   const evaluadoresFiltrados = useMemo(() => {
@@ -729,7 +751,7 @@ export function ConvocatoriaEvaluacion({
 
   return (
     <div className="eval-panel eval-shell-open">
-      <div className="eval-shell">
+      <div className={`eval-shell${esContenido ? " is-contenido" : ""}`}>
       <aside className="eval-side" aria-label="Evaluadores y supervisores de la mentoría">
         <div className="eval-side-header">
           <h3 className="text-lg font-semibold text-navy">
@@ -953,7 +975,7 @@ export function ConvocatoriaEvaluacion({
       </aside>
 
 
-      <div className="eval-main" aria-label="Respuestas de la mentoría" data-tour="lista-casos">
+      <div className="eval-main" aria-label={esContenido ? "Participantes de la mentoría" : "Respuestas de la mentoría"} data-tour="lista-casos">
         <div className="respuestas-filtros space-y-3">
           <div
             className={`eval-filtros-row${filtroPreguntaId ? " has-contiene" : ""}`}
@@ -978,6 +1000,26 @@ export function ConvocatoriaEvaluacion({
                 placeholder="Buscar por correo"
               />
             </div>
+            {esContenido
+              ? piezas.map((pieza) => (
+                  <div className="field" key={pieza.id}>
+                    <label htmlFor={`filtro-pieza-${pieza.id}`}>{pieza.titulo}</label>
+                    <select
+                      className="input"
+                      id={`filtro-pieza-${pieza.id}`}
+                      value={filtroPiezas[pieza.id] ?? ""}
+                      onChange={(event) =>
+                        setFiltroPiezas((prev) => ({ ...prev, [pieza.id]: event.target.value }))
+                      }
+                    >
+                      <option value="">Todas</option>
+                      <option value="marcada">Marcada</option>
+                      <option value="sin">Sin marcar</option>
+                    </select>
+                  </div>
+                ))
+              : (
+              <>
             <div className="field">
               <label htmlFor="filtro-pregunta">Pregunta</label>
               <select
@@ -1086,6 +1128,8 @@ export function ConvocatoriaEvaluacion({
                 ))}
               </select>
             </div>
+              </>
+              )}
           </div>
 
           {error ? <p className="text-danger">{error}</p> : null}
@@ -1113,6 +1157,18 @@ export function ConvocatoriaEvaluacion({
             </p>
           ) : null}
           {respuestasFiltradas.length > 0 ? (
+            esContenido ? (
+            <div className="eval-lista-cabecera is-contenido" style={columnasContenido} aria-hidden="true">
+              <span className="eval-lista-cabecera-ver">Ver</span>
+              <span>Participante</span>
+              {piezas.map((pieza) => (
+                <span key={pieza.id}>{pieza.titulo}</span>
+              ))}
+              <span className="eval-lista-cabecera-accion">
+                <span className="sr-only">Acciones</span>
+              </span>
+            </div>
+            ) : (
             <div className="eval-lista-cabecera" aria-hidden="true">
               <span>Estado respuestas</span>
               <span>Estado evaluaciones</span>
@@ -1121,25 +1177,35 @@ export function ConvocatoriaEvaluacion({
                 <span className="sr-only">Acciones</span>
               </span>
             </div>
+            )
           ) : null}
           {respuestas.length === 0 ? (
-            <p className="text-muted">Todavía no hay respuestas en esta mentoría.</p>
+            <p className="text-muted">
+              {esContenido
+                ? "Todavía no hay participantes en esta mentoría."
+                : "Todavía no hay respuestas en esta mentoría."}
+            </p>
           ) : respuestasFiltradas.length === 0 ? (
-            <p className="text-muted">Ninguna ficha coincide con los filtros.</p>
+            <p className="text-muted">
+              {esContenido
+                ? "Ningún participante coincide con los filtros."
+                : "Ninguna ficha coincide con los filtros."}
+            </p>
           ) : null}
           {respuestasFiltradas.map((postulacion) => {
             const estadoRespuesta = estadoRespuestaFicha(postulacion, preguntas);
             const respuestaAsignable =
               Boolean(postulacion.enviadaAt) && postulacion.estado !== "FINALIZADA";
-            const puedeAsignarEval = respuestaAsignable;
-            const puedeAsignarSup = respuestaAsignable && !postulacion.supervision;
+            const puedeAsignarEval = !esContenido && respuestaAsignable;
+            const puedeAsignarSup = !esContenido && respuestaAsignable && !postulacion.supervision;
             const esDestino = dropTargetId === postulacion.id;
             return (
               <article
                 key={postulacion.id}
-                className={`eval-ficha${esDestino ? " is-drop-target" : ""}${
-                  puedeAsignarEval || puedeAsignarSup ? "" : " is-locked"
+                className={`eval-ficha${esContenido ? " is-contenido" : ""}${esDestino ? " is-drop-target" : ""}${
+                  puedeAsignarEval || puedeAsignarSup || esContenido ? "" : " is-locked"
                 }`}
+                style={esContenido ? columnasContenido : undefined}
                 onDragOver={(event) => {
                   const payload = dragPoolRef.current;
                   const esSup =
@@ -1173,6 +1239,58 @@ export function ConvocatoriaEvaluacion({
                   void soltarEvaluador(postulacion.id, payload.id);
                 }}
               >
+                {esContenido ? (
+                  <>
+                    <div className="eval-ficha-ver-col">
+                      <button
+                        className="btn btn-sm btn-secondary eval-ficha-ver"
+                        type="button"
+                        disabled={detalleLoadingId === postulacion.id}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          void abrirDetalle(postulacion);
+                        }}
+                      >
+                        Ver
+                      </button>
+                    </div>
+                    <div className="eval-ficha-nombre">
+                      <span className="eval-ficha-value">{postulacion.emprendedorNombre}</span>
+                    </div>
+                    {piezas.map((pieza) => {
+                      const marcada = (postulacion.vistasPiezaIds ?? []).includes(pieza.id);
+                      return (
+                        <div key={pieza.id} className="eval-ficha-casilla">
+                          <input
+                            className="pieza-contenido-check"
+                            type="checkbox"
+                            checked={marcada}
+                            disabled
+                            readOnly
+                            aria-label={`${pieza.titulo}: ${marcada ? "vista" : "sin ver"}`}
+                          />
+                        </div>
+                      );
+                    })}
+                    <div className="eval-ficha-acciones">
+                      <button
+                        className="eval-ficha-eliminar"
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          void eliminarFicha(postulacion);
+                        }}
+                        aria-label={`Eliminar participación de ${postulacion.emprendedorNombre}`}
+                        title="Eliminar participación"
+                      >
+                        <IconoBasurero />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
                 <div className="eval-ficha-respuesta">
                   <span className="eval-ficha-ronda">
                     Ronda {rondaRespuestaEmprendedor(postulacion.asignaciones)}
@@ -1287,7 +1405,9 @@ export function ConvocatoriaEvaluacion({
                   >
                     <IconoBasurero />
                   </button>
-                </div>
+                    </div>
+                  </>
+                )}
               </article>
             );
           })}

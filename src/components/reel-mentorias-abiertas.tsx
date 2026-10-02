@@ -5,11 +5,13 @@ import { iniciarPostulacionForm } from "@/actions/postulaciones";
 import { ImagenMentoriaCover } from "@/components/imagen-mentoria";
 import { Modal } from "@/components/modal";
 import type { PosicionImagen } from "@/lib/convocatoria";
+import { TIPO_FORMULARIO_LABEL, type TipoFormulario } from "@/lib/tipo-formulario";
 
 export type MentoriaAbiertaVista = {
   id: string;
   titulo: string;
   descripcion: string;
+  tipo: TipoFormulario;
   imagenUrl: string | null;
   imagenPos: PosicionImagen;
   cierre: string;
@@ -158,6 +160,7 @@ function TarjetaMentoria({
     >
       <div className="reel-mentoria-foto-wrap">
         <FotoMentoria item={item} priority={priority} />
+        <span className="reel-mentoria-tipo">{TIPO_FORMULARIO_LABEL[item.tipo]}</span>
         <button
           className="reel-mentoria-ver-mas"
           type="button"
@@ -169,6 +172,7 @@ function TarjetaMentoria({
           }}
           onPointerDown={(event) => event.stopPropagation()}
         >
+          <span>Ver detalles</span>
           <IconoVerDetalles />
         </button>
       </div>

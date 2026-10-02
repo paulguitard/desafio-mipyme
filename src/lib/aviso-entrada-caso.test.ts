@@ -35,4 +35,17 @@ describe("avisoEntradaParticipante", () => {
     expect(aviso.title).toContain("observaciones");
     expect(aviso.parrafos[0]).toContain("evaluador");
   });
+
+  it("usa la descripción de la mentoría al completar el caso", () => {
+    const aviso = avisoEntradaParticipante({
+      estado: "BORRADOR",
+      esCorreccion: false,
+      canEdit: true,
+      mentoriaAbierta: true,
+      descripcionMentoria: "Texto de la ficha de la mentoría.",
+    });
+    expect(aviso.title).toBe("Completa tu caso");
+    expect(aviso.parrafos).toEqual(["Texto de la ficha de la mentoría."]);
+    expect(aviso.claseModal).toBe("modal-aviso-completa-caso");
+  });
 });

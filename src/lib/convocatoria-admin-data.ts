@@ -3,6 +3,8 @@ import { normalizarCorreo } from "@/lib/correo";
 import { esEvaluacionObservada } from "@/lib/cupo-asignacion";
 import { extraerNombreCaso } from "@/lib/nombre-caso";
 import { USER_PUBLIC_SELECT } from "@/lib/user-public";
+import { medioDesdeFila } from "@/lib/contenido";
+import { parseTipoFormulario } from "@/lib/tipo-formulario";
 
 export type CasoPoolResumen = {
   postulacionId: string;
@@ -95,7 +97,13 @@ export async function getPanelEvaluacion(id: string, page = 1) {
       where: { id },
       include: {
         formulario: {
-          include: { preguntas: { orderBy: { orden: "asc" } } },
+          include: {
+            preguntas: { orderBy: { orden: "asc" } },
+            piezasContenido: {
+              orderBy: { orden: "asc" },
+              include: { medios: { orderBy: { orden: "asc" } } },
+            },
+          },
         },
         evaluadores: {
           include: { evaluador: { select: USER_PUBLIC_SELECT } },
@@ -109,6 +117,7 @@ export async function getPanelEvaluacion(id: string, page = 1) {
           include: {
             postulante: { select: USER_PUBLIC_SELECT },
             respuestas: { select: { preguntaId: true, valor: true } },
+            vistasContenido: { select: { piezaId: true } },
             asignaciones: {
               include: { evaluador: { select: USER_PUBLIC_SELECT } },
               orderBy: { orden: "asc" },
@@ -209,6 +218,7 @@ export async function getPanelEvaluacion(id: string, page = 1) {
     id: convocatoria.id,
     titulo: convocatoria.titulo,
     estado: convocatoria.estado,
+    tipo: parseTipoFormulario(convocatoria.tipo),
     evaluacionesPorPostulacion: convocatoria.evaluacionesPorPostulacion,
     page: safePage,
     pageSize: PANEL_PAGE_SIZE,
@@ -218,6 +228,10 @@ export async function getPanelEvaluacion(id: string, page = 1) {
       enunciado: pregunta.enunciado,
       obligatoria: pregunta.obligatoria,
       opciones: pregunta.opciones,
+    })),
+    piezas: convocatoria.formulario.piezasContenido.map((pieza) => ({
+      id: pieza.id,
+      titulo: pieza.titulo,
     })),
     pool: convocatoria.evaluadores.map((item) => {
       const resumen = stats.get(item.evaluadorId) ?? resumenVacio();
@@ -281,6 +295,7 @@ export async function getPanelEvaluacion(id: string, page = 1) {
         preguntaId: respuesta.preguntaId,
         valor: respuesta.valor,
       })),
+      vistasPiezaIds: postulacion.vistasContenido.map((item) => item.piezaId),
       nombreCaso: postulacion.nombreCaso || extraerNombreCaso(convocatoria.formulario.preguntas, postulacion.respuestas),
       asignaciones: postulacion.asignaciones.map((asignacion) => ({
         evaluadorId: asignacion.evaluadorId,
@@ -321,9 +336,18 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
       supervision: { include: { supervisor: { select: USER_PUBLIC_SELECT } } },
       convocatoria: {
         include: {
-          formulario: { include: { preguntas: { orderBy: { orden: "asc" } } } },
+          formulario: {
+            include: {
+              preguntas: { orderBy: { orden: "asc" } },
+              piezasContenido: {
+                orderBy: { orden: "asc" },
+                include: { medios: { orderBy: { orden: "asc" } } },
+              },
+            },
+          },
         },
       },
+      vistasContenido: { select: { piezaId: true } },
     },
   });
   if (!postulacion) return null;
@@ -339,6 +363,7 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
     nombreCaso: postulacion.nombreCaso || extraerNombreCaso(preguntas, postulacion.respuestas),
     convocatoriaTitulo: postulacion.convocatoria.titulo,
     convocatoriaEstado: postulacion.convocatoria.estado,
+    tipo: parseTipoFormulario(postulacion.convocatoria.tipo),
     modoEvaluacion: postulacion.convocatoria.formulario.modoEvaluacion,
     supervisorNombre: postulacion.supervision?.supervisor.name ?? null,
     supervisorEmail: postulacion.supervision?.supervisor.email
@@ -356,6 +381,16 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
       permiteVideoLink: pregunta.permiteVideoLink,
       conNotas: pregunta.conNotas,
       escalaNotas: pregunta.escalaNotas,
+    })),
+    piezas: postulacion.convocatoria.formulario.piezasContenido.map((pieza) => ({
+      id: pieza.id,
+      orden: pieza.orden,
+      titulo: pieza.titulo,
+      descripcion: pieza.descripcion,
+      marcada: postulacion.vistasContenido.some((item) => item.piezaId === pieza.id),
+      medios: pieza.medios
+        .map(medioDesdeFila)
+        .filter((item): item is NonNullable<typeof item> => Boolean(item)),
     })),
     respuestas: postulacion.respuestas.map((respuesta) => ({
       preguntaId: respuesta.preguntaId,

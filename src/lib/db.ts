@@ -7,7 +7,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /** Subir este valor tras cambios de schema para invalidar el cliente cacheado en `next dev`. */
-const PRISMA_SCHEMA_REV = "configApp-evaluacion-por-pregunta-1";
+const PRISMA_SCHEMA_REV = "piezas-contenido-cliente-2";
 
 if (
   process.env.NODE_ENV !== "production" &&

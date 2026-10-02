@@ -13,11 +13,18 @@ export function AvisoEntradaCaso({ aviso }: { aviso: AvisoEntradaCasoDatos | nul
   }
 
   return (
-    <Modal open={open} compact sinCerrar title={aviso.title} onClose={cerrar}>
+    <Modal
+      open={open}
+      compact
+      sinCerrar
+      title={aviso.title}
+      className={aviso.claseModal}
+      onClose={cerrar}
+    >
       <div className="space-y-4">
         <div className="space-y-3">
           {aviso.parrafos.map((parrafo) => (
-            <p key={parrafo} className="text-sm leading-relaxed">
+            <p key={parrafo} className="aviso-entrada-texto text-sm leading-relaxed whitespace-pre-wrap">
               {parrafo}
             </p>
           ))}

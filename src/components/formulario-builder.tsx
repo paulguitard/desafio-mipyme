@@ -446,6 +446,7 @@ export function FormularioBuilder({
     void accion.ejecutar(() =>
       crearFormularioCompleto({
         titulo: titulo.trim(),
+        tipo: "FEEDBACK",
         modoEvaluacion,
         preguntas: preguntas.map((pregunta) => ({
           enunciado: pregunta.enunciado,

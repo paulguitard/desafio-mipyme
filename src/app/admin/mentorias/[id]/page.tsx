@@ -57,6 +57,8 @@ export default async function MentoriaDetallePage({
       <ConvocatoriaEvaluacion
         convocatoriaId={panel.id}
         estadoConvocatoria={panel.estado}
+        tipo={panel.tipo}
+        piezas={panel.piezas}
         evaluacionesPorPostulacion={panel.evaluacionesPorPostulacion}
         preguntas={panel.preguntas}
         pool={panel.pool}

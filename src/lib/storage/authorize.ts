@@ -40,6 +40,21 @@ export async function userCanAccessStoredFile(
     return true;
   }
 
+  const medioContenido = await prisma.medioContenido.findFirst({
+    where: { payload: { contains: relativePath } },
+    select: { pieza: { select: { formularioId: true } } },
+  });
+  if (medioContenido) {
+    const participa = await prisma.postulacion.findFirst({
+      where: {
+        postulanteId: actor.id,
+        convocatoria: { formularioId: medioContenido.pieza.formularioId },
+      },
+      select: { id: true },
+    });
+    if (participa) return true;
+  }
+
   const [config, documento, respuesta, version] = await Promise.all([
     prisma.configCorreoRecuperacion.findFirst({
       where: { imagen: { contains: relativePath } },

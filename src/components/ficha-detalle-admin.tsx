@@ -6,12 +6,14 @@ import { HistorialVersionesRespuesta } from "@/components/historial-versiones-re
 import { PanelEvaluacionPregunta } from "@/components/panel-evaluacion-pregunta";
 import { PanelObservacionGeneral, PanelSupervisionPendiente } from "@/components/panel-observacion-general";
 import { PreguntaCampo } from "@/components/pregunta-campo";
+import { PiezaContenidoVista } from "@/components/pieza-contenido-vista";
 import type { DetalleFichaAdmin } from "@/lib/convocatoria-admin-data";
 import { normalizarCorreo } from "@/lib/correo";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { notasParaEvaluacionGeneral, parseEscalaNotas } from "@/lib/preguntas";
 import { historialEvaluacion, revisionVigente } from "@/lib/revision-ciclo";
 import { historialSupervision } from "@/lib/supervision-ui";
+import { esMentoriaContenido } from "@/lib/tipo-formulario";
 
 function lineaPersona(
   nombre: string | null | undefined,
@@ -34,6 +36,47 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
   const esGeneral = modoEvaluacion === "GENERAL";
   const ciclo = asignacion?.cicloSupervision ?? 1;
   const ronda = asignacion?.rondaActual ?? 1;
+  const esContenido = esMentoriaContenido(data.tipo);
+
+  if (esContenido) {
+    return (
+      <div className="ficha-detalle-admin eval-shell-open">
+        <section className="eval-detalle-shell" aria-label="Contenido visto por el participante">
+          <EvalDetalleColumnas
+            casoTitle="Contenido"
+            casoSubtitle={lineaPersona(
+              data.emprendedorNombre,
+              data.emprendedorEmail,
+              "Sin participante",
+            )}
+            caso={(data.piezas ?? []).map((pieza) => (
+              <EvalDetalleCelda key={pieza.id} panel="caso">
+                <PiezaContenidoVista pieza={pieza} />
+              </EvalDetalleCelda>
+            ))}
+            evalTitle="Evaluación"
+            evalSubtitle="Sin evaluación"
+            evaluacion={
+              <EvalDetalleCelda panel="eval">
+                <div className="card space-y-2 p-4">
+                  <p className="text-muted">Las mentorías de contenido no tienen evaluación.</p>
+                </div>
+              </EvalDetalleCelda>
+            }
+            supTitle="Supervisión"
+            supSubtitle="Sin supervisión"
+            supervision={
+              <EvalDetalleCelda panel="sup">
+                <div className="card space-y-2 p-4">
+                  <p className="text-muted">Las mentorías de contenido no tienen supervisión.</p>
+                </div>
+              </EvalDetalleCelda>
+            }
+          />
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="ficha-detalle-admin eval-shell-open">
