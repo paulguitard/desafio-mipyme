@@ -139,3 +139,17 @@ export function convocatoriaAbiertaParaPostular(
   if (cierre && !Number.isNaN(cierre.getTime()) && now > cierre) return false;
   return true;
 }
+
+/** Reel y casos nuevos. No afecta casos ya iniciados. */
+export function convocatoriaDisponibleParaNuevosCasos(
+  convocatoria: {
+    estado: string;
+    visible?: boolean;
+    fechaInicio?: Date | string | null;
+    fechaCierre?: Date | string | null;
+  },
+  now = new Date(),
+): boolean {
+  if (convocatoria.visible === false) return false;
+  return convocatoriaAbiertaParaPostular(convocatoria, now);
+}

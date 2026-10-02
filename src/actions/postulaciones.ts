@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { saveUpload } from "@/lib/storage";
 import {
-  getVideoLink,
+  agruparAdjuntos,
   isStoredFile,
   parseArchivos,
   parseConfigCorreo,
@@ -22,7 +22,10 @@ import {
   type StoredVideoLink,
 } from "@/lib/preguntas";
 import { postulacionEditable, type EstadoPostulacion } from "@/lib/estado";
-import { convocatoriaAbiertaParaPostular } from "@/lib/convocatoria";
+import {
+  convocatoriaAbiertaParaPostular,
+  convocatoriaDisponibleParaNuevosCasos,
+} from "@/lib/convocatoria";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { coincideRevisionCiclo } from "@/lib/revision-ciclo";
 import { sanitizeRichText } from "@/lib/html";
@@ -99,8 +102,8 @@ export async function iniciarPostulacion(formData: FormData) {
   const convocatoria = await prisma.convocatoria.findUnique({
     where: { id: convocatoriaId },
   });
-  if (!convocatoria || !convocatoriaAbiertaParaPostular(convocatoria)) {
-    return { error: "La mentoría no está abierta." };
+  if (!convocatoria || !convocatoriaDisponibleParaNuevosCasos(convocatoria)) {
+    return { error: "La asesoría no está disponible." };
   }
 
   const existente = await prisma.postulacion.findUnique({
@@ -216,54 +219,49 @@ async function persistirRespuestas(args: {
     const valorSanitizado =
       pregunta.tipo === "texto_largo" ? sanitizeRichText(String(valor ?? "")) : valor;
 
-    const archivos: StoredAttachment[] = existing
-      ? parseArchivos(existing.archivos).filter(isStoredFile)
-      : [];
+    const previos = existing ? agruparAdjuntos(parseArchivos(existing.archivos)) : null;
+    const archivos: StoredAttachment[] = previos ? [...previos.imagenes, ...previos.documentos] : [];
     const nombresYaGuardados = new Set(
       archivos.filter(isStoredFile).map((a) => a.originalName.trim().toLowerCase()),
     );
 
-    if (pregunta.permiteArchivo) {
-      const file = args.formData.get(`archivo-${pregunta.id}`);
-      if (file instanceof File && file.size > 0) {
-        const nombre = file.name.trim().toLowerCase();
-        if (!nombresYaGuardados.has(nombre)) {
-          archivos.push(await saveUpload(file, "file"));
-          nombresYaGuardados.add(nombre);
-        }
-      }
-    }
-    if (pregunta.permiteImagen) {
-      const file = args.formData.get(`imagen-${pregunta.id}`);
-      if (file instanceof File && file.size > 0) {
-        const nombre = file.name.trim().toLowerCase();
-        if (!nombresYaGuardados.has(nombre)) {
-          archivos.push(await saveUpload(file, "image"));
-          nombresYaGuardados.add(nombre);
-        }
+    async function agregarArchivos(campo: string, kind: "file" | "image") {
+      for (const item of args.formData.getAll(campo)) {
+        if (!(item instanceof File) || item.size <= 0) continue;
+        const nombre = item.name.trim().toLowerCase();
+        if (nombresYaGuardados.has(nombre)) continue;
+        archivos.push(await saveUpload(item, kind));
+        nombresYaGuardados.add(nombre);
       }
     }
 
-    const videoPrevio = existing ? getVideoLink(parseArchivos(existing.archivos)) : null;
+    if (pregunta.permiteArchivo) {
+      await agregarArchivos(`archivo-${pregunta.id}`, "file");
+    }
+    if (pregunta.permiteImagen) {
+      await agregarArchivos(`imagen-${pregunta.id}`, "image");
+    }
+
     if (pregunta.permiteVideoLink) {
-      const videoRaw = String(args.formData.get(`video-${pregunta.id}`) ?? "").trim();
-      if (videoRaw) {
-        const error = validarVideoLink(videoRaw);
-        const resolved = error ? null : resolveVideoEmbed(videoRaw);
-        if (resolved) {
-          const video: StoredVideoLink = {
-            id: randomUUID(),
-            kind: "video_link",
-            url: resolved.url,
-            provider: resolved.provider,
-          };
-          archivos.push(video);
-        } else if (videoPrevio) {
-          archivos.push(videoPrevio);
-        }
+      const urlsVistas = new Set<string>();
+      for (const item of args.formData.getAll(`video-${pregunta.id}`)) {
+        const videoRaw = String(item ?? "").trim();
+        if (!videoRaw || urlsVistas.has(videoRaw.toLowerCase())) continue;
+        urlsVistas.add(videoRaw.toLowerCase());
+        if (validarVideoLink(videoRaw)) continue;
+        const resolved = resolveVideoEmbed(videoRaw);
+        if (!resolved) continue;
+        const previa = previos?.videos.find((video) => video.url === resolved.url);
+        const video: StoredVideoLink = previa ?? {
+          id: randomUUID(),
+          kind: "video_link",
+          url: resolved.url,
+          provider: resolved.provider,
+        };
+        archivos.push(video);
       }
-    } else if (videoPrevio) {
-      archivos.push(videoPrevio);
+    } else if (previos?.videos.length) {
+      archivos.push(...previos.videos);
     }
 
     pendientes.push({
@@ -372,7 +370,7 @@ export async function guardarBorrador(formData: FormData) {
   const postulacion = await cargaPostulacionDelUsuario(id, user.id);
   if (!postulacion) return { error: "Caso no encontrado." };
   if (esMentoriaContenido(postulacion.convocatoria.tipo)) {
-    return { error: "Esta mentoría de contenido no se responde." };
+    return { error: "Esta asesoría de contenido no se responde." };
   }
 
   const estado = postulacion.estado as EstadoPostulacion;
@@ -405,7 +403,7 @@ export async function enviarPostulacion(formData: FormData) {
   const postulacion = await cargaPostulacionDelUsuario(id, user.id);
   if (!postulacion) return { error: "Caso no encontrado." };
   if (esMentoriaContenido(postulacion.convocatoria.tipo)) {
-    return { error: "Esta mentoría de contenido no se responde." };
+    return { error: "Esta asesoría de contenido no se responde." };
   }
 
   const estado = postulacion.estado as EstadoPostulacion;
@@ -503,7 +501,7 @@ export async function marcarVistaPieza(postulacionId: string, piezaId: string) {
     return { error: "Participación no encontrada." };
   }
   if (!esMentoriaContenido(postulacion.convocatoria.tipo)) {
-    return { error: "Esta mentoría no registra visualizaciones de contenido." };
+    return { error: "Esta asesoría no registra visualizaciones de contenido." };
   }
   const pieza = await prisma.piezaContenido.findFirst({
     where: { id: piezaId, formularioId: postulacion.convocatoria.formularioId },

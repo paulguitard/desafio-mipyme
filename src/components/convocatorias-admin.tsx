@@ -8,6 +8,7 @@ import {
   crearConvocatoria,
   eliminarConvocatoria,
   toggleConvocatoria,
+  toggleVisibilidadConvocatoria,
 } from "@/actions/convocatorias";
 import { ConvocatoriaEvaluacion } from "@/components/convocatoria-evaluacion";
 import { ImagenMentoriaCover, ImagenMentoriaEncuadre } from "@/components/imagen-mentoria";
@@ -37,6 +38,7 @@ export type ConvocatoriaListaItem = {
   titulo: string;
   descripcion: string;
   estado: string;
+  visible: boolean;
   tipo: TipoFormulario;
   formularioId: string;
   formularioTitulo: string;
@@ -72,11 +74,14 @@ export function ConvocatoriasAdmin({
   const formRef = useRef<HTMLFormElement>(null);
   const [evaluacionOpen, setEvaluacionOpen] = useState(false);
   const [evaluacionTitulo, setEvaluacionTitulo] = useState("");
+  const [evaluacionTipo, setEvaluacionTipo] = useState<TipoFormulario | null>(null);
+  const [evaluacionConteo, setEvaluacionConteo] = useState(0);
   const [evaluacion, setEvaluacion] = useState<PanelEvaluacion | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
   const [panelLoading, setPanelLoading] = useState(false);
+  const panelEsContenido = esMentoriaContenido(evaluacion?.tipo ?? evaluacionTipo);
   const [tipoMentoria, setTipoMentoria] = useState<TipoFormulario>("FEEDBACK");
-  const tituloModal = editing ? "Editar mentoría" : "Crear mentoría";
+  const tituloModal = editing ? "Editar asesoría" : "Crear asesoría";
   const tipoBloqueado = Boolean(editing && editing.postulaciones > 0);
   const formulariosDelTipo = formularios.filter((form) => form.tipo === tipoMentoria);
 
@@ -141,9 +146,21 @@ export function ConvocatoriasAdmin({
     setVistaEmprendedor(true);
   }
 
+  function cerrarPanelEvaluacion() {
+    setEvaluacionOpen(false);
+    setEvaluacion(null);
+    setEvaluacionTitulo("");
+    setEvaluacionTipo(null);
+    setEvaluacionConteo(0);
+    setPanelError(null);
+    setPanelLoading(false);
+  }
+
   async function abrirEvaluacion(item: ConvocatoriaListaItem) {
     setEvaluacionOpen(true);
     setEvaluacionTitulo(item.titulo);
+    setEvaluacionTipo(item.tipo);
+    setEvaluacionConteo(item.postulaciones);
     setEvaluacion(null);
     setPanelError(null);
     setPanelLoading(true);
@@ -177,6 +194,7 @@ export function ConvocatoriasAdmin({
       titulo: String(formData.get("titulo") ?? "").trim(),
       descripcion: String(formData.get("descripcion") ?? "").trim(),
       estado: actual?.estado ?? "ABIERTA",
+      visible: actual?.visible ?? true,
       tipo: parseTipoFormulario(String(formData.get("tipo") ?? actual?.tipo ?? "FEEDBACK")),
       formularioId,
       formularioTitulo:
@@ -201,9 +219,9 @@ export function ConvocatoriasAdmin({
   return (
     <div className="page-scroll h-full space-y-8 overflow-y-auto">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-extrabold text-navy">Mentorías</h1>
+        <h1 className="text-3xl font-extrabold text-navy">Asesorías</h1>
         <button className="btn btn-sm btn-primary" type="button" onClick={abrirCrear}>
-          Crear mentoría
+          Crear asesoría
         </button>
       </div>
       <IndicadorGuardando visible={lista.guardando} />
@@ -211,7 +229,7 @@ export function ConvocatoriasAdmin({
 
       <div className="space-y-3" data-tour="mentorias-lista">
         {lista.dato.length === 0 ? (
-          <p className="text-muted">Aún no hay mentorías.</p>
+          <p className="text-muted">Aún no hay asesorías.</p>
         ) : null}
         {lista.dato.map((item, index) => {
           const rango = formatoRangoFechas(item.fechaInicio, item.fechaCierre);
@@ -230,6 +248,7 @@ export function ConvocatoriasAdmin({
                   <p className="text-xl font-semibold">{item.titulo}</p>
                   <p className="text-muted">
                     {TIPO_FORMULARIO_LABEL[parseTipoFormulario(item.tipo)]} · {item.formularioTitulo} · {item.postulaciones} casos · {item.estado}
+                    {item.visible ? "" : " · OCULTA"}
                   </p>
                   {rango ? <p className="text-muted">{rango}</p> : null}
                 </div>
@@ -244,13 +263,36 @@ export function ConvocatoriasAdmin({
                 <button
                   className="btn btn-sm btn-secondary"
                   type="button"
+                  data-tour={index === 0 ? "mentoria-mostrar-ocultar" : undefined}
+                  onClick={() => {
+                    const ocultar = item.visible;
+                    const ok = window.confirm(
+                      ocultar
+                        ? "Al ocultar, no aparecerá en el reel ni se podrán iniciar casos nuevos. Quienes ya tienen un caso seguirán viéndolo. ¿Continuar?"
+                        : "¿Mostrar esta asesoría en el reel de participantes?",
+                    );
+                    if (!ok) return;
+                    const formData = new FormData();
+                    formData.set("id", item.id);
+                    persistirYRefrescar(
+                      (prev) =>
+                        prev.map((row) => (row.id === item.id ? { ...row, visible: !row.visible } : row)),
+                      () => toggleVisibilidadConvocatoria(formData),
+                    );
+                  }}
+                >
+                  {item.visible ? "Ocultar" : "Mostrar"}
+                </button>
+                <button
+                  className="btn btn-sm btn-secondary"
+                  type="button"
                   data-tour={index === 0 ? "mentoria-abrir-cerrar" : undefined}
                   onClick={() => {
                     const cerrar = item.estado === "ABIERTA";
                     const ok = window.confirm(
                       cerrar
                         ? "Al cerrar, nadie podrá editar ni evaluar. ¿Continuar?"
-                        : "¿Reabrir esta mentoría?",
+                        : "¿Reabrir esta asesoría?",
                     );
                     if (!ok) return;
                     const formData = new FormData();
@@ -301,15 +343,15 @@ export function ConvocatoriasAdmin({
         title={
           <>
             <span>{evaluacion?.titulo ?? evaluacionTitulo}</span>
-            {evaluacion ? (
+            {evaluacionOpen && evaluacionTipo ? (
               <>
                 <span className="modal-title-sep" aria-hidden="true">
                   ----
                 </span>
                 <span className="modal-title-meta">
-                  {esMentoriaContenido(evaluacion.tipo)
-                    ? `(${evaluacion.postulaciones.length}) Participantes`
-                    : `(${evaluacion.postulaciones.length}) Respuestas`}
+                  {panelEsContenido
+                    ? `(${evaluacion?.postulaciones.length ?? evaluacionConteo}) Participantes`
+                    : `(${evaluacion?.postulaciones.length ?? evaluacionConteo}) Respuestas`}
                 </span>
               </>
             ) : null}
@@ -318,15 +360,12 @@ export function ConvocatoriasAdmin({
         wide
         tall
         toned
-        onClose={() => {
-          setEvaluacionOpen(false);
-          setEvaluacion(null);
-          setEvaluacionTitulo("");
-          setPanelError(null);
-        }}
+        onClose={cerrarPanelEvaluacion}
       >
-        {panelLoading && evaluacionOpen ? (
-          <p className="respuestas-lista text-muted">Cargando evaluación…</p>
+        {panelLoading && evaluacionOpen && !evaluacion ? (
+          <p className="respuestas-lista text-muted">
+            {panelEsContenido ? "Cargando participantes…" : "Cargando evaluación…"}
+          </p>
         ) : null}
         {panelError && evaluacionOpen ? <p className="respuestas-lista text-danger">{panelError}</p> : null}
         {evaluacion ? (
@@ -442,7 +481,7 @@ export function ConvocatoriasAdmin({
             />
           </div>
           <div className="field">
-            <label htmlFor="tipo">Tipo de mentoría</label>
+            <label htmlFor="tipo">Tipo de asesoría</label>
             <select
               className="input"
               id="tipo"
@@ -515,7 +554,7 @@ export function ConvocatoriasAdmin({
             </div>
           </div>
           <button className="btn btn-primary" type="submit">
-            {editing ? "Guardar cambios" : "Crear mentoría"}
+            {editing ? "Guardar cambios" : "Crear asesoría"}
           </button>
         </form>
       </Modal>

@@ -268,8 +268,24 @@ export function parseArchivosSoloFiles(raw: string): StoredFile[] {
   return parseArchivos(raw).filter(isStoredFile);
 }
 
+export function getVideoLinks(archivos: StoredAttachment[]): StoredVideoLink[] {
+  return archivos.filter(isStoredVideoLink);
+}
+
 export function getVideoLink(archivos: StoredAttachment[]): StoredVideoLink | null {
-  return archivos.find(isStoredVideoLink) ?? null;
+  return getVideoLinks(archivos)[0] ?? null;
+}
+
+export function agruparAdjuntos(archivos: StoredAttachment[]) {
+  const imagenes: StoredFile[] = [];
+  const documentos: StoredFile[] = [];
+  const videos: StoredVideoLink[] = [];
+  for (const item of archivos) {
+    if (item.kind === "image") imagenes.push(item);
+    else if (item.kind === "file") documentos.push(item);
+    else videos.push(item);
+  }
+  return { imagenes, documentos, videos };
 }
 
 export function resolveVideoEmbed(urlRaw: string): { provider: VideoProvider; embedUrl: string; url: string } | null {

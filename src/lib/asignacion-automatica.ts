@@ -12,9 +12,9 @@ export async function asignarEvaluadoresAutomaticoEnConvocatoria(convocatoriaId:
       },
     },
   });
-  if (!convocatoria) return { error: "Mentoría no encontrada." };
+  if (!convocatoria) return { error: "Asesoría no encontrada." };
   if (convocatoria.evaluadores.length === 0) {
-    return { error: "Agrega evaluadores al pool de la mentoría primero." };
+    return { error: "Agrega evaluadores al pool de la asesoría primero." };
   }
 
   const n = Math.max(1, convocatoria.evaluacionesPorPostulacion);

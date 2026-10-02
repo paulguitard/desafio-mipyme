@@ -288,11 +288,11 @@ export function PreguntaComposer({
           <p className="font-semibold text-navy">Adjuntos</p>
           <label className="flex items-center gap-2">
             <input type="checkbox" name="permiteArchivo" defaultChecked={inicial?.permiteArchivo ?? false} />
-            Permitir subir archivo
+            Permitir subir archivos (varios)
           </label>
           <label className="flex items-center gap-2">
             <input type="checkbox" name="permiteImagen" defaultChecked={inicial?.permiteImagen ?? false} />
-            Permitir subir imagen
+            Permitir subir imágenes (varias)
           </label>
           <label className="flex items-center gap-2">
             <input
@@ -300,7 +300,7 @@ export function PreguntaComposer({
               name="permiteVideoLink"
               defaultChecked={inicial?.permiteVideoLink ?? false}
             />
-            Permitir pegar link de video
+            Permitir pegar links de video (varios)
           </label>
         </section>
 

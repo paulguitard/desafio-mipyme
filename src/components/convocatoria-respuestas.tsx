@@ -79,7 +79,7 @@ export function ConvocatoriaRespuestas({ data }: { data: RespuestasConvocatoria 
 
   if (enviadas.length === 0) {
     return (
-      <p className="respuestas-lista text-muted">Aún no hay formularios respondidos en esta mentoría.</p>
+      <p className="respuestas-lista text-muted">Aún no hay formularios respondidos en esta asesoría.</p>
     );
   }
 

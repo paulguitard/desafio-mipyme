@@ -25,6 +25,7 @@ export default async function MentoriasPage() {
           titulo: item.titulo,
           descripcion: item.descripcion,
           estado: item.estado,
+          visible: item.visible,
           tipo: parseTipoFormulario(item.tipo),
           formularioId: item.formularioId,
           formularioTitulo: item.formulario.titulo,

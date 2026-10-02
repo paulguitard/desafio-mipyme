@@ -211,7 +211,7 @@ export async function actualizarFormulario(formData: FormData) {
       return { error: "El tipo de evaluación no es válido." };
     }
     if (existente._count.convocatorias > 0 && modoRaw !== existente.modoEvaluacion) {
-      return { error: "No puedes cambiar el tipo de evaluación de un formulario con mentorías." };
+      return { error: "No puedes cambiar el tipo de evaluación de un formulario con asesorías." };
     }
     const { permitirEvaluacionPorPregunta } = await leerConfigApp();
     if (!puedeAsignarModoEvaluacion(modoRaw, permitirEvaluacionPorPregunta, existente.modoEvaluacion)) {

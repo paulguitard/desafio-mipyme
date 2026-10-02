@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Convocatoria" ADD COLUMN IF NOT EXISTS "visible" BOOLEAN NOT NULL DEFAULT true;

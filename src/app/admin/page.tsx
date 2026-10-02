@@ -34,7 +34,7 @@ export default async function AdminHomePage() {
         <h1 className="text-3xl font-extrabold text-navy">Configuración</h1>
       </div>
       <p className="text-muted">
-        Crea usuarios, formularios y mentorías. Configura el pool de evaluadores y asígnalos a cada caso.
+        Crea usuarios, formularios y asesorías. Configura el pool de evaluadores y asígnalos a cada caso.
       </p>
       <div className="grid items-stretch gap-4 md:grid-cols-3">
         <a className="card card-link flex h-full flex-col p-6" href="/admin/usuarios" data-tour="admin-usuarios">
@@ -68,7 +68,7 @@ export default async function AdminHomePage() {
           </dl>
         </a>
         <a className="card card-link flex h-full flex-col p-6" href="/admin/mentorias" data-tour="admin-mentorias">
-          <h2 className="text-2xl font-bold text-navy">Mentorías</h2>
+          <h2 className="text-2xl font-bold text-navy">Asesorías</h2>
           <p className="mt-2 text-muted">Abrir, cerrar y asignar evaluadores.</p>
           <dl className="mt-auto grid grid-cols-2 gap-2 border-t border-[var(--border)] pt-4">
             <div className="flex flex-col">

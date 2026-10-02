@@ -91,6 +91,50 @@ function ToolbarButton({
   );
 }
 
+function ToolbarMenu({
+  label,
+  title,
+  open,
+  active,
+  disabled,
+  alignEnd,
+  className,
+  onToggle,
+  children,
+}: {
+  label: string;
+  title: string;
+  open: boolean;
+  active?: boolean;
+  disabled?: boolean;
+  alignEnd?: boolean;
+  className?: string;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`rte-menu${open ? " is-open" : ""}${alignEnd ? " is-end" : ""}${className ? ` ${className}` : ""}`}>
+      <button
+        type="button"
+        className={`rte-btn rte-menu-trigger${active || open ? " is-active" : ""}`}
+        title={title}
+        aria-label={title}
+        aria-expanded={open}
+        disabled={disabled}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={onToggle}
+      >
+        {label}
+      </button>
+      {open ? (
+        <div className="rte-menu-panel" role="menu">
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function EditorTextoLargo({
   name,
   defaultValue = "",
@@ -104,6 +148,7 @@ export function EditorTextoLargo({
   const hiddenRef = useRef<HTMLInputElement>(null);
   const initial = defaultValue.trim() ? defaultValue : "<p></p>";
   const [html, setHtml] = useState(() => htmlParaFormulario(defaultValue));
+  const [menuAbierto, setMenuAbierto] = useState<"tamano" | "destacar" | "alinear" | null>(null);
 
   const syncHtml = (raw: string) => {
     const next = htmlParaFormulario(raw);
@@ -149,6 +194,18 @@ export function EditorTextoLargo({
   }, [editor, disabled]);
 
   useEffect(() => {
+    if (!menuAbierto) return;
+    function onPointerDown(event: PointerEvent) {
+      const nodo = event.target;
+      if (!(nodo instanceof Element) || !nodo.closest(".rte-menu")) {
+        setMenuAbierto(null);
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [menuAbierto]);
+
+  useEffect(() => {
     if (!editor) return;
     const form = hiddenRef.current?.form;
     if (!form) return;
@@ -166,6 +223,83 @@ export function EditorTextoLargo({
     if (size === "1.25rem") return "1.25rem";
     return "";
   })();
+  const etiquetaTamano = TAMANOS.find((t) => t.value === tamanoActual)?.label ?? "Normal";
+
+  const destacarActivo = Boolean(
+    editor &&
+      (editor.isActive("highlight") ||
+        DESTACADORES.some((color) => editor.isActive("highlight", { color: color.value }))),
+  );
+  const alinearActivo = Boolean(
+    editor && (editor.isActive({ textAlign: "center" }) || editor.isActive({ textAlign: "right" })),
+  );
+
+  const botonesDestacar = (
+    <>
+      {DESTACADORES.map((color) => (
+        <ToolbarButton
+          key={color.value}
+          title={`Destacar ${color.label}`}
+          active={editor?.isActive("highlight", { color: color.value })}
+          disabled={!editor}
+          onClick={() => {
+            editor?.chain().focus().toggleHighlight({ color: color.value }).run();
+            setMenuAbierto(null);
+          }}
+        >
+          <span className="rte-swatch" style={{ backgroundColor: color.value }} aria-hidden />
+        </ToolbarButton>
+      ))}
+      <ToolbarButton
+        title="Quitar destacador"
+        disabled={!editor}
+        onClick={() => {
+          editor?.chain().focus().unsetHighlight().run();
+          setMenuAbierto(null);
+        }}
+      >
+        ✕
+      </ToolbarButton>
+    </>
+  );
+
+  const botonesAlinear = (
+    <>
+      <ToolbarButton
+        title="Alinear a la izquierda"
+        active={editor?.isActive({ textAlign: "left" })}
+        disabled={!editor}
+        onClick={() => {
+          editor?.chain().focus().setTextAlign("left").run();
+          setMenuAbierto(null);
+        }}
+      >
+        <IconAlignLeft />
+      </ToolbarButton>
+      <ToolbarButton
+        title="Centrar"
+        active={editor?.isActive({ textAlign: "center" })}
+        disabled={!editor}
+        onClick={() => {
+          editor?.chain().focus().setTextAlign("center").run();
+          setMenuAbierto(null);
+        }}
+      >
+        <IconAlignCenter />
+      </ToolbarButton>
+      <ToolbarButton
+        title="Alinear a la derecha"
+        active={editor?.isActive({ textAlign: "right" })}
+        disabled={!editor}
+        onClick={() => {
+          editor?.chain().focus().setTextAlign("right").run();
+          setMenuAbierto(null);
+        }}
+      >
+        <IconAlignRight />
+      </ToolbarButton>
+    </>
+  );
 
   return (
     <div className={`rte${disabled ? " is-disabled" : ""}`}>
@@ -201,6 +335,31 @@ export function EditorTextoLargo({
               ))}
             </select>
           </label>
+          <ToolbarMenu
+            className="rte-menu-tamano"
+            label={etiquetaTamano}
+            title="Tamaño de letra"
+            open={menuAbierto === "tamano"}
+            disabled={!editor}
+            onToggle={() => setMenuAbierto((actual) => (actual === "tamano" ? null : "tamano"))}
+          >
+            {TAMANOS.map((t) => (
+              <ToolbarButton
+                key={t.label}
+                title={t.label}
+                active={tamanoActual === t.value}
+                disabled={!editor}
+                onClick={() => {
+                  if (!editor) return;
+                  if (!t.value) editor.chain().focus().unsetFontSize().run();
+                  else editor.chain().focus().setFontSize(t.value).run();
+                  setMenuAbierto(null);
+                }}
+              >
+                {t.label}
+              </ToolbarButton>
+            ))}
+          </ToolbarMenu>
 
           <span className="rte-sep" aria-hidden />
 
@@ -232,54 +391,35 @@ export function EditorTextoLargo({
           <span className="rte-sep" aria-hidden />
 
           <div className="rte-highlights" role="group" aria-label="Color destacador">
-            {DESTACADORES.map((color) => (
-              <ToolbarButton
-                key={color.value}
-                title={`Destacar ${color.label}`}
-                active={editor?.isActive("highlight", { color: color.value })}
-                disabled={!editor}
-                onClick={() =>
-                  editor?.chain().focus().toggleHighlight({ color: color.value }).run()
-                }
-              >
-                <span className="rte-swatch" style={{ backgroundColor: color.value }} aria-hidden />
-              </ToolbarButton>
-            ))}
-            <ToolbarButton
-              title="Quitar destacador"
-              disabled={!editor}
-              onClick={() => editor?.chain().focus().unsetHighlight().run()}
-            >
-              ✕
-            </ToolbarButton>
+            {botonesDestacar}
           </div>
+          <ToolbarMenu
+            label="Destacar"
+            title="Destacar"
+            open={menuAbierto === "destacar"}
+            active={destacarActivo}
+            disabled={!editor}
+            onToggle={() => setMenuAbierto((actual) => (actual === "destacar" ? null : "destacar"))}
+          >
+            {botonesDestacar}
+          </ToolbarMenu>
 
           <span className="rte-sep" aria-hidden />
 
-          <ToolbarButton
-            title="Alinear a la izquierda"
-            active={editor?.isActive({ textAlign: "left" })}
+          <div className="rte-aligns" role="group" aria-label="Alineación">
+            {botonesAlinear}
+          </div>
+          <ToolbarMenu
+            label="Alinear"
+            title="Alinear"
+            open={menuAbierto === "alinear"}
+            active={alinearActivo}
             disabled={!editor}
-            onClick={() => editor?.chain().focus().setTextAlign("left").run()}
+            alignEnd
+            onToggle={() => setMenuAbierto((actual) => (actual === "alinear" ? null : "alinear"))}
           >
-            <IconAlignLeft />
-          </ToolbarButton>
-          <ToolbarButton
-            title="Centrar"
-            active={editor?.isActive({ textAlign: "center" })}
-            disabled={!editor}
-            onClick={() => editor?.chain().focus().setTextAlign("center").run()}
-          >
-            <IconAlignCenter />
-          </ToolbarButton>
-          <ToolbarButton
-            title="Alinear a la derecha"
-            active={editor?.isActive({ textAlign: "right" })}
-            disabled={!editor}
-            onClick={() => editor?.chain().focus().setTextAlign("right").run()}
-          >
-            <IconAlignRight />
-          </ToolbarButton>
+            {botonesAlinear}
+          </ToolbarMenu>
 
           <span className="rte-sep" aria-hidden />
 

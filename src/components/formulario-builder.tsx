@@ -539,7 +539,7 @@ export function FormularioBuilder({
           </div>
           {!puedeCambiarModo ? (
             <p className="text-right text-sm text-muted">
-              El tipo queda fijo porque este formulario ya tiene mentorías asociadas.
+              El tipo queda fijo porque este formulario ya tiene asesorías asociadas.
             </p>
           ) : !permitirEvaluacionPorPregunta && modoEvaluacion !== "POR_PREGUNTA" ? (
             <p className="text-right text-sm text-muted">

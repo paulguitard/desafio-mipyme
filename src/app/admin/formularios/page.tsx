@@ -31,7 +31,7 @@ export default async function FormulariosPage() {
               <h2 className="text-xl font-semibold">{form.titulo}</h2>
               <p className="text-muted">
                 {TIPO_FORMULARIO_LABEL[tipo]} · {detalle} ·{" "}
-                {form._count.convocatorias === 1 ? "1 mentoría" : `${form._count.convocatorias} mentorías`}
+                {form._count.convocatorias === 1 ? "1 asesoría" : `${form._count.convocatorias} asesorías`}
               </p>
             </a>
           );

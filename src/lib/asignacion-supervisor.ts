@@ -11,9 +11,9 @@ export async function asignarSupervisoresAutomaticoEnConvocatoria(convocatoriaId
       },
     },
   });
-  if (!convocatoria) return { error: "Mentoría no encontrada." };
+  if (!convocatoria) return { error: "Asesoría no encontrada." };
   if (convocatoria.supervisores.length === 0) {
-    return { error: "Agrega supervisores al pool de la mentoría primero." };
+    return { error: "Agrega supervisores al pool de la asesoría primero." };
   }
 
   const cargas = new Map<string, number>();

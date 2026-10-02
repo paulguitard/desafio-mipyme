@@ -15,7 +15,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             { href: "/admin", label: "Inicio" },
             { href: "/admin/usuarios", label: "Usuarios" },
             { href: "/admin/formularios", label: "Formularios" },
-            { href: "/admin/mentorias", label: "Mentorías" },
+            { href: "/admin/mentorias", label: "Asesorías" },
           ]}
           trailing={<AdminConfigLauncher />}
         />

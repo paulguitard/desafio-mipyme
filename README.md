@@ -21,6 +21,6 @@ El admin crea evaluadores y participantes en Configuración → Usuarios. Las co
 
 ## Roles
 
-- **Administración**: usuarios, formularios, mentorías (abrir/cerrar) y asignación de evaluadores.
-- **Participante**: mentorías abiertas, casos y correcciones cuando el estado es “Con observaciones”.
+- **Administración**: usuarios, formularios, asesorías (abrir/cerrar) y asignación de evaluadores.
+- **Participante**: asesorías abiertas, casos y correcciones cuando el estado es “Con observaciones”.
 - **Evaluador**: evaluaciones independientes (Evaluación 1, 2, …), observaciones por pregunta e historial de cambios.

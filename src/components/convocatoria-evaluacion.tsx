@@ -752,7 +752,7 @@ export function ConvocatoriaEvaluacion({
   return (
     <div className="eval-panel eval-shell-open">
       <div className={`eval-shell${esContenido ? " is-contenido" : ""}`}>
-      <aside className="eval-side" aria-label="Evaluadores y supervisores de la mentoría">
+      <aside className="eval-side" aria-label="Evaluadores y supervisores de la asesoría">
         <div className="eval-side-header">
           <h3 className="text-lg font-semibold text-navy">
             {esSupervisores ? `Supervisores (${poolActivo.length})` : `Evaluadores (${poolActivo.length})`}
@@ -790,8 +790,8 @@ export function ConvocatoriaEvaluacion({
           {poolActivo.length === 0 ? (
             <p className="text-muted">
               {esSupervisores
-                ? "Todavía no hay supervisores asignados a esta mentoría."
-                : "Todavía no hay evaluadores asignados a esta mentoría."}
+                ? "Todavía no hay supervisores asignados a esta asesoría."
+                : "Todavía no hay evaluadores asignados a esta asesoría."}
             </p>
           ) : (
             <ul className="space-y-2">
@@ -975,7 +975,7 @@ export function ConvocatoriaEvaluacion({
       </aside>
 
 
-      <div className="eval-main" aria-label={esContenido ? "Participantes de la mentoría" : "Respuestas de la mentoría"} data-tour="lista-casos">
+      <div className="eval-main" aria-label={esContenido ? "Participantes de la asesoría" : "Respuestas de la asesoría"} data-tour="lista-casos">
         <div className="respuestas-filtros space-y-3">
           <div
             className={`eval-filtros-row${filtroPreguntaId ? " has-contiene" : ""}`}
@@ -1182,8 +1182,8 @@ export function ConvocatoriaEvaluacion({
           {respuestas.length === 0 ? (
             <p className="text-muted">
               {esContenido
-                ? "Todavía no hay participantes en esta mentoría."
-                : "Todavía no hay respuestas en esta mentoría."}
+                ? "Todavía no hay participantes en esta asesoría."
+                : "Todavía no hay respuestas en esta asesoría."}
             </p>
           ) : respuestasFiltradas.length === 0 ? (
             <p className="text-muted">
@@ -1432,8 +1432,8 @@ export function ConvocatoriaEvaluacion({
               <div className="space-y-4">
                 <p className="text-muted">
                   {esSupervisores
-                    ? "Elige supervisores registrados para sumarlos a esta mentoría. Puedes agregar uno o varios a la vez."
-                    : "Elige evaluadores registrados para sumarlos a esta mentoría. Puedes agregar uno o varios a la vez."}
+                    ? "Elige supervisores registrados para sumarlos a esta asesoría. Puedes agregar uno o varios a la vez."
+                    : "Elige evaluadores registrados para sumarlos a esta asesoría. Puedes agregar uno o varios a la vez."}
                 </p>
                 {agregarError ? <p className="text-danger">{agregarError}</p> : null}
                 {agregarMensaje ? <p className="font-semibold text-navy">{agregarMensaje}</p> : null}
@@ -1519,7 +1519,7 @@ export function ConvocatoriaEvaluacion({
                               Escuela
                             </th>
                             <th scope="col" className="eval-add-status">
-                              En mentoría
+                              En asesoría
                             </th>
                             <th scope="col" className="eval-add-action">
                               Acción
@@ -1554,8 +1554,8 @@ export function ConvocatoriaEvaluacion({
                                   {yaEnPool ? (
                                     <span
                                       className="eval-status-icon eval-status-yes"
-                                      title="Ya está en la mentoría"
-                                      aria-label="Ya está en la mentoría"
+                                      title="Ya está en la asesoría"
+                                      aria-label="Ya está en la asesoría"
                                     >
                                       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                                         <path
@@ -1567,8 +1567,8 @@ export function ConvocatoriaEvaluacion({
                                   ) : (
                                     <span
                                       className="eval-status-icon eval-status-no"
-                                      title="No está en la mentoría"
-                                      aria-label="No está en la mentoría"
+                                      title="No está en la asesoría"
+                                      aria-label="No está en la asesoría"
                                     >
                                       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                                         <path

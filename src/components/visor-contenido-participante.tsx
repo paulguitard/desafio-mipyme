@@ -39,7 +39,7 @@ export function VisorContenidoParticipante({
       </div>
       <div className="page-scroll min-h-0 space-y-6 overflow-y-auto overscroll-contain pr-1 pb-8">
         {piezas.length === 0 ? (
-          <p className="text-muted">Esta mentoría aún no tiene contenido.</p>
+          <p className="text-muted">Esta asesoría aún no tiene contenido.</p>
         ) : (
           piezas.map((pieza) => (
             <PiezaContenidoVista

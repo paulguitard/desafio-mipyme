@@ -6,7 +6,7 @@ export type AvisoEntradaCaso = {
 
 export function parrafosDescripcionMentoria(descripcion: string): string[] {
   const texto = descripcion.trim();
-  if (!texto) return ["Esta mentoría no tiene descripción."];
+  if (!texto) return ["Esta asesoría no tiene descripción."];
   return [texto];
 }
 
@@ -134,9 +134,9 @@ export function avisoEntradaParticipante(args: {
 }): AvisoEntradaCaso {
   if (!args.mentoriaAbierta && !args.canEdit) {
     return {
-      title: "Mentoría cerrada",
+      title: "Asesoría cerrada",
       parrafos: [
-        "La mentoría está cerrada. Solo puedes consultar.",
+        "La asesoría está cerrada. Solo puedes consultar.",
         EXTRA_HISTORIAL,
       ],
     };

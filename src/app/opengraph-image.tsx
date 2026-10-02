@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Desafío MiPyme | Portal de Mentorías";
+export const alt = "Desafío MiPyme | Portal de Asesorías";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -39,7 +39,7 @@ export default function OpenGraphImage() {
           Desafío MiPyme
         </div>
         <div style={{ fontSize: 28, marginTop: 12, opacity: 0.92 }}>
-          Portal de Mentorías
+          Portal de Asesorías
         </div>
       </div>
     ),

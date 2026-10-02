@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
 import { requireUser } from "@/lib/session";
 import {
-  convocatoriaAbiertaParaPostular,
+  convocatoriaDisponibleParaNuevosCasos,
   diasRestantesHasta,
   etiquetaCierreAbierto,
   etiquetaDiasRestantes,
@@ -24,7 +24,7 @@ export default async function ParticipanteHomePage() {
   const user = await requireUser("EMPRENDEDOR");
   const [convocatorias, postulaciones] = await Promise.all([
     prisma.convocatoria.findMany({
-      where: { estado: "ABIERTA" },
+      where: { estado: "ABIERTA", visible: true },
       orderBy: { createdAt: "desc" },
     }),
     prisma.postulacion.findMany({
@@ -45,7 +45,7 @@ export default async function ParticipanteHomePage() {
 
   const yaPostulo = new Set(postulaciones.map((p) => p.convocatoriaId));
   const abiertas: MentoriaAbiertaVista[] = convocatorias
-    .filter((item) => convocatoriaAbiertaParaPostular(item))
+    .filter((item) => convocatoriaDisponibleParaNuevosCasos(item))
     .map((item) => {
       const imagen = parseImagenConvocatoria(item.imagen);
       return {
@@ -64,7 +64,7 @@ export default async function ParticipanteHomePage() {
   return (
     <div className="page-workspace is-participante-home">
       <h1 className="mx-auto w-full max-w-4xl shrink-0 text-3xl font-extrabold text-navy">
-        Mentorías abiertas
+        Asesorías abiertas
       </h1>
       <section className="reel-mentorias-full shrink-0" data-tour="mentorias-abiertas">
         <ReelMentoriasAbiertas items={abiertas} />

@@ -71,24 +71,24 @@ export const CONTEXTO_PANEL_MENTORIA = "panel-mentoria";
 export const PASOS_PANEL_MENTORIA: PasoTutorial[] = [
   {
     ancla: "mentoria-ficha",
-    titulo: "Esta mentoría",
-    descripcion: "Aquí ves el título y cuántas respuestas hay. Cerrar vuelve al listado de mentorías.",
+    titulo: "Esta asesoría",
+    descripcion: "Aquí ves el título y cuántas respuestas hay. Cerrar vuelve al listado de asesorías.",
   },
   {
     ancla: "pool-evaluadores",
     titulo: "Pool de evaluadores",
     descripcion:
-      "Suma evaluadores a la mentoría. Luego puedes asignarlos a cada caso, a mano o con la asignación automática.",
+      "Suma evaluadores a la asesoría. Luego puedes asignarlos a cada caso, a mano o con la asignación automática.",
   },
   {
     ancla: "pool-supervisores",
     titulo: "Pool de supervisores",
-    descripcion: "Cambia a esta pestaña para incorporar supervisores de la mentoría.",
+    descripcion: "Cambia a esta pestaña para incorporar supervisores de la asesoría.",
   },
   {
     ancla: "pool-incorporar",
     titulo: "Incorporar al pool",
-    descripcion: "Abre el listado de personas registradas y elige quiénes entran al pool de esta mentoría.",
+    descripcion: "Abre el listado de personas registradas y elige quiénes entran al pool de esta asesoría.",
   },
   {
     ancla: "asignacion-automatica",
@@ -119,7 +119,7 @@ export function resolverTutorial(
         NAV,
         {
           ancla: "mentorias-abiertas",
-          titulo: "Mentorías abiertas",
+          titulo: "Asesorías abiertas",
           descripcion:
             "Desplaza el carrusel para ver las convocatorias vigentes y entra a una para participar.",
         },
@@ -136,7 +136,7 @@ export function resolverTutorial(
         {
           ancla: "volver",
           titulo: "Volver al panel",
-          descripcion: "Este control te lleva de vuelta a tus mentorías y casos.",
+          descripcion: "Este control te lleva de vuelta a tus asesorías y casos.",
         },
         {
           ancla: "formulario-caso",
@@ -342,11 +342,11 @@ export function resolverTutorial(
       {
         ancla: "admin-formularios",
         titulo: "Formularios",
-        descripcion: "Define las preguntas que responderán los participantes en cada mentoría.",
+        descripcion: "Define las preguntas que responderán los participantes en cada asesoría.",
       },
       {
         ancla: "admin-mentorias",
-        titulo: "Mentorías",
+        titulo: "Asesorías",
         descripcion: "Abre o cierra convocatorias y asigna evaluadores y supervisores a cada caso.",
       },
       {
@@ -419,14 +419,20 @@ export function resolverTutorial(
       NAV,
       {
         ancla: "mentorias-lista",
-        titulo: "Listado de mentorías",
-        descripcion: "Entra a una mentoría para ver casos, o créala con el botón de la esquina.",
+        titulo: "Listado de asesorías",
+        descripcion: "Entra a una asesoría para ver casos, o créala con el botón de la esquina.",
+      },
+      {
+        ancla: "mentoria-mostrar-ocultar",
+        titulo: "Mostrar u ocultar",
+        descripcion:
+          "Ocultar saca la asesoría del reel y evita casos nuevos. Quienes ya tienen un caso lo siguen viendo en Mis casos.",
       },
       {
         ancla: "mentoria-abrir-cerrar",
         titulo: "Abrir o cerrar",
         descripcion:
-          "Cerrar una mentoría deja de admitir respuestas nuevas. Las evaluaciones y supervisiones de los casos ya enviados siguen igual.",
+          "Cerrar una asesoría deja de admitir respuestas nuevas. Las evaluaciones y supervisiones de los casos ya enviados siguen igual.",
       },
     ];
   }

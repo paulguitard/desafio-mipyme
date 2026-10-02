@@ -92,7 +92,7 @@ function AccionPostular({
   if (item.yaTieneCaso) {
     control = (
       <button className="btn btn-postular-bloqueado" type="button" disabled>
-        <span className="reel-postular-texto-largo">Ya tienes un caso en esta mentoría</span>
+        <span className="reel-postular-texto-largo">Ya tienes un caso en esta asesoría</span>
         <span className="reel-postular-texto-corto">Ya tienes un caso</span>
       </button>
     );
@@ -212,7 +212,7 @@ function ModalDetalleMentoria({
   return (
     <Modal
       open={Boolean(item)}
-      title={item?.titulo ?? "Mentoría"}
+      title={item?.titulo ?? "Asesoría"}
       onClose={onClose}
       className="modal-mentoria-detalle"
     >
@@ -248,7 +248,7 @@ function ModalDetalleMentoria({
               </p>
             ) : null}
             {item.yaTieneCaso ? (
-              <p className="mentoria-detalle-chip is-estado">Ya tienes un caso en esta mentoría</p>
+              <p className="mentoria-detalle-chip is-estado">Ya tienes un caso en esta asesoría</p>
             ) : null}
           </div>
           <div className="mentoria-detalle-cuerpo">
@@ -257,7 +257,7 @@ function ModalDetalleMentoria({
               {item.descripcion ? (
                 <p className="mentoria-detalle-desc">{item.descripcion}</p>
               ) : (
-                <p className="text-muted">Esta mentoría no tiene descripción.</p>
+                <p className="text-muted">Esta asesoría no tiene descripción.</p>
               )}
             </div>
           </div>
@@ -308,17 +308,17 @@ export function ReelMentoriasAbiertas({ items }: { items: MentoriaAbiertaVista[]
   }, [total, anterior, siguiente, detalle]);
 
   if (total === 0) {
-    return <p className="text-muted">No hay mentorías abiertas en este momento.</p>;
+    return <p className="text-muted">No hay asesorías abiertas en este momento.</p>;
   }
 
   return (
-    <div className="reel-mentorias" aria-roledescription="carrusel" aria-label="Mentorías abiertas">
+    <div className="reel-mentorias" aria-roledescription="carrusel" aria-label="Asesorías abiertas">
       {total > 1 ? (
         <button
           className="reel-mentorias-nav is-prev"
           type="button"
           onClick={anterior}
-          aria-label="Mentoría anterior"
+          aria-label="Asesoría anterior"
         >
           <Chevron dir="izq" />
         </button>
@@ -377,7 +377,7 @@ export function ReelMentoriasAbiertas({ items }: { items: MentoriaAbiertaVista[]
           className="reel-mentorias-nav is-next"
           type="button"
           onClick={siguiente}
-          aria-label="Mentoría siguiente"
+          aria-label="Asesoría siguiente"
         >
           <Chevron dir="der" />
         </button>

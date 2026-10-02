@@ -181,6 +181,8 @@ model Convocatoria {
   formularioId               String
   formulario                 Formulario @relation(fields: [formularioId], references: [id])
   estado                     String    @default("ABIERTA")
+  /// Si es false, no aparece en el reel ni admite casos nuevos. Los casos existentes siguen visibles.
+  visible                    Boolean   @default(true)
   imagen                     String    @default("")
   fechaInicio                DateTime?
   fechaCierre                DateTime?

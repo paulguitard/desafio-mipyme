@@ -23,10 +23,9 @@ import { InputCorreo } from "@/components/input-correo";
 import { normalizarCorreo } from "@/lib/correo";
 import { textoContinuo } from "@/lib/texto-continuo";
 import {
+  agruparAdjuntos,
   esTipoFormato,
   formatearValorPregunta,
-  getVideoLink,
-  isStoredFile,
   parseArchivos,
   parseConfigCorreo,
   parseConfigFecha,
@@ -34,6 +33,7 @@ import {
   parseOpciones,
   parseValor,
   publicUploadUrl,
+  resolveVideoEmbed,
   type StoredAttachment,
   type StoredFile,
   type TipoPregunta,
@@ -43,16 +43,18 @@ function CampoAdjunto({
   id,
   name,
   tipo,
+  guardados,
 }: {
   id: string;
   name: string;
   tipo: "imagen" | "archivo";
+  guardados: StoredFile[];
 }) {
-  const [nombre, setNombre] = useState("");
+  const [nombres, setNombres] = useState<string[]>([]);
   const esImagen = tipo === "imagen";
 
   function alCambiar(files: FileList | null) {
-    setNombre(files?.[0]?.name ?? "");
+    setNombres(files ? Array.from(files).map((file) => file.name) : []);
   }
 
   function quitar() {
@@ -61,90 +63,120 @@ function CampoAdjunto({
       input.value = "";
       input.dispatchEvent(new Event("change", { bubbles: true }));
     }
-    setNombre("");
+    setNombres([]);
   }
 
   return (
     <div className="campo-adjunto">
-      <p className="campo-adjunto-titulo">{esImagen ? "Imagen" : "Archivo"}</p>
+      <p className="campo-adjunto-titulo">{esImagen ? "Imágenes" : "Archivos"}</p>
+      {guardados.length > 0 ? (
+        <ul className={esImagen ? "pregunta-adjuntos-lista is-imagenes" : "pregunta-adjuntos-lista"}>
+          {guardados.map((file) => (
+            <li key={file.id}>
+              <AdjuntoArchivo file={file} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <input
         className="sr-only"
         id={id}
         name={name}
         type="file"
+        multiple
         accept={esImagen ? "image/jpeg,image/png,.jpg,.jpeg,.png" : undefined}
         onChange={(event) => alCambiar(event.target.files)}
       />
       <div className="campo-adjunto-fila">
         <label className="btn btn-sm btn-secondary cursor-pointer" htmlFor={id}>
-          {nombre ? (esImagen ? "Cambiar imagen" : "Cambiar archivo") : esImagen ? "Elegir imagen" : "Elegir archivo"}
+          {esImagen ? "Elegir imágenes" : "Elegir archivos"}
         </label>
-        {nombre ? (
-          <>
-            <span className="campo-adjunto-nombre">{nombre}</span>
-            <button className="btn btn-sm btn-ghost" type="button" onClick={quitar}>
-              Quitar
-            </button>
-          </>
-        ) : (
-          <span className="campo-adjunto-vacio">
-            {esImagen ? "Aún no elegiste una imagen." : "Aún no elegiste un archivo."}
-          </span>
-        )}
+        {nombres.length > 0 ? (
+          <button className="btn btn-sm btn-ghost" type="button" onClick={quitar}>
+            Quitar selección
+          </button>
+        ) : null}
       </div>
+      {nombres.length > 0 ? (
+        <ul className="campo-adjunto-pendientes">
+          {nombres.map((nombre, index) => (
+            <li key={`${index}-${nombre}`} className="campo-adjunto-nombre">
+              {nombre}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <span className="campo-adjunto-vacio">
+          {esImagen ? "Puedes elegir varias imágenes." : "Puedes elegir varios archivos."}
+        </span>
+      )}
       <p className="text-xs text-muted">
-        {esImagen
-          ? "Acepta JPG o PNG."
-          : "PDF u otro documento, máximo 2 MB."}
+        {esImagen ? "Acepta JPG o PNG." : "PDF u otro documento, máximo 2 MB cada uno."}
       </p>
     </div>
   );
 }
 
-function CampoVideoLink({
+function CampoVideoLinks({
   id,
   name,
-  defaultValue,
+  urlsIniciales,
   disabled,
   preview,
-  embed,
 }: {
   id: string;
   name?: string;
-  defaultValue: string;
+  urlsIniciales: string[];
   disabled?: boolean;
   preview?: boolean;
-  embed?: ReactNode;
 }) {
-  const [url, setUrl] = useState(preview ? "" : defaultValue);
+  const [urls, setUrls] = useState(() => (preview ? [""] : urlsIniciales.length > 0 ? urlsIniciales : [""]));
   const bloqueado = Boolean(disabled || preview);
 
-  function quitar() {
-    setUrl("");
+  function actualizar(index: number, value: string) {
+    setUrls((prev) => prev.map((url, i) => (i === index ? value : url)));
+  }
+
+  function quitar(index: number) {
+    setUrls((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      return next.length > 0 ? next : [""];
+    });
   }
 
   return (
     <div className="campo-adjunto">
-      <p className="campo-adjunto-titulo">Link de video</p>
-      <div className="campo-adjunto-fila">
-        <input
-          className="input campo-adjunto-url"
-          id={id}
-          name={name}
-          type="url"
-          placeholder="https://..."
-          value={url}
-          onChange={(event) => setUrl(event.target.value)}
-          disabled={bloqueado}
-        />
-        {url && !bloqueado ? (
-          <button className="btn btn-sm btn-ghost" type="button" onClick={quitar}>
-            Quitar
-          </button>
-        ) : null}
+      <p className="campo-adjunto-titulo">Links de video</p>
+      <div className="campo-adjunto-videos">
+        {urls.map((url, index) => (
+          <div key={`${id}-${index}`} className="campo-adjunto-video-item">
+            <div className="campo-adjunto-fila">
+              <input
+                className="input campo-adjunto-url"
+                id={index === 0 ? id : `${id}-${index}`}
+                name={name}
+                type="url"
+                placeholder="https://..."
+                value={url}
+                onChange={(event) => actualizar(index, event.target.value)}
+                disabled={bloqueado}
+              />
+              {url && !bloqueado ? (
+                <button className="btn btn-sm btn-ghost" type="button" onClick={() => quitar(index)}>
+                  Quitar
+                </button>
+              ) : null}
+            </div>
+            {!preview && url.trim() && resolveVideoEmbed(url) ? <VideoEmbed url={url} /> : null}
+          </div>
+        ))}
       </div>
+      {bloqueado ? null : (
+        <button className="btn btn-sm btn-secondary self-start" type="button" onClick={() => setUrls((prev) => [...prev, ""])}>
+          Agregar otro link
+        </button>
+      )}
       <p className="text-xs text-muted">YouTube, Vimeo, Google Drive o SharePoint.</p>
-      {embed}
     </div>
   );
 }
@@ -272,45 +304,83 @@ function AdjuntoArchivo({ file }: { file: StoredFile }) {
 }
 
 export function ArchivosLista({ archivos }: { archivos: StoredAttachment[] }) {
-  const files: StoredFile[] = archivos.filter(isStoredFile);
-  if (files.length === 0) return null;
+  const { imagenes, documentos } = agruparAdjuntos(archivos);
+  if (imagenes.length === 0 && documentos.length === 0) return null;
   return (
-    <ul className="pregunta-adjuntos-lista">
-      {files.map((file) => (
-        <li key={file.id}>
-          <AdjuntoArchivo file={file} />
-        </li>
-      ))}
-    </ul>
+    <div className="pregunta-adjuntos-grupos">
+      {imagenes.length > 0 ? (
+        <section className="pregunta-adjuntos-grupo">
+          <h5>Imágenes</h5>
+          <ul className="pregunta-adjuntos-lista is-imagenes">
+            {imagenes.map((file) => (
+              <li key={file.id}>
+                <AdjuntoArchivo file={file} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {documentos.length > 0 ? (
+        <section className="pregunta-adjuntos-grupo">
+          <h5>Archivos</h5>
+          <ul className="pregunta-adjuntos-lista">
+            {documentos.map((file) => (
+              <li key={file.id}>
+                <AdjuntoArchivo file={file} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </div>
   );
 }
 
-export function VideoLinkVista({ archivos }: { archivos: StoredAttachment[] }) {
-  const video = getVideoLink(archivos);
-  if (!video) return null;
-  return <VideoEmbed url={video.url} />;
-}
-
 export function AdjuntosRespuesta({ archivos }: { archivos: StoredAttachment[] }) {
-  const files = archivos.filter(isStoredFile);
-  const video = getVideoLink(archivos);
-  if (files.length === 0 && !video) return null;
+  const { imagenes, documentos, videos } = agruparAdjuntos(archivos);
+  if (imagenes.length === 0 && documentos.length === 0 && videos.length === 0) return null;
 
   return (
     <aside className="pregunta-adjuntos">
       <h4>Adjuntos</h4>
-      <ul className="pregunta-adjuntos-lista">
-        {files.map((file) => (
-          <li key={file.id}>
-            <AdjuntoArchivo file={file} />
-          </li>
-        ))}
-        {video ? (
-          <li>
-            <VideoMiniatura url={video.url} />
-          </li>
+      <div className="pregunta-adjuntos-grupos">
+        {imagenes.length > 0 ? (
+          <section className="pregunta-adjuntos-grupo">
+            <h5>Imágenes</h5>
+            <ul className="pregunta-adjuntos-lista is-imagenes">
+              {imagenes.map((file) => (
+                <li key={file.id}>
+                  <AdjuntoArchivo file={file} />
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
-      </ul>
+        {documentos.length > 0 ? (
+          <section className="pregunta-adjuntos-grupo">
+            <h5>Archivos</h5>
+            <ul className="pregunta-adjuntos-lista">
+              {documentos.map((file) => (
+                <li key={file.id}>
+                  <AdjuntoArchivo file={file} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+        {videos.length > 0 ? (
+          <section className="pregunta-adjuntos-grupo">
+            <h5>Links de video</h5>
+            <ul className="pregunta-adjuntos-lista is-videos">
+              {videos.map((video) => (
+                <li key={video.id}>
+                  <VideoMiniatura url={video.url} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+      </div>
     </aside>
   );
 }
@@ -343,7 +413,7 @@ export function PreguntaCampo({
   const opciones = parseOpciones(pregunta.opciones);
   const valor = parseValor(respuesta?.valor ?? "");
   const archivos = parseArchivos(respuesta?.archivos ?? "[]");
-  const videoLink = getVideoLink(archivos);
+  const { imagenes, documentos, videos } = agruparAdjuntos(archivos);
   const tipo = pregunta.tipo as TipoPregunta;
   const modoFecha = parseConfigFecha(pregunta.opciones);
   const cantidadCorreos = parseConfigCorreo(pregunta.opciones);
@@ -543,21 +613,18 @@ export function PreguntaCampo({
         <CampoObjetivosIndicadores name={name} opcionesRaw={pregunta.opciones} valorInicial={valor} />
       ) : null}
 
-      <ArchivosLista archivos={archivos} />
-
-      {pregunta.permiteArchivo ? (
-        <CampoAdjunto id={`archivo-${pregunta.id}`} name={`archivo-${pregunta.id}`} tipo="archivo" />
-      ) : null}
       {pregunta.permiteImagen ? (
-        <CampoAdjunto id={`imagen-${pregunta.id}`} name={`imagen-${pregunta.id}`} tipo="imagen" />
+        <CampoAdjunto id={`imagen-${pregunta.id}`} name={`imagen-${pregunta.id}`} tipo="imagen" guardados={imagenes} />
+      ) : null}
+      {pregunta.permiteArchivo ? (
+        <CampoAdjunto id={`archivo-${pregunta.id}`} name={`archivo-${pregunta.id}`} tipo="archivo" guardados={documentos} />
       ) : null}
       {pregunta.permiteVideoLink ? (
-        <CampoVideoLink
+        <CampoVideoLinks
           id={`video-${pregunta.id}`}
           name={preview ? undefined : `video-${pregunta.id}`}
-          defaultValue={videoLink?.url ?? ""}
+          urlsIniciales={videos.map((video) => video.url)}
           preview={preview}
-          embed={!preview && videoLink ? <VideoLinkVista archivos={archivos} /> : null}
         />
       ) : null}
     </fieldset>
@@ -568,10 +635,10 @@ export function formatValorRespuesta(valorRaw: string, archivosRaw: string, tipo
   const valor = parseValor(valorRaw);
   const archivos = parseArchivos(archivosRaw);
   const texto = formatearValorPregunta(tipo || "texto_corto", valor, opciones) || "(sin texto)";
-  const files = archivos.filter(isStoredFile);
-  const video = getVideoLink(archivos);
+  const { documentos, imagenes, videos } = agruparAdjuntos(archivos);
   const partes = [texto];
-  if (files.length) partes.push(files.map((a) => a.originalName).join(", "));
-  if (video) partes.push(video.url);
+  if (imagenes.length) partes.push(`Imágenes: ${imagenes.map((a) => a.originalName).join(", ")}`);
+  if (documentos.length) partes.push(`Archivos: ${documentos.map((a) => a.originalName).join(", ")}`);
+  if (videos.length) partes.push(`Videos: ${videos.map((v) => v.url).join(", ")}`);
   return partes.join(" · ");
 }

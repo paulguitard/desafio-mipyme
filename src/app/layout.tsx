@@ -18,9 +18,9 @@ const montserrat = Montserrat({
 });
 
 const APP_NAME = "Desafío MiPyme";
-const APP_TITLE = "Desafío MiPyme | Portal de Mentorías";
+const APP_TITLE = "Desafío MiPyme | Portal de Asesorías";
 const APP_DESCRIPTION =
-  "Portal de mentorías del Desafío Nacional MiPyme AIEP";
+  "Portal de asesorías del Desafío Nacional MiPyme AIEP";
 
 export const viewport: Viewport = {
   width: "device-width",

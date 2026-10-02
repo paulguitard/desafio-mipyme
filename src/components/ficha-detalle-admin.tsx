@@ -59,7 +59,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
             evaluacion={
               <EvalDetalleCelda panel="eval">
                 <div className="card space-y-2 p-4">
-                  <p className="text-muted">Las mentorías de contenido no tienen evaluación.</p>
+                  <p className="text-muted">Las asesorías de contenido no tienen evaluación.</p>
                 </div>
               </EvalDetalleCelda>
             }
@@ -68,7 +68,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
             supervision={
               <EvalDetalleCelda panel="sup">
                 <div className="card space-y-2 p-4">
-                  <p className="text-muted">Las mentorías de contenido no tienen supervisión.</p>
+                  <p className="text-muted">Las asesorías de contenido no tienen supervisión.</p>
                 </div>
               </EvalDetalleCelda>
             }
