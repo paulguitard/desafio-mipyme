@@ -16,6 +16,7 @@ import { esMentoriaContenido, parseTipoFormulario, type TipoFormulario } from "@
 import { asignarEvaluadoresAutomaticoEnConvocatoria } from "@/lib/asignacion-automatica";
 import { asignarSupervisoresAutomaticoEnConvocatoria } from "@/lib/asignacion-supervisor";
 import { cupoAlcanzado, mensajeCupoPersona } from "@/lib/cupo-asignacion";
+import { generarTokenPublico } from "@/lib/ficha-publica";
 import {
   getDetalleFichaAdmin,
   getPanelEvaluacion,
@@ -767,6 +768,30 @@ export async function cargarDetalleFichaAdmin(postulacionId: string) {
   const data = await getDetalleFichaAdmin(postulacionId);
   if (!data) return { error: "Participación no encontrada." };
   return { data };
+}
+
+export async function asegurarTokensPublicos(convocatoriaId: string) {
+  await requireUser("ADMIN");
+  const feedback = await exigirMentoriaFeedback(convocatoriaId);
+  if ("error" in feedback) return feedback;
+  const pendientes = await prisma.postulacion.findMany({
+    where: { convocatoriaId, tokenPublico: null },
+    select: { id: true },
+  });
+  for (const fila of pendientes) {
+    for (let intento = 0; intento < 5; intento += 1) {
+      try {
+        await prisma.postulacion.update({
+          where: { id: fila.id },
+          data: { tokenPublico: generarTokenPublico() },
+        });
+        break;
+      } catch {
+        if (intento === 4) return { error: "No se pudieron generar los links públicos." };
+      }
+    }
+  }
+  return { ok: true as const, creados: pendientes.length };
 }
 
 export async function crearConvocatoriaForm(formData: FormData): Promise<void> {

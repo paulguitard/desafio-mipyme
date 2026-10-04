@@ -7,6 +7,7 @@ import { AvisoEntradaCaso } from "@/components/aviso-entrada-caso";
 import { ConfirmacionEnvio } from "@/components/confirmacion-envio";
 import { EnvioExitoso } from "@/components/envio-exitoso";
 import { IndicadorGuardando } from "@/components/indicador-guardando";
+import { ModalGuardado, type EstadoModalGuardado } from "@/components/modal-guardado";
 import type { AvisoEntradaCaso as AvisoEntradaCasoDatos } from "@/lib/aviso-entrada-caso";
 import {
   MAX_FILE_BYTES,
@@ -58,8 +59,8 @@ export function FormularioPostulante({
 }) {
   const router = useRouter();
   const conPaneles = layout === "paneles";
-  const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [guardadoModal, setGuardadoModal] = useState<EstadoModalGuardado | null>(null);
   const [pendienteEnvio, setPendienteEnvio] = useState<FormData | null>(null);
   const [exito, setExito] = useState<{ title: string; detalle: string } | null>(null);
   const [bloqueado, setBloqueado] = useState(false);
@@ -77,7 +78,6 @@ export function FormularioPostulante({
   function conGuardado(
     formData: FormData,
     persistir: (formData: FormData) => Promise<{ error?: string } | { ok?: boolean } | void>,
-    mensajeOk: string,
   ) {
     if (savingRef.current) return;
     const adjuntoError = validarAdjuntosCliente(formData);
@@ -87,15 +87,16 @@ export function FormularioPostulante({
     }
     savingRef.current = true;
     setError(null);
-    setMensaje(mensajeOk);
+    setGuardadoModal("guardando");
     void accion.ejecutar(() => persistir(formData), {
       onOk: () => {
         limpiarInputsArchivo(formRef.current);
         savingRef.current = false;
+        setGuardadoModal("exito");
       },
       onError: (mensajeError) => {
         savingRef.current = false;
-        setMensaje(null);
+        setGuardadoModal("error");
         setError(mensajeError);
       },
     });
@@ -113,7 +114,6 @@ export function FormularioPostulante({
     }
     savingRef.current = true;
     setError(null);
-    setMensaje(null);
     setBloqueado(true);
     void accion.ejecutar(() => enviarPostulacion(data), {
       onOk: () => {
@@ -166,10 +166,11 @@ export function FormularioPostulante({
                 className="btn btn-sm btn-secondary"
                 data-tour="guardar-borrador"
                 type="button"
+                disabled={Boolean(guardadoModal) || accion.guardando}
                 onClick={() => {
                   const formData = datosDelFormulario();
                   if (!formData) return;
-                  conGuardado(formData, guardarBorrador, "Borrador guardado.");
+                  conGuardado(formData, guardarBorrador);
                 }}
               >
                 Guardar borrador
@@ -178,6 +179,7 @@ export function FormularioPostulante({
                 className="btn btn-sm btn-primary"
                 data-tour="enviar-caso"
                 type="button"
+                disabled={Boolean(guardadoModal) || accion.guardando}
                 onClick={() => {
                   if (savingRef.current) return;
                   const formData = datosDelFormulario();
@@ -191,9 +193,8 @@ export function FormularioPostulante({
           ) : null}
         </div>
         {meta}
-        {mensaje ? <p className="text-emerald-800">{mensaje}</p> : null}
-        {error ? <p className="text-danger">{error}</p> : null}
-        <IndicadorGuardando visible={accion.guardando} />
+        {error && guardadoModal !== "error" ? <p className="text-danger">{error}</p> : null}
+        <IndicadorGuardando visible={accion.guardando && !guardadoModal} />
       </div>
       <div
         className={
@@ -237,6 +238,15 @@ export function FormularioPostulante({
           </>
         )}
       </ConfirmacionEnvio>
+      <ModalGuardado
+        open={guardadoModal !== null}
+        estado={guardadoModal ?? "guardando"}
+        error={error}
+        onAceptar={() => {
+          setGuardadoModal(null);
+          if (guardadoModal === "error") setError(null);
+        }}
+      />
       <EnvioExitoso
         open={exito !== null}
         title={exito?.title ?? ""}

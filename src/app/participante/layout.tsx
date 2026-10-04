@@ -20,7 +20,7 @@ export default async function ParticipanteLayout({ children }: { children: React
           title="Panel de participante"
           name={user?.name ?? sessionUser.name ?? "Participante"}
           links={[
-            { href: "/participante", label: "Panel" },
+            { href: "/participante", label: "Asesorías" },
             { href: "/participante/perfil", label: "Mi Perfil" },
           ]}
         />

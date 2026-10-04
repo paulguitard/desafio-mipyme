@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { sanitizeRichText } from "@/lib/html";
 import { publicUploadUrl } from "@/lib/preguntas";
 import { resolveVideoEmbed } from "@/lib/preguntas";
-import { estadoAsignacionFicha, estadoRespuestaFicha, estadoSupervisionFicha, etiquetaEstadoAsignacionFicha, etiquetaEstadoSupervisionFicha } from "@/lib/convocatoria-evaluacion-filtros";
+import { estadoAsignacionFicha, estadoRespuestaFicha, estadoSupervisionFicha, etiquetaEstadoAsignacionFicha, etiquetaEstadoSupervisionFicha, porcentajeEntero, resumenNumerosAsesoria } from "@/lib/convocatoria-evaluacion-filtros";
 
 describe("sanitizeRichText", () => {
   it("strips scripts and event handlers", () => {
@@ -96,6 +96,54 @@ describe("estadoRespuestaFicha", () => {
         [],
       ),
     ).toBe("completa");
+  });
+});
+
+describe("resumenNumerosAsesoria", () => {
+  it("counts responses by status and assignment", () => {
+    const resumen = resumenNumerosAsesoria(
+      [
+        {
+          estado: "BORRADOR",
+          enviadaAt: null,
+          emprendedorNombre: "A",
+          emprendedorEmail: "a@b.c",
+          nombreCaso: "1",
+          respuestas: [],
+          asignaciones: [],
+        },
+        {
+          estado: "EN_EVALUACION",
+          enviadaAt: "2026-01-01",
+          emprendedorNombre: "B",
+          emprendedorEmail: "b@b.c",
+          nombreCaso: "2",
+          respuestas: [],
+          asignaciones: [{ evaluadorId: "e", estado: "REPARADA" }],
+          supervision: { supervisorId: "s" },
+        },
+        {
+          estado: "FINALIZADA",
+          enviadaAt: "2026-01-01",
+          emprendedorNombre: "C",
+          emprendedorEmail: "c@b.c",
+          nombreCaso: "3",
+          respuestas: [],
+          asignaciones: [{ evaluadorId: "e", estado: "FINALIZADA" }],
+        },
+      ],
+      [],
+    );
+    expect(resumen.total).toBe(3);
+    expect(resumen.porEstado.pendiente).toBe(1);
+    expect(resumen.porEstado["esperando-evaluacion"]).toBe(1);
+    expect(resumen.porEstado.completa).toBe(1);
+    expect(resumen.conEvaluador).toBe(2);
+    expect(resumen.sinEvaluador).toBe(1);
+    expect(resumen.conSupervisor).toBe(1);
+    expect(resumen.sinSupervisor).toBe(2);
+    expect(porcentajeEntero(1, 3)).toBe(33);
+    expect(porcentajeEntero(0, 0)).toBeNull();
   });
 });
 

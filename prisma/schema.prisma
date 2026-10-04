@@ -230,6 +230,8 @@ model Postulacion {
   postulante     User      @relation(fields: [postulanteId], references: [id])
   estado         String    @default("BORRADOR")
   nombreCaso     String    @default("")
+  /// Token opaco fijo para el link público de solo lectura. No se regenera.
+  tokenPublico   String?   @unique
   enviadaAt      DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt

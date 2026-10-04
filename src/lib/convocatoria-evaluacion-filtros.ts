@@ -11,7 +11,15 @@ export type PostulacionFiltroItem = {
   nombreCaso: string;
   respuestas: RespuestaFiltro[];
   asignaciones: AsignacionFiltro[];
+  supervision?: { supervisorId: string } | null;
 };
+
+export const ESTADOS_RESPUESTA_FICHA: EstadoRespuestaFicha[] = [
+  "pendiente",
+  "observaciones",
+  "esperando-evaluacion",
+  "completa",
+];
 
 export type EstadoRespuestaFicha =
   | "pendiente"
@@ -123,4 +131,44 @@ export function estadoRespuestaFicha(
     base.every((pregunta) => respuestaConValor(porPregunta.get(pregunta.id) ?? ""));
 
   return completa ? "completa" : "pendiente";
+}
+
+export function etiquetaEstadoRespuestaFicha(estado: EstadoRespuestaFicha) {
+  if (estado === "observaciones") return "Respondiendo observaciones";
+  if (estado === "esperando-evaluacion") return "Esperando evaluación";
+  if (estado === "completa") return "Completa";
+  return "Pendiente";
+}
+
+export function porcentajeEntero(parte: number, total: number) {
+  if (total <= 0) return null;
+  return Math.round((parte / total) * 100);
+}
+
+export function resumenNumerosAsesoria(
+  postulaciones: PostulacionFiltroItem[],
+  preguntas: PreguntaFiltro[],
+) {
+  const total = postulaciones.length;
+  const porEstado: Record<EstadoRespuestaFicha, number> = {
+    pendiente: 0,
+    observaciones: 0,
+    "esperando-evaluacion": 0,
+    completa: 0,
+  };
+  let conEvaluador = 0;
+  let conSupervisor = 0;
+  for (const postulacion of postulaciones) {
+    porEstado[estadoRespuestaFicha(postulacion, preguntas)] += 1;
+    if (postulacion.asignaciones.length > 0) conEvaluador += 1;
+    if (postulacion.supervision) conSupervisor += 1;
+  }
+  return {
+    total,
+    porEstado,
+    conEvaluador,
+    sinEvaluador: total - conEvaluador,
+    conSupervisor,
+    sinSupervisor: total - conSupervisor,
+  };
 }

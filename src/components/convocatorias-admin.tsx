@@ -79,6 +79,7 @@ export function ConvocatoriasAdmin({
   const [evaluacion, setEvaluacion] = useState<PanelEvaluacion | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
   const [panelLoading, setPanelLoading] = useState(false);
+  const [vistaPanel, setVistaPanel] = useState<"lista" | "numeros" | "links">("lista");
   const panelEsContenido = esMentoriaContenido(evaluacion?.tipo ?? evaluacionTipo);
   const [tipoMentoria, setTipoMentoria] = useState<TipoFormulario>("FEEDBACK");
   const tituloModal = editing ? "Editar asesoría" : "Crear asesoría";
@@ -154,6 +155,7 @@ export function ConvocatoriasAdmin({
     setEvaluacionConteo(0);
     setPanelError(null);
     setPanelLoading(false);
+    setVistaPanel("lista");
   }
 
   async function abrirEvaluacion(item: ConvocatoriaListaItem) {
@@ -163,6 +165,7 @@ export function ConvocatoriasAdmin({
     setEvaluacionConteo(item.postulaciones);
     setEvaluacion(null);
     setPanelError(null);
+    setVistaPanel("lista");
     setPanelLoading(true);
     const result = await cargarPanelEvaluacion(item.id);
     setPanelLoading(false);
@@ -360,6 +363,42 @@ export function ConvocatoriasAdmin({
         wide
         tall
         toned
+        headerExtra={
+          <div className="eval-vista-toggle" role="group" aria-label="Vista del panel" data-tour="vista-panel-asesoria">
+            {panelEsContenido ? null : (
+              <button
+                type="button"
+                className={`eval-vista-btn${vistaPanel === "links" ? " is-active" : ""}`}
+                aria-label="Links públicos"
+                title="Links públicos"
+                aria-pressed={vistaPanel === "links"}
+                onClick={() => setVistaPanel("links")}
+              >
+                <IconoVistaLinks />
+              </button>
+            )}
+            <button
+              type="button"
+              className={`eval-vista-btn${vistaPanel === "lista" ? " is-active" : ""}`}
+              aria-label="Lista"
+              title="Lista"
+              aria-pressed={vistaPanel === "lista"}
+              onClick={() => setVistaPanel("lista")}
+            >
+              <IconoVistaLista />
+            </button>
+            <button
+              type="button"
+              className={`eval-vista-btn${vistaPanel === "numeros" ? " is-active" : ""}`}
+              aria-label="Números"
+              title="Números"
+              aria-pressed={vistaPanel === "numeros"}
+              onClick={() => setVistaPanel("numeros")}
+            >
+              <IconoVistaNumeros />
+            </button>
+          </div>
+        }
         onClose={cerrarPanelEvaluacion}
       >
         {panelLoading && evaluacionOpen && !evaluacion ? (
@@ -381,6 +420,7 @@ export function ConvocatoriasAdmin({
             poolSupervisores={evaluacion.poolSupervisores}
             supervisoresDisponibles={evaluacion.supervisoresDisponibles}
             postulaciones={evaluacion.postulaciones}
+            vista={vistaPanel}
             onMutated={refrescarEvaluacion}
           />
         ) : null}
@@ -627,5 +667,41 @@ function VistaEmprendedorMentoria({
         </div>
       </div>
     </article>
+  );
+}
+
+function IconoVistaLinks() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+      <path
+        d="M16 8.2A4.8 4.8 0 1 0 17 14v-2"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      <circle cx="12" cy="12" r="2.4" stroke="currentColor" strokeWidth="2.2" />
+    </svg>
+  );
+}
+
+function IconoVistaLista() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+      <path
+        d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function IconoVistaNumeros() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M3.5 10h17M3.5 15h17M10 4.5v15" stroke="currentColor" strokeWidth="2" />
+    </svg>
   );
 }

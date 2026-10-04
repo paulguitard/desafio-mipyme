@@ -4,7 +4,7 @@ import { Readable } from "node:stream";
 import { auth } from "@/auth";
 import { normalizeRole } from "@/lib/roles";
 import { cloudinaryDeliveryUrl } from "@/lib/storage/cloudinary";
-import { userCanAccessStoredFile, fileLooksLikeSvg } from "@/lib/storage/authorize";
+import { userCanAccessStoredFile, tokenCanAccessStoredFile, fileLooksLikeSvg } from "@/lib/storage/authorize";
 import { mimeFromFilename, uploadAbsolutePath } from "@/lib/storage/local";
 import { looksLikeCloudinaryPublicId, parseUploadWidth } from "@/lib/storage/public-id";
 
@@ -12,20 +12,23 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
-  const session = await auth();
-  const role = normalizeRole(session?.user?.role ?? "");
-  if (!session?.user?.id || !role) {
-    return new Response("No autorizado", { status: 401 });
-  }
-
   const { path: segments } = await params;
   const relativePath = segments.map((segment) => decodeURIComponent(segment)).join("/");
-  const width = parseUploadWidth(new URL(request.url).searchParams.get("w"));
+  const requestUrl = new URL(request.url);
+  const width = parseUploadWidth(requestUrl.searchParams.get("w"));
+  const fichaToken = requestUrl.searchParams.get("ficha");
 
-  const allowed = await userCanAccessStoredFile(
-    { id: session.user.id, role },
-    relativePath,
-  );
+  let allowed = false;
+  if (fichaToken) {
+    allowed = await tokenCanAccessStoredFile(fichaToken, relativePath);
+  } else {
+    const session = await auth();
+    const role = normalizeRole(session?.user?.role ?? "");
+    if (!session?.user?.id || !role) {
+      return new Response("No autorizado", { status: 401 });
+    }
+    allowed = await userCanAccessStoredFile({ id: session.user.id, role }, relativePath);
+  }
   if (!allowed) {
     return new Response("No autorizado", { status: 403 });
   }

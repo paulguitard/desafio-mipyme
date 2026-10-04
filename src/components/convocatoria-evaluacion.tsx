@@ -14,6 +14,7 @@ import {
   asignarSupervisorAPostulacion,
   asignarSupervisoresAutomatico,
   cargarDetalleFichaAdmin,
+  asegurarTokensPublicos,
   eliminarPostulacion,
   guardarConfigEvaluacion,
   guardarCupoPool,
@@ -30,6 +31,7 @@ import { normalizarCorreo } from "@/lib/correo";
 import { parseValor } from "@/lib/preguntas";
 import { ESCUELAS } from "@/lib/escuelas";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
+import { rutaFichaPublica } from "@/lib/ficha-publica";
 import { esMentoriaContenido, parseTipoFormulario, type TipoFormulario } from "@/lib/tipo-formulario";
 import {
   contiene,
@@ -37,9 +39,11 @@ import {
   estadoRespuestaFicha,
   estadoSupervisionFicha,
   etiquetaEstadoAsignacionFicha,
+  etiquetaEstadoRespuestaFicha,
   etiquetaEstadoSupervisionFicha,
+  ESTADOS_RESPUESTA_FICHA,
+  resumenNumerosAsesoria,
   type EstadoEvaluacionFicha,
-  type EstadoRespuestaFicha,
   type EstadoSupervisionFicha,
 } from "@/lib/convocatoria-evaluacion-filtros";
 
@@ -83,6 +87,7 @@ type PostulacionItem = {
   emprendedorNombre: string;
   emprendedorEmail: string;
   nombreCaso: string;
+  tokenPublico?: string | null;
   respuestas: RespuestaFiltro[];
   vistasPiezaIds?: string[];
   asignaciones: Asignacion[];
@@ -225,11 +230,31 @@ function textoPlano(valor: unknown) {
   return String(valor);
 }
 
-function etiquetaEstadoRespuesta(estado: EstadoRespuestaFicha) {
-  if (estado === "observaciones") return "Respondiendo observaciones";
-  if (estado === "esperando-evaluacion") return "Esperando evaluación";
-  if (estado === "completa") return "Completa";
-  return "Pendiente";
+function TablaNumeros({
+  titulo,
+  variante,
+  filas,
+}: {
+  titulo: string;
+  variante: "respuestas" | "evaluadores" | "supervisores";
+  filas: { etiqueta: string; valor: number; total?: boolean }[];
+}) {
+  return (
+    <section className={`eval-numeros-card is-${variante}`}>
+      <h3 className="eval-numeros-titulo">{titulo}</h3>
+      <table className="eval-numeros-tabla">
+        <caption className="sr-only">{titulo}</caption>
+        <tbody>
+          {filas.map((fila) => (
+            <tr key={fila.etiqueta} className={fila.total ? "eval-numeros-total" : undefined}>
+              <th scope="row">{fila.etiqueta}</th>
+              <td>{fila.valor}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
 }
 
 function claseAvatarEstado(estado: EstadoEvaluacionFicha | EstadoSupervisionFicha) {
@@ -353,6 +378,7 @@ export function ConvocatoriaEvaluacion({
   onMutated,
   tipo = "FEEDBACK",
   piezas = [],
+  vista = "lista",
 }: {
   convocatoriaId: string;
   estadoConvocatoria: string;
@@ -369,6 +395,7 @@ export function ConvocatoriaEvaluacion({
   onMutated?: () => Promise<void> | void;
   tipo?: TipoFormulario;
   piezas?: { id: string; titulo: string }[];
+  vista?: "lista" | "numeros" | "links";
 }) {
   const servidor = useMemo(
     () => ({
@@ -433,6 +460,33 @@ export function ConvocatoriaEvaluacion({
     poolSupLocal.find((item) => item.evaluadorId === poolModalId) ??
     null;
   const respuestas = postulacionesLocal;
+  const resumenNumeros = useMemo(
+    () => resumenNumerosAsesoria(respuestas, preguntas),
+    [preguntas, respuestas],
+  );
+  const esNumeros = vista === "numeros";
+  const esLinks = vista === "links";
+  const [copiadoId, setCopiadoId] = useState<string | null>(null);
+  const onMutatedRef = useRef(onMutated);
+  onMutatedRef.current = onMutated;
+
+  useEffect(() => {
+    if (!esLinks || esContenido) return;
+    let cancelado = false;
+    void asegurarTokensPublicos(convocatoriaId).then((result) => {
+      if (cancelado) return;
+      if (result && "error" in result && result.error) {
+        setError(result.error);
+        return;
+      }
+      if (result && "creados" in result && result.creados > 0) {
+        void onMutatedRef.current?.();
+      }
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [convocatoriaId, esContenido, esLinks, setError]);
 
   const respuestasFiltradas = useMemo(() => {
     return respuestas.filter((postulacion) => {
@@ -751,7 +805,7 @@ export function ConvocatoriaEvaluacion({
 
   return (
     <div className="eval-panel eval-shell-open">
-      <div className={`eval-shell${esContenido ? " is-contenido" : ""}`}>
+      <div className={`eval-shell${esContenido ? " is-contenido" : ""}${esNumeros ? " is-numeros" : ""}${esLinks ? " is-links" : ""}`}>
       <aside className="eval-side" aria-label="Evaluadores y supervisores de la asesoría">
         <div className="eval-side-header">
           <h3 className="text-lg font-semibold text-navy">
@@ -975,7 +1029,105 @@ export function ConvocatoriaEvaluacion({
       </aside>
 
 
-      <div className="eval-main" aria-label={esContenido ? "Participantes de la asesoría" : "Respuestas de la asesoría"} data-tour="lista-casos">
+      <div
+        className="eval-main"
+        aria-label={
+          esLinks
+            ? "Links públicos de las respuestas"
+            : esNumeros
+            ? "Números de la asesoría"
+            : esContenido
+              ? "Participantes de la asesoría"
+              : "Respuestas de la asesoría"
+        }
+        data-tour="lista-casos"
+      >
+        {esNumeros ? (
+          <div className="eval-numeros">
+            <TablaNumeros
+              titulo={esContenido ? "Participantes" : "Respuestas"}
+              variante="respuestas"
+              filas={[
+                {
+                  etiqueta: esContenido ? "Total de participantes" : "Total de respuestas",
+                  valor: resumenNumeros.total,
+                  total: true,
+                },
+                ...(esContenido
+                  ? []
+                  : ESTADOS_RESPUESTA_FICHA.map((estado) => ({
+                      etiqueta: etiquetaEstadoRespuestaFicha(estado),
+                      valor: resumenNumeros.porEstado[estado],
+                    }))),
+              ]}
+            />
+            {esContenido ? null : (
+              <>
+                <TablaNumeros
+                  titulo="Evaluadores"
+                  variante="evaluadores"
+                  filas={[
+                    { etiqueta: "Con evaluador asignado", valor: resumenNumeros.conEvaluador },
+                    { etiqueta: "Sin evaluador asignado", valor: resumenNumeros.sinEvaluador },
+                  ]}
+                />
+                <TablaNumeros
+                  titulo="Supervisores"
+                  variante="supervisores"
+                  filas={[
+                    { etiqueta: "Con supervisor asignado", valor: resumenNumeros.conSupervisor },
+                    { etiqueta: "Sin supervisor asignado", valor: resumenNumeros.sinSupervisor },
+                  ]}
+                />
+              </>
+            )}
+          </div>
+        ) : null}
+        {esLinks && !esContenido ? (
+          <div className="eval-links">
+            {respuestas.length === 0 ? (
+              <p className="text-muted">Todavía no hay respuestas en esta asesoría.</p>
+            ) : (
+              <ul className="eval-links-lista">
+                {respuestas.map((postulacion) => {
+                  const path = postulacion.tokenPublico
+                    ? rutaFichaPublica(postulacion.tokenPublico)
+                    : null;
+                  return (
+                    <li key={postulacion.id} className="eval-links-item">
+                      <div className="eval-links-meta">
+                        <span className="eval-links-caso">{etiquetaNombreCaso(postulacion.nombreCaso)}</span>
+                        <span className="eval-links-nombre">{postulacion.emprendedorNombre}</span>
+                      </div>
+                      {path ? (
+                        <div className="eval-links-url">
+                          <code>{path}</code>
+                          <button
+                            className="btn btn-sm btn-secondary"
+                            type="button"
+                            onClick={() => {
+                              const absoluto = `${window.location.origin}${path}`;
+                              void navigator.clipboard.writeText(absoluto).then(() => {
+                                setCopiadoId(postulacion.id);
+                                window.setTimeout(() => {
+                                  setCopiadoId((actual) => (actual === postulacion.id ? null : actual));
+                                }, 1600);
+                              });
+                            }}
+                          >
+                            {copiadoId === postulacion.id ? "Copiado" : "Copiar"}
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-muted">Generando link…</p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        ) : null}
         <div className="respuestas-filtros space-y-3">
           <div
             className={`eval-filtros-row${filtroPreguntaId ? " has-contiene" : ""}`}
@@ -1324,7 +1476,7 @@ export function ConvocatoriaEvaluacion({
                       <div className="eval-ficha-estado">
                         <span className="eval-ficha-label">Estado</span>
                         <span className={`eval-ficha-value is-${estadoRespuesta}`}>
-                          {etiquetaEstadoRespuesta(estadoRespuesta)}
+                          {etiquetaEstadoRespuestaFicha(estadoRespuesta)}
                         </span>
                       </div>
                     </div>

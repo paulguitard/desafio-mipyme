@@ -4,7 +4,8 @@ import { esEvaluacionObservada } from "@/lib/cupo-asignacion";
 import { extraerNombreCaso } from "@/lib/nombre-caso";
 import { USER_PUBLIC_SELECT } from "@/lib/user-public";
 import { medioDesdeFila } from "@/lib/contenido";
-import { parseTipoFormulario } from "@/lib/tipo-formulario";
+import { parseTipoFormulario, esMentoriaContenido } from "@/lib/tipo-formulario";
+import { esTokenPublicoValido } from "@/lib/ficha-publica";
 
 export type CasoPoolResumen = {
   postulacionId: string;
@@ -297,6 +298,7 @@ export async function getPanelEvaluacion(id: string, page = 1) {
       })),
       vistasPiezaIds: postulacion.vistasContenido.map((item) => item.piezaId),
       nombreCaso: postulacion.nombreCaso || extraerNombreCaso(convocatoria.formulario.preguntas, postulacion.respuestas),
+      tokenPublico: postulacion.tokenPublico,
       asignaciones: postulacion.asignaciones.map((asignacion) => ({
         evaluadorId: asignacion.evaluadorId,
         evaluadorNombre: asignacion.evaluador.name,
@@ -450,6 +452,17 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
       })),
     })),
   };
+}
+
+export async function getDetalleFichaPorToken(token: string) {
+  if (!esTokenPublicoValido(token)) return null;
+  const fila = await prisma.postulacion.findUnique({
+    where: { tokenPublico: token },
+    select: { id: true, convocatoria: { select: { tipo: true } } },
+  });
+  if (!fila) return null;
+  if (esMentoriaContenido(fila.convocatoria.tipo)) return null;
+  return getDetalleFichaAdmin(fila.id);
 }
 
 export type RespuestasConvocatoria = NonNullable<Awaited<ReturnType<typeof getRespuestasConvocatoria>>>;

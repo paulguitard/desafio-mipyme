@@ -20,7 +20,9 @@ const CampoObjetivosIndicadores = dynamic(
 );
 import { VideoEmbed, VideoMiniatura } from "@/components/video-embed";
 import { InputCorreo } from "@/components/input-correo";
+import { useFichaPublicaToken } from "@/components/ficha-publica-token";
 import { normalizarCorreo } from "@/lib/correo";
+import { withFichaToken } from "@/lib/ficha-publica";
 import { textoContinuo } from "@/lib/texto-continuo";
 import {
   agruparAdjuntos,
@@ -263,17 +265,20 @@ function etiquetaArchivo(file: StoredFile) {
 }
 
 function AdjuntoArchivo({ file }: { file: StoredFile }) {
+  const fichaToken = useFichaPublicaToken();
+  const href = withFichaToken(publicUploadUrl(file), fichaToken);
+  const src = withFichaToken(publicUploadUrl(file, { width: 1200 }), fichaToken);
   if (file.kind === "image") {
     return (
       <a
-        href={publicUploadUrl(file)}
+        href={href}
         target="_blank"
         rel="noreferrer"
         className="pregunta-adjuntos-link"
         title={`Abrir ${file.originalName}`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={publicUploadUrl(file, { width: 1200 })} alt={file.originalName} className="pregunta-adjuntos-media" />
+        <img src={src} alt={file.originalName} className="pregunta-adjuntos-media" />
       </a>
     );
   }
@@ -283,7 +288,7 @@ function AdjuntoArchivo({ file }: { file: StoredFile }) {
   return (
     <a
       className="pregunta-adjuntos-doc"
-      href={publicUploadUrl(file)}
+      href={href}
       target="_blank"
       rel="noreferrer"
       title={`Abrir ${file.originalName}`}

@@ -12,6 +12,7 @@ import { AvisoEntradaCaso } from "@/components/aviso-entrada-caso";
 import { ConfirmacionEnvio } from "@/components/confirmacion-envio";
 import { EnvioExitoso } from "@/components/envio-exitoso";
 import { IndicadorGuardando } from "@/components/indicador-guardando";
+import { ModalGuardado, type EstadoModalGuardado } from "@/components/modal-guardado";
 import { EvalDetalleColumnas } from "@/components/eval-detalle-head";
 import type { AvisoEntradaCaso as AvisoEntradaCasoDatos } from "@/lib/aviso-entrada-caso";
 import { useAccionOptimista } from "@/lib/use-dato-optimista";
@@ -62,8 +63,8 @@ export function FormularioEvaluacion({
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
-  const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [guardadoModal, setGuardadoModal] = useState<EstadoModalGuardado | null>(null);
   const [pendienteEnvio, setPendienteEnvio] = useState<PendienteEnvio | null>(null);
   const [exito, setExito] = useState<{ title: string; detalle: string } | null>(null);
   const [bloqueado, setBloqueado] = useState(false);
@@ -91,7 +92,6 @@ export function FormularioEvaluacion({
     const { formData, accion: tipo } = pendienteEnvio;
     setPendienteEnvio(null);
     setError(null);
-    setMensaje(null);
     let persistir: (data: FormData) => Promise<{ error?: string } | { ok: boolean } | void>;
     let exitoEnvio: { title: string; detalle: string };
     if (tipo === "enviar-observaciones-supervisor") {
@@ -139,16 +139,19 @@ export function FormularioEvaluacion({
 
   function guardarRevisionActual(
     persistir: (data: FormData) => Promise<{ error?: string } | { ok: boolean } | void>,
-    mensajeOk: string,
   ) {
     return () => {
+      if (accion.guardando || guardadoModal) return;
       const formData = datosDelFormulario();
       if (!formData) return;
       setError(null);
-      setMensaje(mensajeOk);
+      setGuardadoModal("guardando");
       void accion.ejecutar(() => persistir(formData), {
+        onOk: () => {
+          setGuardadoModal("exito");
+        },
         onError: (mensajeError) => {
-          setMensaje(null);
+          setGuardadoModal("error");
           setError(mensajeError);
         },
       });
@@ -253,7 +256,8 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-secondary"
                     data-tour="guardar-revision"
                     type="button"
-                    onClick={guardarRevisionActual(guardarSupervision, "Supervisión guardada.")}
+                    disabled={Boolean(guardadoModal) || accion.guardando}
+                    onClick={guardarRevisionActual(guardarSupervision)}
                   >
                     Guardar revisión
                   </button>
@@ -261,6 +265,7 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-gold"
                     data-tour="enviar-observaciones"
                     type="button"
+                    disabled={Boolean(guardadoModal) || accion.guardando}
                     onClick={() => abrirConfirmacion("enviar-observaciones-evaluador")}
                   >
                     Enviar observaciones
@@ -269,6 +274,7 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-primary"
                     data-tour="proceder"
                     type="button"
+                    disabled={Boolean(guardadoModal) || accion.guardando}
                     onClick={() => abrirConfirmacion("proceder")}
                   >
                     Proceder
@@ -280,7 +286,8 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-secondary"
                     data-tour="guardar-revision"
                     type="button"
-                    onClick={guardarRevisionActual(guardarRevision, "Revisión guardada.")}
+                    disabled={Boolean(guardadoModal) || accion.guardando}
+                    onClick={guardarRevisionActual(guardarRevision)}
                   >
                     Guardar revisión
                   </button>
@@ -288,6 +295,7 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-gold"
                     data-tour="enviar-supervisor"
                     type="button"
+                    disabled={Boolean(guardadoModal) || accion.guardando}
                     onClick={() => abrirConfirmacion("enviar-observaciones-supervisor")}
                   >
                     Enviar a supervisor
@@ -296,6 +304,7 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-primary"
                     data-tour="finalizar-evaluacion"
                     type="button"
+                    disabled={Boolean(guardadoModal) || accion.guardando}
                     onClick={() => abrirConfirmacion("finalizar-evaluacion")}
                   >
                     Finalizar evaluación
@@ -306,9 +315,8 @@ export function FormularioEvaluacion({
           ) : null}
         </div>
         {meta}
-        {mensaje ? <p className="text-emerald-800">{mensaje}</p> : null}
-        {error ? <p className="text-danger">{error}</p> : null}
-        <IndicadorGuardando visible={accion.guardando} />
+        {error && guardadoModal !== "error" ? <p className="text-danger">{error}</p> : null}
+        <IndicadorGuardando visible={accion.guardando && !guardadoModal} />
       </div>
 
       <section className="eval-detalle-shell h-full min-h-0" aria-label="Caso, evaluación y supervisión">
@@ -347,6 +355,15 @@ export function FormularioEvaluacion({
           {modalConfirmacion.body}
         </ConfirmacionEnvio>
       ) : null}
+      <ModalGuardado
+        open={guardadoModal !== null}
+        estado={guardadoModal ?? "guardando"}
+        error={error}
+        onAceptar={() => {
+          setGuardadoModal(null);
+          if (guardadoModal === "error") setError(null);
+        }}
+      />
       <EnvioExitoso
         open={exito !== null}
         title={exito?.title ?? ""}

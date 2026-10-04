@@ -1,5 +1,8 @@
 import { prisma } from "@/lib/db";
 import type { Role } from "@/lib/roles";
+import { esTokenPublicoValido } from "@/lib/ficha-publica";
+import { esMentoriaContenido } from "@/lib/tipo-formulario";
+import { isSafeRelativeUploadPath } from "@/lib/storage/local";
 
 export type FileAccessActor = {
   id: string;
@@ -104,6 +107,29 @@ export async function userCanAccessStoredFile(
   if (postulacion.asignaciones.some((item) => item.evaluadorId === actor.id)) return true;
   if (postulacion.supervision?.supervisorId === actor.id) return true;
   return false;
+}
+
+export async function tokenCanAccessStoredFile(token: string, relativePath: string): Promise<boolean> {
+  if (!relativePath || !esTokenPublicoValido(token) || !isSafeRelativeUploadPath(relativePath)) return false;
+  const postulacion = await prisma.postulacion.findUnique({
+    where: { tokenPublico: token },
+    select: {
+      convocatoria: { select: { tipo: true } },
+      respuestas: {
+        select: {
+          archivos: true,
+          versiones: { select: { archivos: true } },
+        },
+      },
+    },
+  });
+  if (!postulacion) return false;
+  if (esMentoriaContenido(postulacion.convocatoria.tipo)) return false;
+  return postulacion.respuestas.some(
+    (respuesta) =>
+      respuesta.archivos.includes(relativePath) ||
+      respuesta.versiones.some((version) => version.archivos.includes(relativePath)),
+  );
 }
 
 export function fileLooksLikeSvg(relativePath: string, mimeType?: string) {

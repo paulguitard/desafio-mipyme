@@ -1417,7 +1417,13 @@ html:has(.app-shell) body {
   margin: auto;
   padding: 0;
   border: none;
+  outline: none;
   background: transparent;
+}
+
+.modal-dialog:focus,
+.modal-dialog:focus-visible {
+  outline: none;
 }
 
 .modal-dialog.modal-wide {
@@ -1427,6 +1433,21 @@ html:has(.app-shell) body {
 .modal-dialog.modal-compact {
   max-width: min(28rem, calc(100% - 2rem));
   max-height: min(90vh, 24rem);
+}
+
+.modal-guardado-spinner {
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 3px solid var(--navy-soft);
+  border-top-color: var(--navy);
+  border-radius: 50%;
+  animation: modal-guardado-spin 0.75s linear infinite;
+}
+
+@keyframes modal-guardado-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .modal-dialog.modal-compact .modal-panel {
@@ -1524,6 +1545,12 @@ html:has(.app-shell) body {
   min-height: 0;
   flex: 1 1 auto;
   overflow-y: auto;
+  outline: none;
+}
+
+.modal-body:focus,
+.modal-body:focus-visible {
+  outline: none;
 }
 
 .modal-dialog.modal-toned > .modal-panel {
@@ -1810,6 +1837,263 @@ html:has(.app-shell) body {
 
 .eval-shell.is-contenido .eval-side {
   display: none;
+}
+
+.eval-shell.is-numeros .eval-side,
+.eval-shell.is-numeros .respuestas-filtros,
+.eval-shell.is-numeros .respuestas-lista,
+.eval-shell.is-links .eval-side,
+.eval-shell.is-links .respuestas-filtros,
+.eval-shell.is-links .respuestas-lista {
+  display: none;
+}
+
+.eval-vista-toggle {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.eval-vista-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0;
+  border: 1px solid rgba(10, 33, 86, 0.22);
+  background: #fff;
+  color: var(--navy);
+  border-radius: 0.7rem;
+  cursor: pointer;
+}
+
+.eval-vista-btn.is-active {
+  background: var(--navy);
+  color: #fff;
+  border-color: var(--navy);
+}
+
+.eval-vista-btn:hover:not(.is-active) {
+  border-color: var(--navy);
+}
+
+.eval-numeros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16.5rem, 1fr));
+  gap: 1rem;
+  align-items: start;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 1.1rem 1.25rem 1.35rem;
+}
+
+.eval-numeros-card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(10, 33, 86, 0.06);
+}
+
+.eval-numeros-titulo {
+  margin: 0;
+  padding: 0.7rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.eval-numeros-card.is-respuestas {
+  border-color: #8aa0c8;
+}
+
+.eval-numeros-card.is-respuestas .eval-numeros-titulo {
+  background: var(--navy);
+  color: #fff;
+}
+
+.eval-numeros-card.is-respuestas .eval-numeros-total th,
+.eval-numeros-card.is-respuestas .eval-numeros-total td {
+  background: #eef2fa;
+}
+
+.eval-numeros-card.is-evaluadores {
+  border-color: #8bb8d9;
+}
+
+.eval-numeros-card.is-evaluadores .eval-numeros-titulo {
+  background: #1565a8;
+  color: #fff;
+}
+
+.eval-numeros-card.is-evaluadores .eval-numeros-tabla th,
+.eval-numeros-card.is-evaluadores .eval-numeros-tabla td {
+  background: #f3f9fd;
+}
+
+.eval-numeros-card.is-supervisores {
+  border-color: #d4b56a;
+}
+
+.eval-numeros-card.is-supervisores .eval-numeros-titulo {
+  background: #c9a227;
+  color: #fff;
+}
+
+.eval-numeros-card.is-supervisores .eval-numeros-tabla th,
+.eval-numeros-card.is-supervisores .eval-numeros-tabla td {
+  background: #fffaf0;
+}
+
+.eval-numeros-tabla {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.eval-numeros-tabla th,
+.eval-numeros-tabla td {
+  padding: 0.7rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(10, 33, 86, 0.08);
+}
+
+.eval-numeros-tabla tbody th {
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.eval-numeros-tabla td {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  text-align: right;
+  width: 4.5rem;
+  color: var(--navy);
+}
+
+.eval-numeros-tabla tr:last-child th,
+.eval-numeros-tabla tr:last-child td {
+  border-bottom: none;
+}
+
+.eval-links {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 1.1rem 1.25rem 1.35rem;
+}
+
+.eval-links-lista {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.eval-links-item {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.9fr) minmax(16rem, 1.4fr);
+  gap: 0.75rem 1rem;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(10, 33, 86, 0.06);
+}
+
+.eval-links-meta {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.eval-links-caso,
+.eval-links-nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eval-links-caso {
+  color: var(--navy);
+  font-weight: 800;
+}
+
+.eval-links-nombre {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.eval-links-url {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.eval-links-url code {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--navy);
+  font-size: 0.82rem;
+}
+
+.ficha-publica-page {
+  display: flex;
+  height: 100%;
+  max-height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  background: #e8ecf4;
+}
+
+html:has(.ficha-publica-page),
+html:has(.ficha-publica-page) body {
+  height: 100%;
+  overflow: hidden;
+}
+
+@supports (height: 100dvh) {
+  .ficha-publica-page {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+}
+
+.ficha-publica-chrome {
+  flex: none;
+  padding: 0.7rem 1.25rem;
+  background: #b4c3de;
+  border-bottom: 1px solid #9fb0d0;
+}
+
+.ficha-publica-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.55rem 0.85rem;
+  margin: 0;
+  color: var(--navy);
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.ficha-publica-body {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .eval-shell.is-contenido .respuestas-lista {
@@ -3083,6 +3367,10 @@ html:has(.app-shell) body {
     max-height: 40%;
     border-right: none;
     border-bottom: 1px solid var(--border);
+  }
+
+  .eval-links-item {
+    grid-template-columns: 1fr;
   }
 }
 

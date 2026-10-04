@@ -3,7 +3,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
 import { TextStyle, FontSize } from "@tiptap/extension-text-style";
@@ -170,7 +169,6 @@ export function EditorTextoLargo({
         orderedList: false,
         strike: false,
       }),
-      Underline,
       Highlight.configure({ multicolor: true }),
       TextStyle,
       FontSize,

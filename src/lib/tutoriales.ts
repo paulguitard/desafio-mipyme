@@ -75,6 +75,12 @@ export const PASOS_PANEL_MENTORIA: PasoTutorial[] = [
     descripcion: "Aquí ves el título y cuántas respuestas hay. Cerrar vuelve al listado de asesorías.",
   },
   {
+    ancla: "vista-panel-asesoria",
+    titulo: "Lista, números y links",
+    descripcion:
+      "El icono de arroba abre el link público de cada respuesta. El de lista muestra cada caso. El de tabla resume cantidades por estado y asignaciones.",
+  },
+  {
     ancla: "pool-evaluadores",
     titulo: "Pool de evaluadores",
     descripcion:
