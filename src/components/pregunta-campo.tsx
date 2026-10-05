@@ -72,7 +72,7 @@ function CampoAdjunto({
     <div className="campo-adjunto">
       <p className="campo-adjunto-titulo">{esImagen ? "Imágenes" : "Archivos"}</p>
       {guardados.length > 0 ? (
-        <ul className={esImagen ? "pregunta-adjuntos-lista is-imagenes" : "pregunta-adjuntos-lista"}>
+        <ul className={esImagen ? "pregunta-adjuntos-lista is-imagenes" : "pregunta-adjuntos-lista is-archivos"}>
           {guardados.map((file) => (
             <li key={file.id}>
               <AdjuntoArchivo file={file} />
@@ -328,7 +328,7 @@ export function ArchivosLista({ archivos }: { archivos: StoredAttachment[] }) {
       {documentos.length > 0 ? (
         <section className="pregunta-adjuntos-grupo">
           <h5>Archivos</h5>
-          <ul className="pregunta-adjuntos-lista">
+          <ul className="pregunta-adjuntos-lista is-archivos">
             {documentos.map((file) => (
               <li key={file.id}>
                 <AdjuntoArchivo file={file} />
@@ -364,7 +364,7 @@ export function AdjuntosRespuesta({ archivos }: { archivos: StoredAttachment[] }
         {documentos.length > 0 ? (
           <section className="pregunta-adjuntos-grupo">
             <h5>Archivos</h5>
-            <ul className="pregunta-adjuntos-lista">
+            <ul className="pregunta-adjuntos-lista is-archivos">
               {documentos.map((file) => (
                 <li key={file.id}>
                   <AdjuntoArchivo file={file} />
@@ -432,10 +432,16 @@ export function PreguntaCampo({
       {pregunta.obligatoria ? " *" : ""}
     </h3>
   );
+  const descripcion = pregunta.ayuda ? (
+    <p className="pregunta-descripcion">{pregunta.ayuda}</p>
+  ) : null;
   const encabezado = (
-    <div className="flex items-start justify-between gap-3">
-      {titulo}
-      {acciones ? <div className="flex shrink-0 items-center gap-1">{acciones}</div> : null}
+    <div className="pregunta-encabezado">
+      <div className="flex items-start justify-between gap-3">
+        {titulo}
+        {acciones ? <div className="flex shrink-0 items-center gap-1">{acciones}</div> : null}
+      </div>
+      {descripcion}
     </div>
   );
 
@@ -471,7 +477,6 @@ export function PreguntaCampo({
       <section className="card pregunta-lectura">
         <div className="pregunta-lectura-enunciado">{encabezado}</div>
         <div className="pregunta-lectura-cuerpo">
-          {pregunta.ayuda ? <p className="text-muted">{pregunta.ayuda}</p> : null}
           <div className={hayAdjuntos ? "pregunta-con-adjuntos" : undefined}>
             <div className="pregunta-valor min-w-0">{valorNodo}</div>
             <AdjuntosRespuesta archivos={archivos} />
@@ -497,7 +502,6 @@ export function PreguntaCampo({
   return (
     <fieldset className="card space-y-3 p-5" aria-labelledby={tituloId}>
       {encabezado}
-      {pregunta.ayuda ? <p className="text-muted">{pregunta.ayuda}</p> : null}
 
       {tipo === "texto_corto" ? (
         <input

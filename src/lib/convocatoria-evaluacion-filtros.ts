@@ -39,7 +39,7 @@ export type EstadoSupervisionFicha =
   | "esperando-evaluacion"
   | "finalizada";
 
-const ESTADOS_TURNO_EVALUADOR = new Set([
+export const ESTADOS_TURNO_EVALUADOR = new Set([
   "PENDIENTE",
   "EN_REVISION",
   "REPARADA",

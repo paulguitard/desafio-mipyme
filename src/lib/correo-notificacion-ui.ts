@@ -4,6 +4,13 @@ export const TIPOS_CORREO_NOTIFICACION = [
   "EVALUADOR_DEVOLUCION_SUPERVISOR",
   "EVALUADOR_APROBACION_SUPERVISOR",
   "SUPERVISOR_NUEVA_REVISION",
+  "PARTICIPANTE_RECORDATORIO_PENDIENTE",
+  "PARTICIPANTE_RECORDATORIO_COMPLETA",
+  "PARTICIPANTE_RECORDATORIO_OBSERVACIONES",
+  "EVALUADOR_RECORDATORIO_CASO",
+  "SUPERVISOR_RECORDATORIO_CASO",
+  "EVALUADOR_RECORDATORIO_RESUMEN",
+  "SUPERVISOR_RECORDATORIO_RESUMEN",
 ] as const;
 
 export type TipoCorreoNotificacion = (typeof TIPOS_CORREO_NOTIFICACION)[number];
@@ -56,6 +63,51 @@ export const SECCIONES_CORREO_NOTIFICACION: {
       "Se envía al supervisor cuando un evaluador envía una evaluación para revisión.",
     placeholders: "{{nombre}}, {{enlace}}, {{caso}}, {{mentoria}}, {{actor}}",
   },
+  {
+    id: "PARTICIPANTE_RECORDATORIO_PENDIENTE",
+    label: "Recordatorio: participante pendiente",
+    descripcion: "Se envía al participante cuando su caso todavía no está completo ni enviado.",
+    placeholders: "{{nombre}}, {{enlace}}, {{caso}}, {{mentoria}}",
+  },
+  {
+    id: "PARTICIPANTE_RECORDATORIO_COMPLETA",
+    label: "Recordatorio: participante sin enviar",
+    descripcion:
+      "Se envía al participante cuando el caso está completo y falta pulsar «Enviar caso». Todavía puede editar y adjuntar archivos.",
+    placeholders: "{{nombre}}, {{enlace}}, {{caso}}, {{mentoria}}",
+  },
+  {
+    id: "PARTICIPANTE_RECORDATORIO_OBSERVACIONES",
+    label: "Recordatorio: participante con observaciones",
+    descripcion: "Se envía al participante cuando hay observaciones pendientes de corregir.",
+    placeholders: "{{nombre}}, {{enlace}}, {{caso}}, {{mentoria}}",
+  },
+  {
+    id: "EVALUADOR_RECORDATORIO_CASO",
+    label: "Recordatorio: evaluador de un caso",
+    descripcion: "Se envía al evaluador cuando todavía tiene ese caso pendiente de evaluar.",
+    placeholders: "{{nombre}}, {{enlace}}, {{caso}}, {{mentoria}}",
+  },
+  {
+    id: "SUPERVISOR_RECORDATORIO_CASO",
+    label: "Recordatorio: supervisor de un caso",
+    descripcion: "Se envía al supervisor cuando ese caso está pendiente de supervisión.",
+    placeholders: "{{nombre}}, {{enlace}}, {{caso}}, {{mentoria}}",
+  },
+  {
+    id: "EVALUADOR_RECORDATORIO_RESUMEN",
+    label: "Recordatorio: evaluadores (resumen)",
+    descripcion:
+      "Se envía a cada evaluador con casos pendientes en la asesoría, indicando cuántos le quedan.",
+    placeholders: "{{nombre}}, {{enlace}}, {{mentoria}}, {{cantidad}}",
+  },
+  {
+    id: "SUPERVISOR_RECORDATORIO_RESUMEN",
+    label: "Recordatorio: supervisores (resumen)",
+    descripcion:
+      "Se envía a cada supervisor con casos pendientes en la asesoría, indicando cuántos le quedan.",
+    placeholders: "{{nombre}}, {{enlace}}, {{mentoria}}, {{cantidad}}",
+  },
 ];
 
 export const DEFAULT_CORREO_NOTIFICACION: Record<TipoCorreoNotificacion, TextosCorreoNotificacion> = {
@@ -97,6 +149,62 @@ export const DEFAULT_CORREO_NOTIFICACION: Record<TipoCorreoNotificacion, TextosC
     cuerpo:
       "Hola {{nombre}},\n\n{{actor}} envió una evaluación de «{{caso}}» en {{mentoria}} para tu revisión.",
     textoBoton: "Abrir la supervisión",
+    pie: "Si el botón no funciona, copia y pega este enlace en tu navegador:\n{{enlace}}",
+  },
+  PARTICIPANTE_RECORDATORIO_PENDIENTE: {
+    asunto: "Recordatorio: completa tu caso — {{caso}}",
+    titulo: "Tu caso sigue pendiente",
+    cuerpo:
+      "Hola {{nombre}},\n\nTodavía no has completado ni enviado tu caso «{{caso}}» en {{mentoria}}. Entra para terminarlo y pulsar «Enviar caso».",
+    textoBoton: "Ir al caso",
+    pie: "Si el botón no funciona, copia y pega este enlace en tu navegador:\n{{enlace}}",
+  },
+  PARTICIPANTE_RECORDATORIO_COMPLETA: {
+    asunto: "Recordatorio: envía tu caso — {{caso}}",
+    titulo: "Falta enviar tu caso",
+    cuerpo:
+      "Hola {{nombre}},\n\nTu caso «{{caso}}» en {{mentoria}} ya está completo. Pulsa «Enviar caso» para que pase a la siguiente fase de evaluación.\n\nAntes de enviarlo todavía puedes editar el caso e incluir imágenes y archivos.",
+    textoBoton: "Enviar el caso",
+    pie: "Si el botón no funciona, copia y pega este enlace en tu navegador:\n{{enlace}}",
+  },
+  PARTICIPANTE_RECORDATORIO_OBSERVACIONES: {
+    asunto: "Recordatorio: corrige tu caso — {{caso}}",
+    titulo: "Faltan correcciones",
+    cuerpo:
+      "Hola {{nombre}},\n\nTodavía hay observaciones pendientes en tu caso «{{caso}}» en {{mentoria}}. Entra para corregirlas y volver a enviar el caso.",
+    textoBoton: "Ir al caso",
+    pie: "Si el botón no funciona, copia y pega este enlace en tu navegador:\n{{enlace}}",
+  },
+  EVALUADOR_RECORDATORIO_CASO: {
+    asunto: "Recordatorio: evalúa el caso — {{caso}}",
+    titulo: "Tienes un caso por evaluar",
+    cuerpo:
+      "Hola {{nombre}},\n\nTodavía tienes pendiente la evaluación de «{{caso}}» en {{mentoria}}. Entra para revisarlo.",
+    textoBoton: "Abrir la evaluación",
+    pie: "Si el botón no funciona, copia y pega este enlace en tu navegador:\n{{enlace}}",
+  },
+  SUPERVISOR_RECORDATORIO_CASO: {
+    asunto: "Recordatorio: supervisa el caso — {{caso}}",
+    titulo: "Tienes un caso por supervisar",
+    cuerpo:
+      "Hola {{nombre}},\n\nTodavía tienes pendiente la supervisión de «{{caso}}» en {{mentoria}}. Entra para revisarlo.",
+    textoBoton: "Abrir la supervisión",
+    pie: "Si el botón no funciona, copia y pega este enlace en tu navegador:\n{{enlace}}",
+  },
+  EVALUADOR_RECORDATORIO_RESUMEN: {
+    asunto: "Recordatorio: te quedan {{cantidad}} casos por evaluar — {{mentoria}}",
+    titulo: "Casos pendientes de evaluación",
+    cuerpo:
+      "Hola {{nombre}},\n\nEn {{mentoria}} te quedan {{cantidad}} casos por evaluar. Entra a tu panel para continuar.",
+    textoBoton: "Ir a mis evaluaciones",
+    pie: "Si el botón no funciona, copia y pega este enlace en tu navegador:\n{{enlace}}",
+  },
+  SUPERVISOR_RECORDATORIO_RESUMEN: {
+    asunto: "Recordatorio: te quedan {{cantidad}} casos por supervisar — {{mentoria}}",
+    titulo: "Casos pendientes de supervisión",
+    cuerpo:
+      "Hola {{nombre}},\n\nEn {{mentoria}} te quedan {{cantidad}} casos por supervisar. Entra a tu panel para continuar.",
+    textoBoton: "Ir a mis supervisiones",
     pie: "Si el botón no funciona, copia y pega este enlace en tu navegador:\n{{enlace}}",
   },
 };

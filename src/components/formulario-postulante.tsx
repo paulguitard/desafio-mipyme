@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import { enviarPostulacion, guardarBorrador } from "@/actions/postulaciones";
 import { AvisoEntradaCaso } from "@/components/aviso-entrada-caso";
 import { ConfirmacionEnvio } from "@/components/confirmacion-envio";
-import { EnvioExitoso } from "@/components/envio-exitoso";
 import { IndicadorGuardando } from "@/components/indicador-guardando";
-import { ModalGuardado, type EstadoModalGuardado } from "@/components/modal-guardado";
+import {
+  ModalGuardado,
+  ModalProgreso,
+  type EstadoModalProgreso,
+} from "@/components/modal-guardado";
 import type { AvisoEntradaCaso as AvisoEntradaCasoDatos } from "@/lib/aviso-entrada-caso";
 import {
   MAX_FILE_BYTES,
@@ -60,15 +63,15 @@ export function FormularioPostulante({
   const router = useRouter();
   const conPaneles = layout === "paneles";
   const [error, setError] = useState<string | null>(null);
-  const [guardadoModal, setGuardadoModal] = useState<EstadoModalGuardado | null>(null);
+  const [guardadoModal, setGuardadoModal] = useState<EstadoModalProgreso | null>(null);
+  const [envioModal, setEnvioModal] = useState<EstadoModalProgreso | null>(null);
   const [pendienteEnvio, setPendienteEnvio] = useState<FormData | null>(null);
-  const [exito, setExito] = useState<{ title: string; detalle: string } | null>(null);
   const [bloqueado, setBloqueado] = useState(false);
   const accion = useAccionOptimista();
   const savingRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
   const camposVisibles = useRef(children);
-  const conservarCampos = bloqueado || exito !== null;
+  const conservarCampos = bloqueado || envioModal === "exito";
   if (!conservarCampos) camposVisibles.current = children;
 
   function datosDelFormulario() {
@@ -87,7 +90,7 @@ export function FormularioPostulante({
     }
     savingRef.current = true;
     setError(null);
-    setGuardadoModal("guardando");
+    setGuardadoModal("enCurso");
     void accion.ejecutar(() => persistir(formData), {
       onOk: () => {
         limpiarInputsArchivo(formRef.current);
@@ -115,23 +118,15 @@ export function FormularioPostulante({
     savingRef.current = true;
     setError(null);
     setBloqueado(true);
+    setEnvioModal("enCurso");
     void accion.ejecutar(() => enviarPostulacion(data), {
       onOk: () => {
         savingRef.current = false;
-        setExito(
-          esCorreccion
-            ? {
-                title: "Correcciones enviadas",
-                detalle: "Las correcciones se enviaron al evaluador.",
-              }
-            : {
-                title: "Caso enviado",
-                detalle: "El caso se envió al evaluador.",
-              },
-        );
+        setEnvioModal("exito");
       },
       onError: (mensajeError) => {
         savingRef.current = false;
+        setEnvioModal("error");
         setError(mensajeError);
         setBloqueado(false);
       },
@@ -193,8 +188,10 @@ export function FormularioPostulante({
           ) : null}
         </div>
         {meta}
-        {error && guardadoModal !== "error" ? <p className="text-danger">{error}</p> : null}
-        <IndicadorGuardando visible={accion.guardando && !guardadoModal} />
+        {error && guardadoModal !== "error" && envioModal !== "error" ? (
+          <p className="text-danger">{error}</p>
+        ) : null}
+        <IndicadorGuardando visible={accion.guardando && !guardadoModal && !envioModal} />
       </div>
       <div
         className={
@@ -206,7 +203,7 @@ export function FormularioPostulante({
       >
         <div
           className={[
-            bloqueado && !exito ? "pointer-events-none opacity-70" : "",
+            bloqueado && envioModal !== "exito" ? "pointer-events-none opacity-70" : "",
             conPaneles ? "h-full min-h-0" : "flex flex-col gap-6",
           ]
             .filter(Boolean)
@@ -240,18 +237,31 @@ export function FormularioPostulante({
       </ConfirmacionEnvio>
       <ModalGuardado
         open={guardadoModal !== null}
-        estado={guardadoModal ?? "guardando"}
+        estado={guardadoModal ?? "enCurso"}
         error={error}
         onAceptar={() => {
           setGuardadoModal(null);
           if (guardadoModal === "error") setError(null);
         }}
       />
-      <EnvioExitoso
-        open={exito !== null}
-        title={exito?.title ?? ""}
-        detalle={exito?.detalle}
-        onAceptar={() => router.push("/participante")}
+      <ModalProgreso
+        open={envioModal !== null}
+        estado={envioModal ?? "enCurso"}
+        variante="enviar"
+        error={error}
+        detalleExito={
+          esCorreccion
+            ? "Las correcciones se enviaron al evaluador."
+            : "El caso se envió al evaluador."
+        }
+        onAceptar={() => {
+          if (envioModal === "exito") {
+            router.push("/participante");
+            return;
+          }
+          setEnvioModal(null);
+          setError(null);
+        }}
       />
     </form>
   );

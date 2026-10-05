@@ -129,17 +129,28 @@ export type VarsNovedadCaso = {
   mentoria?: string;
   actor?: string;
   resultado?: string;
+  cantidad?: string;
 };
+
+export type NotifyNovedadResult =
+  | { ok: true }
+  | { ok: false; error: string; notConfigured?: boolean };
 
 export async function notifyNovedadCaso(input: {
   tipo: TipoCorreoNotificacion;
   to: string;
   vars: VarsNovedadCaso;
-}) {
-  if (!input.to.includes("@")) return;
+}): Promise<NotifyNovedadResult> {
+  if (!input.to.includes("@")) {
+    return { ok: false, error: "Correo inválido." };
+  }
   if (!isMailConfigured()) {
     console.warn("[mail] SMTP no configurado; se omitió aviso", input.tipo);
-    return;
+    return {
+      ok: false,
+      notConfigured: true,
+      error: "El envío de correo no está configurado (faltan MAIL_FROM, MAIL_SMTP_USER o MAIL_SMTP_PASS).",
+    };
   }
 
   try {
@@ -155,6 +166,7 @@ export async function notifyNovedadCaso(input: {
       mentoria: input.vars.mentoria ?? "",
       actor: input.vars.actor ?? "",
       resultado: input.vars.resultado ?? "",
+      cantidad: input.vars.cantidad ?? "",
     };
     const rendered = renderCorreoRecuperacion(config, vars, imagenUrlForMail(diseno.imagen));
     const sent = await sendMail({
@@ -165,11 +177,18 @@ export async function notifyNovedadCaso(input: {
     });
     if (!sent.ok) {
       console.error("[mail] aviso no enviado", input.tipo, sent.error);
+      return sent;
     }
+    return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[mail] aviso falló", input.tipo, message.slice(0, 400));
+    return { ok: false, error: message };
   }
+}
+
+export function urlPanelEvaluador() {
+  return `${getAppBaseUrl()}/evaluador`;
 }
 
 export function contextoCaso(postulacion: {

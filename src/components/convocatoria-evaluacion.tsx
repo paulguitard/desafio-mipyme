@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { IndicadorGuardando } from "@/components/indicador-guardando";
 import { useDatoOptimista } from "@/lib/use-dato-optimista";
@@ -21,6 +21,13 @@ import {
   quitarEvaluadorDelPool,
   quitarSupervisorDelPool,
 } from "@/actions/convocatorias";
+import {
+  enviarRecordatorioEvaluadorCaso,
+  enviarRecordatorioEvaluadoresResumen,
+  enviarRecordatorioParticipante,
+  enviarRecordatorioSupervisorCaso,
+  enviarRecordatorioSupervisoresResumen,
+} from "@/actions/recordatorios";
 import { FichaDetalleAdmin } from "@/components/ficha-detalle-admin";
 import { Modal } from "@/components/modal";
 import { PoolPersonaModal } from "@/components/pool-persona-modal";
@@ -33,6 +40,7 @@ import { ESCUELAS } from "@/lib/escuelas";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
 import { rutaFichaPublica } from "@/lib/ficha-publica";
 import { esMentoriaContenido, parseTipoFormulario, type TipoFormulario } from "@/lib/tipo-formulario";
+import { workbookXlsx } from "@/lib/xlsx-workbook";
 import {
   contiene,
   estadoAsignacionFicha,
@@ -46,6 +54,13 @@ import {
   type EstadoEvaluacionFicha,
   type EstadoSupervisionFicha,
 } from "@/lib/convocatoria-evaluacion-filtros";
+import {
+  cantidadesPendientesEvaluadores,
+  cantidadesPendientesSupervisores,
+  recordatorioEvaluadorCaso,
+  recordatorioParticipante,
+  recordatorioSupervisorCaso,
+} from "@/lib/correo-recordatorio";
 
 type Evaluador = { id: string; name: string; email: string; escuela: string | null };
 
@@ -122,6 +137,36 @@ function casoResumen(postulacion: PostulacionItem): CasoPoolResumen {
     nombreCaso: postulacion.nombreCaso,
     emprendedorNombre: postulacion.emprendedorNombre,
   };
+}
+
+function urlFichaPublica(postulacion: PostulacionItem, origen: string) {
+  if (!postulacion.tokenPublico) return "";
+  return `${origen}${rutaFichaPublica(postulacion.tokenPublico)}`;
+}
+
+function filasExcelLinks(filas: PostulacionItem[], origen: string) {
+  return [
+    ["Nombre del caso", "Participante", "Correo", "Link"],
+    ...filas.map((postulacion) => [
+      etiquetaNombreCaso(postulacion.nombreCaso),
+      postulacion.emprendedorNombre,
+      normalizarCorreo(postulacion.emprendedorEmail),
+      urlFichaPublica(postulacion, origen),
+    ]),
+  ];
+}
+
+function descargarExcelLinks(filas: PostulacionItem[]) {
+  const bytes = workbookXlsx("Links", filasExcelLinks(filas, window.location.origin));
+  const blob = new Blob([new Uint8Array(bytes)], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "links-casos.xlsx";
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function conPersonasEnPool(
@@ -234,10 +279,12 @@ function TablaNumeros({
   titulo,
   variante,
   filas,
+  accion,
 }: {
   titulo: string;
   variante: "respuestas" | "evaluadores" | "supervisores";
   filas: { etiqueta: string; valor: number; total?: boolean }[];
+  accion?: ReactNode;
 }) {
   return (
     <section className={`eval-numeros-card is-${variante}`}>
@@ -253,7 +300,84 @@ function TablaNumeros({
           ))}
         </tbody>
       </table>
+      {accion}
     </section>
+  );
+}
+
+function IconoLupa() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+      />
+    </svg>
+  );
+}
+
+function AccionesCasoModal({
+  postulacion,
+  preguntas,
+  enviando,
+  error,
+  mensaje,
+  onVerCaso,
+  onRecordatorioParticipante,
+  onRecordatorioEvaluador,
+  onRecordatorioSupervisor,
+}: {
+  postulacion: PostulacionItem;
+  preguntas: PreguntaFiltro[];
+  enviando: string | null;
+  error: string | null;
+  mensaje: string | null;
+  onVerCaso: () => void;
+  onRecordatorioParticipante: () => void;
+  onRecordatorioEvaluador: () => void;
+  onRecordatorioSupervisor: () => void;
+}) {
+  const participante = recordatorioParticipante(postulacion, preguntas);
+  const evaluador = recordatorioEvaluadorCaso(postulacion.asignaciones);
+  const supervisor = recordatorioSupervisorCaso(postulacion.asignaciones, postulacion.supervision);
+  const ocupado = enviando != null;
+  return (
+    <div className="eval-acciones-caso">
+      <button className="btn btn-sm btn-secondary" type="button" onClick={onVerCaso}>
+        Ver caso
+      </button>
+      <button
+        className="btn btn-sm btn-secondary"
+        type="button"
+        disabled={ocupado || !participante.habilitado}
+        onClick={onRecordatorioParticipante}
+      >
+        {enviando === "participante" ? "Enviando…" : "Enviar recordatorio a Participante"}
+      </button>
+      {participante.habilitado ? null : (
+        <p className="eval-acciones-hint">{participante.motivo}</p>
+      )}
+      <button
+        className="btn btn-sm btn-secondary"
+        type="button"
+        disabled={ocupado || !evaluador.habilitado}
+        onClick={onRecordatorioEvaluador}
+      >
+        {enviando === "evaluador" ? "Enviando…" : "Enviar recordatorio al evaluador"}
+      </button>
+      {evaluador.habilitado ? null : <p className="eval-acciones-hint">{evaluador.motivo}</p>}
+      <button
+        className="btn btn-sm btn-secondary"
+        type="button"
+        disabled={ocupado || !supervisor.habilitado}
+        onClick={onRecordatorioSupervisor}
+      >
+        {enviando === "supervisor" ? "Enviando…" : "Enviar recordatorio al supervisor"}
+      </button>
+      {supervisor.habilitado ? null : <p className="eval-acciones-hint">{supervisor.motivo}</p>}
+      {error ? <p className="eval-acciones-aviso text-danger">{error}</p> : null}
+      {mensaje ? <p className="eval-acciones-aviso">{mensaje}</p> : null}
+    </div>
   );
 }
 
@@ -446,6 +570,10 @@ export function ConvocatoriaEvaluacion({
   const [detalleLoadingId, setDetalleLoadingId] = useState<string | null>(null);
   const [detalleError, setDetalleError] = useState<string | null>(null);
   const [detalle, setDetalle] = useState<DetalleFichaAdmin | null>(null);
+  const [accionesCaso, setAccionesCaso] = useState<PostulacionItem | null>(null);
+  const [recordatorioEnviando, setRecordatorioEnviando] = useState<string | null>(null);
+  const [recordatorioError, setRecordatorioError] = useState<string | null>(null);
+  const [recordatorioMensaje, setRecordatorioMensaje] = useState<string | null>(null);
   const [poolModalId, setPoolModalId] = useState<string | null>(null);
   const inputCasosRef = useRef<HTMLInputElement>(null);
   const cancelandoCasosRef = useRef(false);
@@ -463,6 +591,14 @@ export function ConvocatoriaEvaluacion({
   const resumenNumeros = useMemo(
     () => resumenNumerosAsesoria(respuestas, preguntas),
     [preguntas, respuestas],
+  );
+  const nEvalPendientes = useMemo(
+    () => cantidadesPendientesEvaluadores(respuestas).size,
+    [respuestas],
+  );
+  const nSupPendientes = useMemo(
+    () => cantidadesPendientesSupervisores(respuestas).size,
+    [respuestas],
   );
   const esNumeros = vista === "numeros";
   const esLinks = vista === "links";
@@ -803,6 +939,40 @@ export function ConvocatoriaEvaluacion({
     setDetalleLoadingId(null);
   }
 
+  function abrirAccionesCaso(postulacion: PostulacionItem) {
+    setAccionesCaso(postulacion);
+    setRecordatorioError(null);
+    setRecordatorioMensaje(null);
+  }
+
+  function cerrarAccionesCaso() {
+    setAccionesCaso(null);
+    setRecordatorioError(null);
+    setRecordatorioMensaje(null);
+  }
+
+  async function ejecutarRecordatorio(
+    clave: string,
+    confirmar: string,
+    accion: () => Promise<{ ok?: true; enviados?: number; error?: string } | void>,
+  ) {
+    if (!window.confirm(confirmar)) return;
+    setRecordatorioError(null);
+    setRecordatorioMensaje(null);
+    setRecordatorioEnviando(clave);
+    try {
+      const result = await accion();
+      if (result && "error" in result && result.error) {
+        setRecordatorioError(result.error);
+        return;
+      }
+      const n = result && "enviados" in result && result.enviados ? result.enviados : 0;
+      setRecordatorioMensaje(n === 1 ? "Se envió 1 correo." : `Se enviaron ${n} correos.`);
+    } finally {
+      setRecordatorioEnviando(null);
+    }
+  }
+
   return (
     <div className="eval-panel eval-shell-open">
       <div className={`eval-shell${esContenido ? " is-contenido" : ""}${esNumeros ? " is-numeros" : ""}${esLinks ? " is-links" : ""}`}>
@@ -1070,6 +1240,29 @@ export function ConvocatoriaEvaluacion({
                     { etiqueta: "Con evaluador asignado", valor: resumenNumeros.conEvaluador },
                     { etiqueta: "Sin evaluador asignado", valor: resumenNumeros.sinEvaluador },
                   ]}
+                  accion={
+                    <div className="eval-numeros-accion">
+                      <button
+                        className="btn btn-sm btn-secondary"
+                        type="button"
+                        disabled={nEvalPendientes === 0 || recordatorioEnviando != null}
+                        onClick={() =>
+                          void ejecutarRecordatorio(
+                            "eval-resumen",
+                            `Se enviará un correo a ${nEvalPendientes} ${nEvalPendientes === 1 ? "evaluador" : "evaluadores"} con casos pendientes. ¿Continuar?`,
+                            () => enviarRecordatorioEvaluadoresResumen(convocatoriaId),
+                          )
+                        }
+                      >
+                        {recordatorioEnviando === "eval-resumen"
+                          ? "Enviando…"
+                          : "Enviar recordatorio a evaluadores"}
+                      </button>
+                      {nEvalPendientes === 0 ? (
+                        <p className="eval-numeros-hint">Nadie tiene casos pendientes de evaluar.</p>
+                      ) : null}
+                    </div>
+                  }
                 />
                 <TablaNumeros
                   titulo="Supervisores"
@@ -1078,13 +1271,52 @@ export function ConvocatoriaEvaluacion({
                     { etiqueta: "Con supervisor asignado", valor: resumenNumeros.conSupervisor },
                     { etiqueta: "Sin supervisor asignado", valor: resumenNumeros.sinSupervisor },
                   ]}
+                  accion={
+                    <div className="eval-numeros-accion">
+                      <button
+                        className="btn btn-sm btn-secondary"
+                        type="button"
+                        disabled={nSupPendientes === 0 || recordatorioEnviando != null}
+                        onClick={() =>
+                          void ejecutarRecordatorio(
+                            "sup-resumen",
+                            `Se enviará un correo a ${nSupPendientes} ${nSupPendientes === 1 ? "supervisor" : "supervisores"} con casos pendientes. ¿Continuar?`,
+                            () => enviarRecordatorioSupervisoresResumen(convocatoriaId),
+                          )
+                        }
+                      >
+                        {recordatorioEnviando === "sup-resumen"
+                          ? "Enviando…"
+                          : "Enviar recordatorio a supervisores"}
+                      </button>
+                      {nSupPendientes === 0 ? (
+                        <p className="eval-numeros-hint">Nadie tiene casos pendientes de supervisar.</p>
+                      ) : null}
+                    </div>
+                  }
                 />
+                {recordatorioError && esNumeros ? (
+                  <p className="eval-numeros-aviso text-danger">{recordatorioError}</p>
+                ) : null}
+                {recordatorioMensaje && esNumeros && !accionesCaso ? (
+                  <p className="eval-numeros-aviso">{recordatorioMensaje}</p>
+                ) : null}
               </>
             )}
           </div>
         ) : null}
         {esLinks && !esContenido ? (
           <div className="eval-links">
+            <div className="eval-links-toolbar">
+              <button
+                className="btn btn-sm btn-secondary"
+                type="button"
+                disabled={respuestas.length === 0}
+                onClick={() => descargarExcelLinks(respuestas)}
+              >
+                Descargar excel
+              </button>
+            </div>
             {respuestas.length === 0 ? (
               <p className="text-muted">Todavía no hay respuestas en esta asesoría.</p>
             ) : (
@@ -1098,6 +1330,9 @@ export function ConvocatoriaEvaluacion({
                       <div className="eval-links-meta">
                         <span className="eval-links-caso">{etiquetaNombreCaso(postulacion.nombreCaso)}</span>
                         <span className="eval-links-nombre">{postulacion.emprendedorNombre}</span>
+                        <span className="eval-links-correo">
+                          {normalizarCorreo(postulacion.emprendedorEmail)}
+                        </span>
                       </div>
                       {path ? (
                         <div className="eval-links-url">
@@ -1449,16 +1684,17 @@ export function ConvocatoriaEvaluacion({
                   </span>
                   <div className="eval-ficha-ver-col">
                     <button
-                      className="btn btn-sm btn-secondary eval-ficha-ver"
+                      className="btn btn-sm btn-secondary eval-ficha-ver eval-ficha-lupa"
                       type="button"
-                      disabled={detalleLoadingId === postulacion.id}
+                      aria-label={`Acciones del caso de ${postulacion.emprendedorNombre}`}
+                      title="Acciones del caso"
                       onClick={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
-                        void abrirDetalle(postulacion);
+                        abrirAccionesCaso(postulacion);
                       }}
                     >
-                      Ver
+                      <IconoLupa />
                     </button>
                   </div>
                   <div className="eval-ficha-respuesta-body">
@@ -1770,6 +2006,62 @@ export function ConvocatoriaEvaluacion({
                 guardarCupoPersona(poolModalId, cupo, esSupervisor);
               }}
             />,
+            document.body,
+          )
+        : null}
+
+      {portalListo
+        ? createPortal(
+            <Modal
+              open={Boolean(accionesCaso)}
+              title={
+                accionesCaso
+                  ? `${etiquetaNombreCaso(accionesCaso.nombreCaso)} · ${accionesCaso.emprendedorNombre}`
+                  : "Acciones del caso"
+              }
+              compact
+              onClose={cerrarAccionesCaso}
+            >
+              {accionesCaso ? (
+                <AccionesCasoModal
+                  postulacion={accionesCaso}
+                  preguntas={preguntas}
+                  enviando={recordatorioEnviando}
+                  error={recordatorioError}
+                  mensaje={recordatorioMensaje}
+                  onVerCaso={() => {
+                    const caso = accionesCaso;
+                    cerrarAccionesCaso();
+                    void abrirDetalle(caso);
+                  }}
+                  onRecordatorioParticipante={() =>
+                    void ejecutarRecordatorio(
+                      "participante",
+                      "¿Enviar recordatorio al participante de este caso?",
+                      () => enviarRecordatorioParticipante(accionesCaso.id),
+                    )
+                  }
+                  onRecordatorioEvaluador={() => {
+                    const n = recordatorioEvaluadorCaso(accionesCaso.asignaciones);
+                    const cuantos = n.habilitado ? n.asignaciones.length : 0;
+                    void ejecutarRecordatorio(
+                      "evaluador",
+                      cuantos === 1
+                        ? "¿Enviar recordatorio al evaluador de este caso?"
+                        : `¿Enviar recordatorio a ${cuantos} evaluadores de este caso?`,
+                      () => enviarRecordatorioEvaluadorCaso(accionesCaso.id),
+                    );
+                  }}
+                  onRecordatorioSupervisor={() =>
+                    void ejecutarRecordatorio(
+                      "supervisor",
+                      "¿Enviar recordatorio al supervisor de este caso?",
+                      () => enviarRecordatorioSupervisorCaso(accionesCaso.id),
+                    )
+                  }
+                />
+              ) : null}
+            </Modal>,
             document.body,
           )
         : null}

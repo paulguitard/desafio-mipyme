@@ -110,13 +110,15 @@ export function renderCorreoRecuperacion(
 <!DOCTYPE html>
 <html lang="es">
 <body style="margin:0;padding:0;background:${escapeHtml(config.colorFondo)};">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${escapeHtml(config.colorFondo)};padding:24px 12px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${escapeHtml(config.colorFondo)};padding:24px 12px;border-collapse:collapse;">
     <tr>
       <td align="center">
-        <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #dce3ee;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;table-layout:fixed;border-collapse:collapse;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #dce3ee;">
           ${
             imagenUrl
-              ? `<tr><td style="padding:0;line-height:0;"><img src="${escapeHtml(imagenUrl)}" alt="" width="560" style="display:block;width:100%;max-width:560px;height:auto;" /></td></tr>`
+              ? `<tr><td style="padding:0;font-size:0;line-height:0;">
+              <img src="${escapeHtml(imagenUrl)}" alt="" width="560" style="display:block;width:100%;max-width:100%;height:auto;border:0;outline:none;" />
+            </td></tr>`
               : ""
           }
           <tr>
@@ -125,7 +127,7 @@ export function renderCorreoRecuperacion(
             </td>
           </tr>
           <tr>
-            <td style="padding:28px;color:${escapeHtml(config.colorTexto)};font-family:Segoe UI,Arial,sans-serif;font-size:16px;">
+            <td style="padding:28px;color:${escapeHtml(config.colorTexto)};font-family:Segoe UI,Arial,sans-serif;font-size:16px;word-break:break-word;overflow-wrap:anywhere;">
               ${paragraphsToHtml(cuerpo)}
               <p style="margin:0 0 1.5rem;">
                 <a href="${escapeHtml(enlace)}" style="display:inline-block;background:${escapeHtml(config.colorBoton)};color:#ffffff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:8px;">

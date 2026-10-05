@@ -1192,7 +1192,8 @@ html:has(.app-shell) body {
 }
 
 .pregunta-adjuntos-lista.is-imagenes,
-.pregunta-adjuntos-lista.is-videos {
+.pregunta-adjuntos-lista.is-videos,
+.pregunta-adjuntos-lista.is-archivos {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
   width: 100%;
@@ -1207,13 +1208,9 @@ html:has(.app-shell) body {
 }
 
 .pregunta-adjuntos .pregunta-adjuntos-lista.is-imagenes,
-.pregunta-adjuntos .pregunta-adjuntos-lista.is-videos {
+.pregunta-adjuntos .pregunta-adjuntos-lista.is-videos,
+.pregunta-adjuntos .pregunta-adjuntos-lista.is-archivos {
   grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
-}
-
-.pregunta-adjuntos .pregunta-adjuntos-grupo .pregunta-adjuntos-lista:not(.is-imagenes):not(.is-videos) {
-  display: flex;
-  flex-direction: column;
 }
 
 .pregunta-adjuntos .pregunta-adjuntos-lista > li {
@@ -1259,7 +1256,7 @@ html:has(.app-shell) body {
   flex-direction: column;
   width: 100%;
   max-width: 12rem;
-  height: 100%;
+  height: auto;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 0.5rem;
@@ -1281,9 +1278,10 @@ html:has(.app-shell) body {
 .pregunta-adjuntos-doc-sheet {
   position: relative;
   display: flex;
-  flex: 1 1 auto;
+  flex: none;
   align-items: flex-start;
   justify-content: center;
+  width: 100%;
   aspect-ratio: 4 / 3;
   padding: 1rem 0.85rem 0.75rem;
   background:
@@ -1980,11 +1978,58 @@ html:has(.app-shell) body {
   border-bottom: none;
 }
 
+.eval-numeros-accion {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.75rem 1rem 1rem;
+}
+
+.eval-numeros-accion .btn {
+  width: 100%;
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.eval-numeros-hint,
+.eval-acciones-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.eval-numeros-aviso,
+.eval-acciones-aviso {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.eval-numeros-aviso {
+  grid-column: 1 / -1;
+}
+
+.eval-acciones-caso {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.eval-acciones-caso .btn {
+  width: 100%;
+  justify-content: center;
+  white-space: normal;
+  line-height: 1.25;
+}
+
 .eval-links {
   min-height: 0;
   flex: 1 1 auto;
   overflow: auto;
   padding: 1.1rem 1.25rem 1.35rem;
+}
+
+.eval-links-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.85rem;
 }
 
 .eval-links-lista {
@@ -2028,6 +2073,14 @@ html:has(.app-shell) body {
 .eval-links-nombre {
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.eval-links-correo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .eval-links-url {
@@ -2531,6 +2584,15 @@ html:has(.ficha-publica-page) body {
   flex: none;
   padding-inline: 0.7rem;
   line-height: 1.2;
+}
+
+.eval-ficha-lupa {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0.35rem;
 }
 
 .eval-ficha-respuesta-body {
@@ -3307,6 +3369,17 @@ html:has(.ficha-publica-page) body {
 
 .pregunta-lectura-enunciado h3 {
   color: var(--navy);
+}
+
+.pregunta-descripcion {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 1rem;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .pregunta-lectura-cuerpo {

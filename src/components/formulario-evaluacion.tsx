@@ -10,9 +10,12 @@ import {
 } from "@/actions/supervisiones";
 import { AvisoEntradaCaso } from "@/components/aviso-entrada-caso";
 import { ConfirmacionEnvio } from "@/components/confirmacion-envio";
-import { EnvioExitoso } from "@/components/envio-exitoso";
 import { IndicadorGuardando } from "@/components/indicador-guardando";
-import { ModalGuardado, type EstadoModalGuardado } from "@/components/modal-guardado";
+import {
+  ModalGuardado,
+  ModalProgreso,
+  type EstadoModalProgreso,
+} from "@/components/modal-guardado";
 import { EvalDetalleColumnas } from "@/components/eval-detalle-head";
 import type { AvisoEntradaCaso as AvisoEntradaCasoDatos } from "@/lib/aviso-entrada-caso";
 import { useAccionOptimista } from "@/lib/use-dato-optimista";
@@ -64,16 +67,17 @@ export function FormularioEvaluacion({
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [guardadoModal, setGuardadoModal] = useState<EstadoModalGuardado | null>(null);
+  const [guardadoModal, setGuardadoModal] = useState<EstadoModalProgreso | null>(null);
+  const [envioModal, setEnvioModal] = useState<EstadoModalProgreso | null>(null);
+  const [detalleEnvio, setDetalleEnvio] = useState<string | null>(null);
   const [pendienteEnvio, setPendienteEnvio] = useState<PendienteEnvio | null>(null);
-  const [exito, setExito] = useState<{ title: string; detalle: string } | null>(null);
   const [bloqueado, setBloqueado] = useState(false);
   const accion = useAccionOptimista();
   const esGeneral = modoEvaluacion === "GENERAL";
   const esSupervisor = rolAccion === "supervisor";
   const mostrarAcciones = canEdit && rolAccion !== "lectura" && !bloqueado;
   const finalizaAlProceder = intencionPendiente === "FINALIZAR";
-  const conservarCampos = bloqueado || exito !== null;
+  const conservarCampos = bloqueado || envioModal === "exito";
   const camposVisibles = useRef({ caso, evaluacion, supervision });
   if (!conservarCampos) camposVisibles.current = { caso, evaluacion, supervision };
 
@@ -93,44 +97,32 @@ export function FormularioEvaluacion({
     setPendienteEnvio(null);
     setError(null);
     let persistir: (data: FormData) => Promise<{ error?: string } | { ok: boolean } | void>;
-    let exitoEnvio: { title: string; detalle: string };
+    let detalleExito: string;
     if (tipo === "enviar-observaciones-supervisor") {
       persistir = enviarObservaciones;
-      exitoEnvio = {
-        title: "Enviado al supervisor",
-        detalle: "Las observaciones se enviaron al supervisor.",
-      };
+      detalleExito = "Las observaciones se enviaron al supervisor.";
     } else if (tipo === "finalizar-evaluacion") {
       persistir = finalizarEvaluacion;
-      exitoEnvio = {
-        title: "Finalización enviada",
-        detalle: "La finalización se envió al supervisor.",
-      };
+      detalleExito = "La finalización se envió al supervisor.";
     } else if (tipo === "enviar-observaciones-evaluador") {
       persistir = enviarObservacionesSupervision;
-      exitoEnvio = {
-        title: "Observaciones enviadas al evaluador",
-        detalle: "Las observaciones se enviaron al evaluador.",
-      };
+      detalleExito = "Las observaciones se enviaron al evaluador.";
     } else if (finalizaAlProceder) {
       persistir = procederSupervision;
-      exitoEnvio = {
-        title: "Evaluación finalizada",
-        detalle: "La evaluación quedó cerrada.",
-      };
+      detalleExito = "La evaluación quedó cerrada.";
     } else {
       persistir = procederSupervision;
-      exitoEnvio = {
-        title: "Observaciones enviadas",
-        detalle: "Las observaciones se enviaron al participante.",
-      };
+      detalleExito = "Las observaciones se enviaron al participante.";
     }
     setBloqueado(true);
+    setDetalleEnvio(detalleExito);
+    setEnvioModal("enCurso");
     void accion.ejecutar(() => persistir(formData), {
       onOk: () => {
-        setExito(exitoEnvio);
+        setEnvioModal("exito");
       },
       onError: (mensajeError) => {
+        setEnvioModal("error");
         setError(mensajeError);
         setBloqueado(false);
       },
@@ -141,11 +133,11 @@ export function FormularioEvaluacion({
     persistir: (data: FormData) => Promise<{ error?: string } | { ok: boolean } | void>,
   ) {
     return () => {
-      if (accion.guardando || guardadoModal) return;
+      if (accion.guardando || guardadoModal || envioModal) return;
       const formData = datosDelFormulario();
       if (!formData) return;
       setError(null);
-      setGuardadoModal("guardando");
+      setGuardadoModal("enCurso");
       void accion.ejecutar(() => persistir(formData), {
         onOk: () => {
           setGuardadoModal("exito");
@@ -256,7 +248,7 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-secondary"
                     data-tour="guardar-revision"
                     type="button"
-                    disabled={Boolean(guardadoModal) || accion.guardando}
+                    disabled={Boolean(guardadoModal) || Boolean(envioModal) || accion.guardando}
                     onClick={guardarRevisionActual(guardarSupervision)}
                   >
                     Guardar revisión
@@ -265,7 +257,7 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-gold"
                     data-tour="enviar-observaciones"
                     type="button"
-                    disabled={Boolean(guardadoModal) || accion.guardando}
+                    disabled={Boolean(guardadoModal) || Boolean(envioModal) || accion.guardando}
                     onClick={() => abrirConfirmacion("enviar-observaciones-evaluador")}
                   >
                     Enviar observaciones
@@ -274,7 +266,7 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-primary"
                     data-tour="proceder"
                     type="button"
-                    disabled={Boolean(guardadoModal) || accion.guardando}
+                    disabled={Boolean(guardadoModal) || Boolean(envioModal) || accion.guardando}
                     onClick={() => abrirConfirmacion("proceder")}
                   >
                     Proceder
@@ -286,7 +278,7 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-secondary"
                     data-tour="guardar-revision"
                     type="button"
-                    disabled={Boolean(guardadoModal) || accion.guardando}
+                    disabled={Boolean(guardadoModal) || Boolean(envioModal) || accion.guardando}
                     onClick={guardarRevisionActual(guardarRevision)}
                   >
                     Guardar revisión
@@ -295,7 +287,7 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-gold"
                     data-tour="enviar-supervisor"
                     type="button"
-                    disabled={Boolean(guardadoModal) || accion.guardando}
+                    disabled={Boolean(guardadoModal) || Boolean(envioModal) || accion.guardando}
                     onClick={() => abrirConfirmacion("enviar-observaciones-supervisor")}
                   >
                     Enviar a supervisor
@@ -304,7 +296,7 @@ export function FormularioEvaluacion({
                     className="btn btn-sm btn-primary"
                     data-tour="finalizar-evaluacion"
                     type="button"
-                    disabled={Boolean(guardadoModal) || accion.guardando}
+                    disabled={Boolean(guardadoModal) || Boolean(envioModal) || accion.guardando}
                     onClick={() => abrirConfirmacion("finalizar-evaluacion")}
                   >
                     Finalizar evaluación
@@ -315,14 +307,16 @@ export function FormularioEvaluacion({
           ) : null}
         </div>
         {meta}
-        {error && guardadoModal !== "error" ? <p className="text-danger">{error}</p> : null}
-        <IndicadorGuardando visible={accion.guardando && !guardadoModal} />
+        {error && guardadoModal !== "error" && envioModal !== "error" ? (
+          <p className="text-danger">{error}</p>
+        ) : null}
+        <IndicadorGuardando visible={accion.guardando && !guardadoModal && !envioModal} />
       </div>
 
       <section className="eval-detalle-shell h-full min-h-0" aria-label="Caso, evaluación y supervisión">
         <input type="hidden" name="asignacionId" value={asignacionId} />
         <EvalDetalleColumnas
-          bloqueado={bloqueado && !exito}
+          bloqueado={bloqueado && envioModal !== "exito"}
           casoTitle="Caso"
           casoSubtitle="Respuestas del participante"
           caso={conservarCampos ? camposVisibles.current.caso : caso}
@@ -357,18 +351,27 @@ export function FormularioEvaluacion({
       ) : null}
       <ModalGuardado
         open={guardadoModal !== null}
-        estado={guardadoModal ?? "guardando"}
+        estado={guardadoModal ?? "enCurso"}
         error={error}
         onAceptar={() => {
           setGuardadoModal(null);
           if (guardadoModal === "error") setError(null);
         }}
       />
-      <EnvioExitoso
-        open={exito !== null}
-        title={exito?.title ?? ""}
-        detalle={exito?.detalle}
-        onAceptar={() => router.push("/evaluador")}
+      <ModalProgreso
+        open={envioModal !== null}
+        estado={envioModal ?? "enCurso"}
+        variante="enviar"
+        error={error}
+        detalleExito={detalleEnvio}
+        onAceptar={() => {
+          if (envioModal === "exito") {
+            router.push("/evaluador");
+            return;
+          }
+          setEnvioModal(null);
+          setError(null);
+        }}
       />
     </form>
   );
