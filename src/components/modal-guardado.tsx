@@ -1,6 +1,6 @@
 "use client";
 
-import { Modal } from "@/components/modal";
+import { cerrarDialogDesde, Modal } from "@/components/modal";
 
 export type EstadoModalProgreso = "enCurso" | "exito" | "error";
 export type EstadoModalGuardado = EstadoModalProgreso;
@@ -79,7 +79,15 @@ export function ModalProgreso({
               <p className="text-sm leading-relaxed">{detalleExito ?? copy.detalleExito}</p>
             )}
             <div className="flex justify-end">
-              <button className="btn btn-sm btn-primary" type="button" onClick={onAceptar}>
+              <button
+                className="btn btn-sm btn-primary"
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  cerrarDialogDesde(event.currentTarget);
+                  onAceptar();
+                }}
+              >
                 Aceptar
               </button>
             </div>

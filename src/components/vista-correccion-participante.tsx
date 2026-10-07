@@ -3,11 +3,9 @@
 import { useMemo, useState } from "react";
 import { EvalDetalleCelda, EvalDetalleColumnas } from "@/components/eval-detalle-head";
 import { HistorialVersionesRespuesta } from "@/components/historial-versiones-respuesta";
-import { PanelEvaluacionPregunta } from "@/components/panel-evaluacion-pregunta";
-import { PanelObservacionGeneral } from "@/components/panel-observacion-general";
+import { PanelHiloRevision } from "@/components/hilo-revision";
 import { PreguntaCampo } from "@/components/pregunta-campo";
-import { notasParaEvaluacionGeneral, parseEscalaNotas } from "@/lib/preguntas";
-import { historialEvaluacionParticipante, revisionVigente } from "@/lib/revision-ciclo";
+import { parseEscalaNotas } from "@/lib/preguntas";
 
 export type RevisionParticipante = {
   id: string;
@@ -60,15 +58,6 @@ function PanelVacio({ texto }: { texto: string }) {
   );
 }
 
-function rondaCicloVista(asignacion: AsignacionParticipanteVista, esGeneral: boolean) {
-  const fuente = esGeneral ? asignacion.revisionesGenerales : asignacion.revisiones;
-  const ultima = fuente[fuente.length - 1];
-  return {
-    ronda: ultima?.ronda ?? asignacion.rondaActual,
-    ciclo: ultima?.ciclo ?? asignacion.cicloSupervision,
-  };
-}
-
 export function VistaCorreccionParticipante({
   preguntas,
   respuestas,
@@ -92,7 +81,6 @@ export function VistaCorreccionParticipante({
     "";
   const [asignacionId, setAsignacionId] = useState(inicial);
   const asignacion = asignaciones.find((item) => item.id === asignacionId) ?? asignaciones[0] ?? null;
-  const vista = asignacion ? rondaCicloVista(asignacion, esGeneral) : { ronda: 1, ciclo: 1 };
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -163,28 +151,18 @@ export function VistaCorreccionParticipante({
           evaluacion={
             esGeneral ? (
               <EvalDetalleCelda panel="eval">
-                {asignacion && asignacion.revisionesGenerales.length > 0 ? (
-                  <PanelObservacionGeneral
-                    canEdit={false}
-                    ronda={vista.ronda}
-                    cicloActual={vista.ciclo}
-                    namePrefix="eval-"
-                    nombreResponsable={asignacion.evaluadorNombre}
-                    notasPreguntas={notasParaEvaluacionGeneral(
-                      preguntas,
-                      asignacion.revisiones,
-                      vista.ronda,
-                      vista.ciclo,
-                    )}
-                    veredictoInicial={
-                      revisionVigente(asignacion.revisionesGenerales, vista.ronda, vista.ciclo)
-                        ?.veredicto
-                    }
-                    comentarioInicial={
-                      revisionVigente(asignacion.revisionesGenerales, vista.ronda, vista.ciclo)
-                        ?.comentario
-                    }
-                    historial={historialEvaluacionParticipante(asignacion.revisionesGenerales)}
+                {asignacion ? (
+                  <PanelHiloRevision
+                    audiencia="participante"
+                    asignacion={{
+                      estado: asignacion.estado,
+                      rondaActual: asignacion.rondaActual,
+                      cicloSupervision: asignacion.cicloSupervision,
+                    }}
+                    revisiones={asignacion.revisionesGenerales}
+                    nombreEvaluador={asignacion.evaluadorNombre}
+                    preguntasNotas={preguntas}
+                    revisionesNotas={asignacion.revisiones}
                   />
                 ) : (
                   <PanelVacio texto="Todavía no hay una evaluación visible." />
@@ -194,23 +172,22 @@ export function VistaCorreccionParticipante({
               preguntas.map((pregunta) => {
                 const historialPregunta =
                   asignacion?.revisiones.filter((item) => item.preguntaId === pregunta.id) ?? [];
-                const actual = revisionVigente(historialPregunta, vista.ronda, vista.ciclo);
                 const escala = pregunta.conNotas ? parseEscalaNotas(pregunta.escalaNotas) : [];
                 return (
                   <EvalDetalleCelda key={pregunta.id} panel="eval">
-                    {historialPregunta.length > 0 && asignacion ? (
-                      <PanelEvaluacionPregunta
+                    {asignacion ? (
+                      <PanelHiloRevision
+                        audiencia="participante"
+                        asignacion={{
+                          estado: asignacion.estado,
+                          rondaActual: asignacion.rondaActual,
+                          cicloSupervision: asignacion.cicloSupervision,
+                        }}
                         preguntaId={pregunta.id}
-                        canEdit={false}
-                        ronda={vista.ronda}
-                        cicloActual={vista.ciclo}
-                        veredictoInicial={actual?.veredicto}
-                        comentarioInicial={actual?.comentario}
-                        notaInicial={actual?.nota}
                         escala={escala}
-                        namePrefix="eval-"
-                        nombreResponsable={asignacion.evaluadorNombre}
-                        historial={historialEvaluacionParticipante(historialPregunta)}
+                        revisiones={historialPregunta}
+                        nombreEvaluador={asignacion.evaluadorNombre}
+                        textoVacio="Todavía no hay una evaluación visible en esta pregunta."
                       />
                     ) : (
                       <PanelVacio texto="Todavía no hay una evaluación visible en esta pregunta." />

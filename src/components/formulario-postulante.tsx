@@ -256,6 +256,7 @@ export function FormularioPostulante({
         }
         onAceptar={() => {
           if (envioModal === "exito") {
+            setEnvioModal(null);
             router.push("/participante");
             return;
           }

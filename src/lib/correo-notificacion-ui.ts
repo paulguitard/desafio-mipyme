@@ -1,5 +1,6 @@
 export const TIPOS_CORREO_NOTIFICACION = [
   "PARTICIPANTE_OBSERVACIONES",
+  "CASO_APROBADO",
   "EVALUADOR_RESPUESTA_REENVIO",
   "EVALUADOR_DEVOLUCION_SUPERVISOR",
   "EVALUADOR_APROBACION_SUPERVISOR",
@@ -33,8 +34,15 @@ export const SECCIONES_CORREO_NOTIFICACION: {
     id: "PARTICIPANTE_OBSERVACIONES",
     label: "Participante: observaciones",
     descripcion:
-      "Se envía cuando el supervisor aprueba las observaciones y el participante ya puede reparar el caso.",
-    placeholders: "{{nombre}}, {{enlace}}, {{caso}}, {{mentoria}}, {{actor}}",
+      "Se envía al participante cuando ya puede reparar el caso. El texto no debe mencionar supervisores.",
+    placeholders: "{{nombre}}, {{enlace}}, {{caso}}, {{mentoria}}",
+  },
+  {
+    id: "CASO_APROBADO",
+    label: "Caso aprobado y finalizado",
+    descripcion:
+      "Se envía al participante y a cada evaluador cuando todos los evaluadores del caso quedaron finalizados.",
+    placeholders: "{{nombre}}, {{enlace}}, {{caso}}, {{mentoria}}",
   },
   {
     id: "EVALUADOR_RESPUESTA_REENVIO",
@@ -115,7 +123,15 @@ export const DEFAULT_CORREO_NOTIFICACION: Record<TipoCorreoNotificacion, TextosC
     asunto: "Hay observaciones para reparar — {{caso}}",
     titulo: "Observaciones para reparar",
     cuerpo:
-      "Hola {{nombre}},\n\nEl evaluador envió observaciones sobre tu caso «{{caso}}» en {{mentoria}}, y el supervisor ya las aprobó. Entra para revisarlas y enviar las correcciones.",
+      "Hola {{nombre}},\n\nEl evaluador envió observaciones sobre tu caso «{{caso}}» en {{mentoria}}. Entra para revisarlas y enviar las correcciones.",
+    textoBoton: "Ver el caso",
+    pie: "Si el botón no funciona, copia y pega este enlace en tu navegador:\n{{enlace}}",
+  },
+  CASO_APROBADO: {
+    asunto: "Tu caso fue aprobado — {{caso}}",
+    titulo: "Caso aprobado",
+    cuerpo:
+      "Hola {{nombre}},\n\nLa evaluación de «{{caso}}» en {{mentoria}} terminó y el caso fue aprobado. El equipo del desafío te informará pronto los siguientes pasos.",
     textoBoton: "Ver el caso",
     pie: "Si el botón no funciona, copia y pega este enlace en tu navegador:\n{{enlace}}",
   },

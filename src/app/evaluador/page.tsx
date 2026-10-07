@@ -40,7 +40,7 @@ export default async function EvaluadorHomePage({
     detalle: `${item.postulacion.convocatoria.titulo} · ${item.postulacion.postulante.name}`,
     estado: item.estado,
     etiqueta: etiquetaAsignacionPanelEvaluador(item.estado),
-    grupos: [grupoFiltroEvaluador(item.estado)],
+    grupos: [grupoFiltroEvaluador(item.estado, item.cicloSupervision)],
     updatedAt: item.updatedAt.getTime(),
   }));
 

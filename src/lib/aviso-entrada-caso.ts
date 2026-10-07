@@ -11,7 +11,7 @@ export function parrafosDescripcionMentoria(descripcion: string): string[] {
 }
 
 const EXTRA_HISTORIAL =
-  "En cada pregunta, Versiones abre el historial de cambios de la respuesta.";
+  "En cada pregunta, Modificada abre el historial de cambios de la respuesta.";
 const EXTRA_PESTANAS =
   "Usa las pestañas Caso, Evaluación y Supervisión para pasar de las respuestas a los comentarios.";
 
@@ -52,7 +52,7 @@ export function avisoEntradaEvaluador(estado: string): AvisoEntradaCaso {
       title: "El participante ya corrigió",
       parrafos: [
         "El participante ya corrigió. Revisa los cambios en el historial de cada pregunta.",
-        "Compara las versiones, actualiza tu revisión y envía al supervisor o finaliza si corresponde.",
+        "Abre Modificada en las preguntas que cambió, actualiza tu revisión y envía al supervisor o finaliza si corresponde.",
         EXTRA_PESTANAS,
       ],
     };
@@ -132,6 +132,14 @@ export function avisoEntradaParticipante(args: {
   mentoriaAbierta: boolean;
   descripcionMentoria?: string;
 }): AvisoEntradaCaso {
+  if (args.estado === "FINALIZADA") {
+    return {
+      title: "Tu caso fue aprobado",
+      parrafos: [
+        "¡Felicidades! Tu caso fue aprobado por los evaluadores. El equipo del desafío te informará pronto los siguientes pasos.",
+      ],
+    };
+  }
   if (!args.mentoriaAbierta && !args.canEdit) {
     return {
       title: "Asesoría cerrada",
@@ -156,15 +164,6 @@ export function avisoEntradaParticipante(args: {
       title: "Completa tu caso",
       parrafos: parrafosDescripcionMentoria(args.descripcionMentoria ?? ""),
       claseModal: "modal-aviso-completa-caso",
-    };
-  }
-  if (args.estado === "FINALIZADA") {
-    return {
-      title: "Caso finalizado",
-      parrafos: [
-        "Este caso ya está finalizado. Puedes consultarlo, pero ya no se edita.",
-        EXTRA_HISTORIAL,
-      ],
     };
   }
   return {

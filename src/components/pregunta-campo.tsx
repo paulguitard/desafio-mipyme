@@ -7,7 +7,7 @@ const EditorTextoLargo = dynamic(
   () => import("@/components/editor-texto-largo").then((mod) => mod.EditorTextoLargo),
 );
 const TextoLargoVista = dynamic(
-  () => import("@/components/editor-texto-largo").then((mod) => mod.TextoLargoVista),
+  () => import("@/components/texto-largo-vista").then((mod) => mod.TextoLargoVista),
 );
 const CampoGantt = dynamic(
   () => import("@/components/pregunta-formatos").then((mod) => mod.CampoGantt),
@@ -390,6 +390,38 @@ export function AdjuntosRespuesta({ archivos }: { archivos: StoredAttachment[] }
   );
 }
 
+function MarcoPregunta({
+  id,
+  className,
+  modificada,
+  etiqueta,
+  children,
+}: {
+  id: string;
+  className: string;
+  modificada: boolean;
+  etiqueta?: string;
+  children: ReactNode;
+}) {
+  const campo = etiqueta ? (
+    <fieldset id={modificada ? undefined : id} className={className} aria-labelledby={etiqueta}>
+      {children}
+    </fieldset>
+  ) : (
+    <section id={modificada ? undefined : id} className={className}>
+      {children}
+    </section>
+  );
+  if (!modificada) return campo;
+  return (
+    <div id={id} className="pregunta-modificada-halo">
+      <span className="pregunta-modificada-halo__glow" aria-hidden="true" />
+      <span className="pregunta-modificada-halo__ring" aria-hidden="true" />
+      {campo}
+    </div>
+  );
+}
+
 export function PreguntaCampo({
   pregunta,
   respuesta,
@@ -397,6 +429,7 @@ export function PreguntaCampo({
   disabled,
   preview,
   acciones,
+  modificada = false,
 }: {
   pregunta: {
     id: string;
@@ -414,6 +447,7 @@ export function PreguntaCampo({
   disabled?: boolean;
   preview?: boolean;
   acciones?: ReactNode;
+  modificada?: boolean;
 }) {
   const opciones = parseOpciones(pregunta.opciones);
   const valor = parseValor(respuesta?.valor ?? "");
@@ -426,6 +460,8 @@ export function PreguntaCampo({
   const name = preview ? `preview-${pregunta.id}` : `valor-${pregunta.id}`;
   const locked = Boolean(readOnly || disabled);
   const tituloId = `pregunta-titulo-${pregunta.id}`;
+  const clasePregunta = "card pregunta-lectura";
+  const anclaId = `pregunta-caso-${pregunta.id}`;
   const titulo = (
     <h3 id={tituloId} className="min-w-0 flex-1 text-xl font-semibold">
       {pregunta.enunciado}
@@ -474,7 +510,7 @@ export function PreguntaCampo({
     const hayAdjuntos = archivos.length > 0;
 
     return (
-      <section className="card pregunta-lectura">
+      <MarcoPregunta id={anclaId} className={clasePregunta} modificada={modificada}>
         <div className="pregunta-lectura-enunciado">{encabezado}</div>
         <div className="pregunta-lectura-cuerpo">
           <div className={hayAdjuntos ? "pregunta-con-adjuntos" : undefined}>
@@ -482,7 +518,7 @@ export function PreguntaCampo({
             <AdjuntosRespuesta archivos={archivos} />
           </div>
         </div>
-      </section>
+      </MarcoPregunta>
     );
   }
 
@@ -500,9 +536,9 @@ export function PreguntaCampo({
       : { desde: "", hasta: "" };
 
   return (
-    <fieldset className="card space-y-3 p-5" aria-labelledby={tituloId}>
-      {encabezado}
-
+    <MarcoPregunta id={anclaId} className={clasePregunta} modificada={modificada} etiqueta={tituloId}>
+      <div className="pregunta-lectura-enunciado">{encabezado}</div>
+      <div className="pregunta-lectura-cuerpo">
       {tipo === "texto_corto" ? (
         <input
           className="input w-full"
@@ -636,7 +672,8 @@ export function PreguntaCampo({
           preview={preview}
         />
       ) : null}
-    </fieldset>
+      </div>
+    </MarcoPregunta>
   );
 }
 

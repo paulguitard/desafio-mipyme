@@ -3,16 +3,13 @@
 import { useMemo, useState } from "react";
 import { EvalDetalleCelda, EvalDetalleColumnas } from "@/components/eval-detalle-head";
 import { HistorialVersionesRespuesta } from "@/components/historial-versiones-respuesta";
-import { PanelEvaluacionPregunta } from "@/components/panel-evaluacion-pregunta";
-import { PanelObservacionGeneral, PanelSupervisionPendiente } from "@/components/panel-observacion-general";
+import { PanelHiloRevision } from "@/components/hilo-revision";
 import { PreguntaCampo } from "@/components/pregunta-campo";
 import { PiezaContenidoVista } from "@/components/pieza-contenido-vista";
 import type { DetalleFichaAdmin } from "@/lib/convocatoria-admin-data";
 import { normalizarCorreo } from "@/lib/correo";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
-import { notasParaEvaluacionGeneral, parseEscalaNotas } from "@/lib/preguntas";
-import { historialEvaluacion, revisionVigente } from "@/lib/revision-ciclo";
-import { historialSupervision } from "@/lib/supervision-ui";
+import { parseEscalaNotas } from "@/lib/preguntas";
 import { esMentoriaContenido } from "@/lib/tipo-formulario";
 
 function lineaPersona(
@@ -34,8 +31,6 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
 
   const modoEvaluacion = parseModoEvaluacion(data.modoEvaluacion);
   const esGeneral = modoEvaluacion === "GENERAL";
-  const ciclo = asignacion?.cicloSupervision ?? 1;
-  const ronda = asignacion?.rondaActual ?? 1;
   const esContenido = esMentoriaContenido(data.tipo);
 
   if (esContenido) {
@@ -43,6 +38,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
       <div className="ficha-detalle-admin eval-shell-open">
         <section className="eval-detalle-shell" aria-label="Contenido visto por el participante">
           <EvalDetalleColumnas
+            sinSupervision
             casoTitle="Contenido"
             casoSubtitle={lineaPersona(
               data.emprendedorNombre,
@@ -60,15 +56,6 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
               <EvalDetalleCelda panel="eval">
                 <div className="card space-y-2 p-4">
                   <p className="text-muted">Las asesorías de contenido no tienen evaluación.</p>
-                </div>
-              </EvalDetalleCelda>
-            }
-            supTitle="Supervisión"
-            supSubtitle="Sin supervisión"
-            supervision={
-              <EvalDetalleCelda panel="sup">
-                <div className="card space-y-2 p-4">
-                  <p className="text-muted">Las asesorías de contenido no tienen supervisión.</p>
                 </div>
               </EvalDetalleCelda>
             }
@@ -111,6 +98,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
 
       <section className="eval-detalle-shell" aria-label="Caso, evaluación y supervisión">
         <EvalDetalleColumnas
+          sinSupervision
           casoTitle="Caso"
           casoSubtitle={lineaPersona(
             data.emprendedorNombre,
@@ -144,7 +132,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
               </EvalDetalleCelda>
             );
           })}
-          evalTitle="Evaluación"
+          evalTitle="Evaluación y Supervisión"
           evalSubtitle={lineaPersona(
             asignacion?.evaluadorNombre,
             asignacion?.evaluadorEmail,
@@ -154,25 +142,19 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
             esGeneral ? (
               <EvalDetalleCelda panel="eval">
                 {asignacion ? (
-                  <PanelObservacionGeneral
-                    canEdit={false}
-                    ronda={ronda}
-                    cicloActual={ciclo}
-                    namePrefix="eval-"
-                    nombreResponsable={asignacion.evaluadorNombre}
-                    notasPreguntas={notasParaEvaluacionGeneral(
-                      data.preguntas,
-                      asignacion.revisiones,
-                      ronda,
-                      ciclo,
-                    )}
-                    veredictoInicial={
-                      revisionVigente(asignacion.revisionesGenerales, ronda, ciclo)?.veredicto
-                    }
-                    comentarioInicial={
-                      revisionVigente(asignacion.revisionesGenerales, ronda, ciclo)?.comentario
-                    }
-                    historial={historialEvaluacion(asignacion.revisionesGenerales)}
+                  <PanelHiloRevision
+                    audiencia="equipo"
+                    asignacion={{
+                      estado: asignacion.estado,
+                      rondaActual: asignacion.rondaActual,
+                      cicloSupervision: asignacion.cicloSupervision,
+                    }}
+                    revisiones={asignacion.revisionesGenerales}
+                    supervisiones={asignacion.supervisionesGenerales}
+                    nombreEvaluador={asignacion.evaluadorNombre}
+                    nombreSupervisor={data.supervisorNombre}
+                    preguntasNotas={data.preguntas}
+                    revisionesNotas={asignacion.revisiones}
                   />
                 ) : (
                   <div className="card space-y-2 p-4">
@@ -182,98 +164,29 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
               </EvalDetalleCelda>
             ) : (
               data.preguntas.map((pregunta) => {
-                const actual = revisionVigente(
-                  asignacion?.revisiones.filter((item) => item.preguntaId === pregunta.id) ?? [],
-                  ronda,
-                  ciclo,
-                );
-                const historial =
-                  asignacion?.revisiones.filter((item) => item.preguntaId === pregunta.id) ?? [];
                 const escala = pregunta.conNotas ? parseEscalaNotas(pregunta.escalaNotas) : [];
                 return (
                   <EvalDetalleCelda key={pregunta.id} panel="eval">
                     {asignacion ? (
-                      <PanelEvaluacionPregunta
+                      <PanelHiloRevision
+                        audiencia="equipo"
+                        asignacion={{
+                          estado: asignacion.estado,
+                          rondaActual: asignacion.rondaActual,
+                          cicloSupervision: asignacion.cicloSupervision,
+                        }}
                         preguntaId={pregunta.id}
-                        canEdit={false}
-                        ronda={ronda}
-                        cicloActual={ciclo}
-                        veredictoInicial={actual?.veredicto}
-                        comentarioInicial={actual?.comentario}
-                        notaInicial={actual?.nota}
                         escala={escala}
-                        namePrefix="eval-"
-                        nombreResponsable={asignacion.evaluadorNombre}
-                        historial={historialEvaluacion(historial)}
+                        revisiones={asignacion.revisiones.filter((item) => item.preguntaId === pregunta.id)}
+                        supervisiones={asignacion.supervisionesPregunta.filter(
+                          (item) => item.preguntaId === pregunta.id,
+                        )}
+                        nombreEvaluador={asignacion.evaluadorNombre}
+                        nombreSupervisor={data.supervisorNombre}
                       />
                     ) : (
                       <div className="card space-y-2 p-4">
                         <p className="text-muted">Aún no hay evaluadores asignados a esta ficha.</p>
-                      </div>
-                    )}
-                  </EvalDetalleCelda>
-                );
-              })
-            )
-          }
-          supTitle="Supervisión"
-          supSubtitle={lineaPersona(
-            data.supervisorNombre,
-            data.supervisorEmail,
-            "Sin supervisor asignado",
-          )}
-          supervision={
-            esGeneral ? (
-              <EvalDetalleCelda panel="sup">
-                {asignacion && asignacion.supervisionesGenerales.length > 0 ? (
-                  <PanelObservacionGeneral
-                    canEdit={false}
-                    ronda={ciclo}
-                    tipo="supervision"
-                    namePrefix="sup-"
-                    nombreResponsable={data.supervisorNombre}
-                    veredictoInicial={
-                      asignacion.supervisionesGenerales.find(
-                        (item) => item.ronda === ronda && item.ciclo === ciclo,
-                      )?.veredicto
-                    }
-                    comentarioInicial={
-                      asignacion.supervisionesGenerales.find(
-                        (item) => item.ronda === ronda && item.ciclo === ciclo,
-                      )?.comentario
-                    }
-                    historial={historialSupervision(asignacion.supervisionesGenerales)}
-                  />
-                ) : (
-                  <PanelSupervisionPendiente />
-                )}
-              </EvalDetalleCelda>
-            ) : (
-              data.preguntas.map((pregunta) => {
-                const supervisiones =
-                  asignacion?.supervisionesPregunta.filter((item) => item.preguntaId === pregunta.id) ??
-                  [];
-                const actualSup = supervisiones.find(
-                  (item) => item.ronda === ronda && item.ciclo === ciclo,
-                );
-                return (
-                  <EvalDetalleCelda key={pregunta.id} panel="sup">
-                    {asignacion ? (
-                      <PanelEvaluacionPregunta
-                        preguntaId={pregunta.id}
-                        canEdit={false}
-                        ronda={ciclo}
-                        veredictoInicial={actualSup?.veredicto}
-                        comentarioInicial={actualSup?.comentario}
-                        escala={[]}
-                        tipo="supervision"
-                        namePrefix="sup-"
-                        nombreResponsable={data.supervisorNombre}
-                        historial={historialSupervision(supervisiones)}
-                      />
-                    ) : (
-                      <div className="card space-y-2 p-4">
-                        <p className="text-muted">Sin supervisión.</p>
                       </div>
                     )}
                   </EvalDetalleCelda>

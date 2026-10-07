@@ -11,6 +11,20 @@ describe("avisoEntradaEvaluador", () => {
     expect(aviso.title).toBe("El participante ya corrigió");
     expect(aviso.parrafos[0]).toContain("historial de cada pregunta");
   });
+
+  it.each([
+    "PENDIENTE",
+    "EN_REVISION",
+    "EN_SUPERVISION",
+    "DEVUELTA_SUPERVISOR",
+    "CON_OBSERVACIONES",
+    "REPARADA",
+    "FINALIZADA",
+  ])("tiene título y texto en %s", (estado) => {
+    const aviso = avisoEntradaEvaluador(estado);
+    expect(aviso.title.trim().length).toBeGreaterThan(0);
+    expect(aviso.parrafos.every((parrafo) => parrafo.trim().length > 0)).toBe(true);
+  });
 });
 
 describe("avisoEntradaSupervisor", () => {
@@ -22,6 +36,15 @@ describe("avisoEntradaSupervisor", () => {
       "envió observaciones",
     );
   });
+
+  it.each(["EN_SUPERVISION", "DEVUELTA_SUPERVISOR", "FINALIZADA", "PENDIENTE"])(
+    "tiene título y texto en %s",
+    (estado) => {
+      const aviso = avisoEntradaSupervisor(estado, "OBSERVACIONES");
+      expect(aviso.title.trim().length).toBeGreaterThan(0);
+      expect(aviso.parrafos.every((parrafo) => parrafo.trim().length > 0)).toBe(true);
+    },
+  );
 });
 
 describe("avisoEntradaParticipante", () => {
@@ -47,5 +70,32 @@ describe("avisoEntradaParticipante", () => {
     expect(aviso.title).toBe("Completa tu caso");
     expect(aviso.parrafos).toEqual(["Texto de la ficha de la asesoría."]);
     expect(aviso.claseModal).toBe("modal-aviso-completa-caso");
+  });
+
+  it.each(["BORRADOR", "ENVIADA", "EN_EVALUACION", "REPARADA_POR_EL_EMPRENDEDOR"] as const)(
+    "explica el paso cuando el caso está %s",
+    (estado) => {
+      const aviso = avisoEntradaParticipante({
+        estado,
+        esCorreccion: false,
+        canEdit: estado === "BORRADOR",
+        mentoriaAbierta: true,
+        descripcionMentoria: "Descripción de la asesoría.",
+      });
+      expect(aviso.title.trim().length).toBeGreaterThan(0);
+      expect(aviso.parrafos.length).toBeGreaterThan(0);
+    },
+  );
+
+  it("felicita cuando el caso quedó aprobado y finalizado", () => {
+    const aviso = avisoEntradaParticipante({
+      estado: "FINALIZADA",
+      esCorreccion: false,
+      canEdit: false,
+      mentoriaAbierta: false,
+    });
+    expect(aviso.title).toBe("Tu caso fue aprobado");
+    expect(aviso.parrafos[0]).toContain("Felicidades");
+    expect(aviso.parrafos[0]).toContain("siguientes pasos");
   });
 });

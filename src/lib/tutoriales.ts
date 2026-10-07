@@ -159,7 +159,7 @@ export function resolverTutorial(
           ancla: "observacion-pregunta",
           titulo: "Evaluación",
           descripcion:
-            "Lee las observaciones y el histórico por ronda. Solo aparece la última versión de cada ciclo evaluación-supervisión.",
+            "Lee las observaciones aprobadas. Cada ronda muestra la versión final de tu evaluación.",
         },
         {
           ancla: "guardar-borrador",
@@ -219,26 +219,21 @@ export function resolverTutorial(
         },
         {
           ancla: "historial-versiones",
-          titulo: "Versiones",
+          titulo: "Modificada",
           descripcion:
-            "Si el participante corrigió, el historial muestra cómo cambió la respuesta en cada ronda.",
+            "Si el participante corrigió, Modificada muestra cómo cambió la respuesta en cada ronda.",
         },
         {
           ancla: "pestaña-evaluacion",
-          titulo: "Evaluación",
+          titulo: "Evaluación y supervisión",
           descripcion:
-            "Cambia a esta pestaña para marcar observaciones, comentar y, si corresponde, asignar una nota.",
+            "Aquí ves la conversación de cada ronda: tu comentario y, cuando corresponda, el del supervisor. Lo más nuevo queda arriba.",
         },
         {
           ancla: "observacion-pregunta",
           titulo: "Tu revisión",
           descripcion:
-            "Marca si hay observaciones, deja un comentario y, si corresponde, asigna una nota.",
-        },
-        {
-          ancla: "pestaña-supervision",
-          titulo: "Supervisión",
-          descripcion: "Consulta lo que observó el supervisor sobre tu evaluación.",
+            "Escribe tu evaluación en la tarjeta de la ronda. Al enviarla, queda como comentario. Si el supervisor observa, respondes en la misma tarjeta.",
         },
         {
           ancla: "guardar-revision",
@@ -303,18 +298,20 @@ export function resolverTutorial(
         },
         {
           ancla: "historial-versiones",
-          titulo: "Versiones",
-          descripcion: "Abre el historial para ver cómo cambió una respuesta entre rondas.",
+          titulo: "Modificada",
+          descripcion: "Abre Modificada para ver cómo cambió una respuesta entre rondas.",
         },
         {
           ancla: "pestaña-evaluacion",
-          titulo: "Evaluación",
-          descripcion: "Revisa lo que marcó el evaluador en cada pregunta o en la revisión general.",
+          titulo: "Evaluación y supervisión",
+          descripcion:
+            "En esta pestaña ves la evaluación y dejas tu comentario en la misma tarjeta de la ronda.",
         },
         {
-          ancla: "pestaña-supervision",
-          titulo: "Supervisión",
-          descripcion: "En esta pestaña dejas tus comentarios de supervisión.",
+          ancla: "observacion-pregunta",
+          titulo: "Tu supervisión",
+          descripcion:
+            "Tu comentario queda encima del evaluador, en la misma ronda. Si no hay observaciones, procede para liberar esa versión.",
         },
         {
           ancla: "guardar-revision",

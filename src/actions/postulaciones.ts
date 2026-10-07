@@ -34,6 +34,7 @@ import { esMentoriaContenido } from "@/lib/tipo-formulario";
 import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
 import { avisarEvaluadoresRespuestaReenviada } from "@/lib/correo-notificacion";
 import { randomUUID } from "node:crypto";
+import { respuestasEquivalentes } from "@/lib/versiones-respuesta";
 
 async function cargaPostulacionDelUsuario(id: string, emprendedorId: string) {
   const postulacion = await prisma.postulacion.findUnique({
@@ -194,6 +195,7 @@ async function persistirRespuestas(args: {
 }) {
   const pendientes: {
     preguntaId: string;
+    tipo: string;
     valorStr: string;
     archivosStr: string;
     existing: { id: string; valor: string; archivos: string } | null;
@@ -266,6 +268,7 @@ async function persistirRespuestas(args: {
 
     pendientes.push({
       preguntaId: pregunta.id,
+      tipo: pregunta.tipo,
       valorStr: serializeValor(valorSanitizado),
       archivosStr: JSON.stringify(archivos),
       existing,
@@ -274,6 +277,24 @@ async function persistirRespuestas(args: {
 
   await prisma.$transaction(async (tx) => {
     for (const item of pendientes) {
+      const igual =
+        item.existing != null &&
+        respuestasEquivalentes({
+          tipo: item.tipo,
+          valorA: item.existing.valor,
+          archivosA: item.existing.archivos,
+          valorB: item.valorStr,
+          archivosB: item.archivosStr,
+        });
+
+      if (igual && item.existing) {
+        if (!args.crearVersion) continue;
+        const versions = await tx.respuestaVersion.count({
+          where: { respuestaId: item.existing.id },
+        });
+        if (versions > 0) continue;
+      }
+
       const respuesta = await tx.respuesta.upsert({
         where: {
           postulacionId_preguntaId: {
@@ -290,23 +311,14 @@ async function persistirRespuestas(args: {
         },
       });
 
-      const changed =
-        !item.existing ||
-        item.existing.valor !== item.valorStr ||
-        item.existing.archivos !== item.archivosStr;
       if (args.crearVersion) {
-        const versions = await tx.respuestaVersion.count({
-          where: { respuestaId: respuesta.id },
+        await tx.respuestaVersion.create({
+          data: {
+            respuestaId: respuesta.id,
+            valor: item.valorStr,
+            archivos: item.archivosStr,
+          },
         });
-        if (changed || versions === 0) {
-          await tx.respuestaVersion.create({
-            data: {
-              respuestaId: respuesta.id,
-              valor: item.valorStr,
-              archivos: item.archivosStr,
-            },
-          });
-        }
       }
     }
   });

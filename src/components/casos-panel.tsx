@@ -213,10 +213,8 @@ export function CasosPanel({
         </div>
       </div>
       <div className="page-scroll min-h-0 overflow-y-auto space-y-7 pr-1" data-tour={tourLista}>
-        {!hayTarjetas ? (
-          <p className="text-muted">
-            {activoId === "todas" ? emptyLabel : "No hay casos en este estado."}
-          </p>
+        {!hayTarjetas && activoId === "todas" ? (
+          <p className="text-muted">{emptyLabel}</p>
         ) : (
           bandasLista.map((banda) => (
             <section key={banda.id} className="casos-banda" aria-label={banda.label || undefined}>
@@ -225,46 +223,55 @@ export function CasosPanel({
               ) : null}
               {banda.filtros.map((grupo) => (
                 <section key={grupo.id} className="casos-grupo" aria-labelledby={`grupo-${grupo.id}`}>
-                  <header className="casos-grupo-cabecera">
-                    <h3 id={`grupo-${grupo.id}`}>{grupo.label}</h3>
-                    <span className="casos-grupo-n">{grupo.items.length}</span>
+                  <header className="casos-grupo-head">
+                    <div className="casos-grupo-cabecera">
+                      <h3 id={`grupo-${grupo.id}`}>{grupo.label}</h3>
+                      <span className="casos-grupo-n">{grupo.items.length}</span>
+                    </div>
+                    {grupo.descripcion ? (
+                      <p className="casos-grupo-ayuda">{grupo.descripcion}</p>
+                    ) : null}
                   </header>
-                  <div className="casos-lista">
-                    {grupo.items.map((item) => (
-                      <CasoFila
-                        key={item.id}
-                        href={item.href}
-                        nombre={item.nombre}
-                        detalle={item.detalle}
-                        badge={
-                          item.extra ? undefined : (
-                            <BadgeAsignacion estado={item.estado} etiqueta={item.etiqueta} />
-                          )
-                        }
-                        extra={
-                          item.extra ? (
-                            <ul className="caso-fila-evals">
-                              {item.extra.length === 0 ? (
-                                <li className="text-sm text-muted">Sin evaluadores asignados</li>
-                              ) : (
-                                item.extra.map((asignacion, extraIdx) => (
-                                  <li key={`${item.id}-${extraIdx}-${asignacion.nombre}`}>
-                                    <span>{asignacion.nombre}</span>
-                                    <BadgeAsignacion estado={asignacion.estado} etiqueta={asignacion.etiqueta} />
-                                    {asignacion.estado === "EN_SUPERVISION" && asignacion.intencion ? (
-                                      <span className="caso-fila-intencion">
-                                        {asignacion.intencion === "FINALIZAR" ? "Finalización" : "Observaciones"}
-                                      </span>
-                                    ) : null}
-                                  </li>
-                                ))
-                              )}
-                            </ul>
-                          ) : undefined
-                        }
-                      />
-                    ))}
-                  </div>
+                  {grupo.items.length === 0 ? (
+                    <p className="text-muted">No hay casos en este estado.</p>
+                  ) : (
+                    <div className="casos-lista">
+                      {grupo.items.map((item) => (
+                        <CasoFila
+                          key={item.id}
+                          href={item.href}
+                          nombre={item.nombre}
+                          detalle={item.detalle}
+                          badge={
+                            item.extra ? undefined : (
+                              <BadgeAsignacion estado={item.estado} etiqueta={item.etiqueta} />
+                            )
+                          }
+                          extra={
+                            item.extra ? (
+                              <ul className="caso-fila-evals">
+                                {item.extra.length === 0 ? (
+                                  <li className="text-sm text-muted">Sin evaluadores asignados</li>
+                                ) : (
+                                  item.extra.map((asignacion, extraIdx) => (
+                                    <li key={`${item.id}-${extraIdx}-${asignacion.nombre}`}>
+                                      <span>{asignacion.nombre}</span>
+                                      <BadgeAsignacion estado={asignacion.estado} etiqueta={asignacion.etiqueta} />
+                                      {asignacion.estado === "EN_SUPERVISION" && asignacion.intencion ? (
+                                        <span className="caso-fila-intencion">
+                                          {asignacion.intencion === "FINALIZAR" ? "Finalización" : "Observaciones"}
+                                        </span>
+                                      ) : null}
+                                    </li>
+                                  ))
+                                )}
+                              </ul>
+                            ) : undefined
+                          }
+                        />
+                      ))}
+                    </div>
+                  )}
                 </section>
               ))}
             </section>

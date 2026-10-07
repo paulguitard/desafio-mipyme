@@ -8,6 +8,7 @@ import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
 import {
   avisarEvaluadorDevolucionSupervisor,
   avisarTrasAprobacionSupervisor,
+  avisarCasoAprobado,
 } from "@/lib/correo-notificacion";
 
 async function cargaAsignacionParaSupervisor(asignacionId: string, supervisorId: string) {
@@ -225,11 +226,20 @@ export async function procederSupervision(formData: FormData) {
     },
   });
   await sincronizarEstadoPostulacion(asignacion.postulacionId);
-  await avisarTrasAprobacionSupervisor({
-    asignacionId,
-    actorNombre: user.name ?? "El supervisor",
-    resultado: asignacion.intencionPendiente === "FINALIZAR" ? "finalizacion" : "observaciones",
+  const postulacion = await prisma.postulacion.findUnique({
+    where: { id: asignacion.postulacionId },
+    select: { estado: true },
   });
+  const casoAprobado = siguienteEstado === "FINALIZADA" && postulacion?.estado === "FINALIZADA";
+  if (casoAprobado) {
+    await avisarCasoAprobado(asignacion.postulacionId);
+  } else {
+    await avisarTrasAprobacionSupervisor({
+      asignacionId,
+      actorNombre: user.name ?? "El supervisor",
+      resultado: asignacion.intencionPendiente === "FINALIZAR" ? "finalizacion" : "observaciones",
+    });
+  }
   revalidateSupervision(asignacionId, asignacion.postulacionId);
   return { ok: true };
 }

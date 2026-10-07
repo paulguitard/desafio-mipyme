@@ -17,8 +17,10 @@ import {
 
 describe("grupoFiltroEvaluador", () => {
   it("agrupa los estados de acción del evaluador", () => {
-    expect(grupoFiltroEvaluador("DEVUELTA_SUPERVISOR")).toBe("pendientes");
+    expect(grupoFiltroEvaluador("DEVUELTA_SUPERVISOR")).toBe("observadas-supervisor");
+    expect(grupoFiltroEvaluador("EN_REVISION", 2)).toBe("observadas-supervisor");
     expect(grupoFiltroEvaluador("EN_REVISION")).toBe("pendientes");
+    expect(grupoFiltroEvaluador("PENDIENTE")).toBe("pendientes");
     expect(grupoFiltroEvaluador("REPARADA")).toBe("reparadas");
     expect(grupoFiltroEvaluador("EN_SUPERVISION")).toBe("supervision");
     expect(grupoFiltroEvaluador("CON_OBSERVACIONES")).toBe("observaciones");
@@ -90,15 +92,23 @@ describe("supervisorCoincideFiltro", () => {
     expect(supervisorCoincideFiltro("esperando-respuesta", mixtoRespuestaYEvaluacion)).toBe(false);
   });
 
-  it("espera evaluación cuando el evaluador tiene la pelota, incluidas las devueltas", () => {
+  it("espera evaluación cuando el evaluador tiene la pelota y tú no se la devolviste", () => {
     expect(supervisorCoincideFiltro("esperando-evaluacion", esperandoEvaluacion)).toBe(true);
-    expect(supervisorCoincideFiltro("esperando-evaluacion", devuelta)).toBe(true);
+    expect(supervisorCoincideFiltro("esperando-evaluacion-corregida", esperandoEvaluacion)).toBe(false);
     expect(supervisorCoincideFiltro("esperando-evaluacion", mixtoRespuestaYEvaluacion)).toBe(true);
     expect(supervisorCoincideFiltro("esperando-respuesta", devuelta)).toBe(false);
   });
 
-  it("mapea filtros viejos a Esperando evaluación", () => {
-    expect(resolverFiltroSupervisor("devueltas").id).toBe("esperando-evaluacion");
+  it("saca las devueltas de Esperando evaluación", () => {
+    const borradorCorregido = [{ estado: "EN_REVISION", intencionPendiente: null, cicloSupervision: 2 }];
+    expect(supervisorCoincideFiltro("esperando-evaluacion", devuelta)).toBe(false);
+    expect(supervisorCoincideFiltro("esperando-evaluacion-corregida", devuelta)).toBe(true);
+    expect(supervisorCoincideFiltro("esperando-evaluacion", borradorCorregido)).toBe(false);
+    expect(supervisorCoincideFiltro("esperando-evaluacion-corregida", borradorCorregido)).toBe(true);
+  });
+
+  it("mapea el filtro viejo de devueltas a Esperando evaluación corregida", () => {
+    expect(resolverFiltroSupervisor("devueltas").id).toBe("esperando-evaluacion-corregida");
     expect(resolverFiltroSupervisor("en_curso").id).toBe("esperando-evaluacion");
   });
 });
@@ -109,6 +119,7 @@ describe("agruparFiltrosPorBanda", () => {
     expect(bandas.map((b) => b.id)).toEqual(["todas", "tu-turno", "supervisor", "participante", "cerrados"]);
     expect(bandas.find((b) => b.id === "tu-turno")?.filtros.map((f) => f.id)).toEqual([
       "pendientes",
+      "observadas-supervisor",
       "reparadas",
     ]);
   });
@@ -119,6 +130,10 @@ describe("agruparFiltrosPorBanda", () => {
     expect(bandas.find((b) => b.id === "tu-turno")?.filtros.map((f) => f.id)).toEqual([
       "observaciones",
       "finalizar",
+    ]);
+    expect(bandas.find((b) => b.id === "evaluador")?.filtros.map((f) => f.id)).toEqual([
+      "esperando-evaluacion",
+      "esperando-evaluacion-corregida",
     ]);
   });
 });
@@ -137,7 +152,26 @@ describe("gruposVisibles", () => {
 
   it("en un filtro muestra la sección aunque esté vacía", () => {
     const grupos = gruposVisibles(filtros, "b", () => []);
-    expect(grupos).toEqual([{ id: "b", label: "B", banda: "participante", items: [] }]);
+    expect(grupos).toEqual([
+      { id: "b", label: "B", descripcion: undefined, banda: "participante", items: [] },
+    ]);
+  });
+
+  it("expone la explicación de cada filtro en la sección", () => {
+    const grupos = gruposVisibles(FILTROS_EVALUADOR, "pendientes", () => []);
+    expect(grupos[0]?.descripcion).toMatch(/primer envío/i);
+    expect(grupos[0]?.descripcion).not.toMatch(/supervisor/i);
+    const observadas = gruposVisibles(FILTROS_EVALUADOR, "observadas-supervisor", () => []);
+    expect(observadas[0]?.descripcion).toMatch(/devolvió/i);
+    const supervisor = gruposVisibles(FILTROS_SUPERVISOR, "observaciones", () => []);
+    expect(supervisor[0]?.descripcion).toMatch(/evaluador/i);
+  });
+
+  it("todos los filtros de lista tienen explicación", () => {
+    for (const filtro of [...FILTROS_EVALUADOR, ...FILTROS_SUPERVISOR]) {
+      if (filtro.id === "todas") continue;
+      expect(filtro.descripcion?.trim().length).toBeGreaterThan(20);
+    }
   });
 });
 

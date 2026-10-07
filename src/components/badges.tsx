@@ -58,19 +58,27 @@ export function BadgeAvanceContenido({
 export function BadgePostulacion({
   estado,
   cortoMovil = false,
+  vistaParticipante = false,
 }: {
   estado: string;
   cortoMovil?: boolean;
+  vistaParticipante?: boolean;
 }) {
   const key = (
     estado === "REPARADA_POR_EL_POSTULANTE" ? "REPARADA_POR_EL_EMPRENDEDOR" : estado
   ) as EstadoPostulacion;
-  const label = ESTADO_POSTULACION_LABEL[key] ?? estado;
+  const label =
+    key === "FINALIZADA" && vistaParticipante
+      ? "Aprobado y finalizado"
+      : (ESTADO_POSTULACION_LABEL[key] ?? estado);
   const cls = POSTULACION_CLASS[key] ?? "bg-slate-100";
   if (!cortoMovil) {
     return <span className={`badge ${cls}`}>{label}</span>;
   }
-  const corto = ESTADO_POSTULACION_LABEL_CORTO[key] ?? label;
+  const corto =
+    key === "FINALIZADA" && vistaParticipante
+      ? "Aprobado"
+      : (ESTADO_POSTULACION_LABEL_CORTO[key] ?? label);
   return (
     <span className={`badge ${cls}`}>
       <span className="badge-texto-largo">{label}</span>

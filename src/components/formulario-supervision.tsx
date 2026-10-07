@@ -7,15 +7,15 @@ import { EvalDetalleCelda } from "@/components/eval-detalle-head";
 import { FichaCasoMeta } from "@/components/ficha-caso-meta";
 import { FormularioEvaluacion } from "@/components/formulario-evaluacion";
 import { HistorialVersionesRespuesta } from "@/components/historial-versiones-respuesta";
-import { PanelEvaluacionPregunta } from "@/components/panel-evaluacion-pregunta";
-import { PanelObservacionGeneral, PanelSupervisionPendiente } from "@/components/panel-observacion-general";
+import { PanelHiloRevision } from "@/components/hilo-revision";
 import { PreguntaCampo } from "@/components/pregunta-campo";
+import { ResumenCambiosReenvio } from "@/components/resumen-cambios-reenvio";
+import { preguntasModificadasEnUltimoEnvio } from "@/lib/cambios-reenvio";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { avisoEntradaSupervisor } from "@/lib/aviso-entrada-caso";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
-import { notasParaEvaluacionGeneral, parseEscalaNotas } from "@/lib/preguntas";
-import { historialEvaluacion, revisionVigente } from "@/lib/revision-ciclo";
-import { historialSupervision } from "@/lib/supervision-ui";
+import { parseEscalaNotas } from "@/lib/preguntas";
+import { revisionParaEditar } from "@/lib/revision-ciclo";
 import type { DetalleFichaAdmin } from "@/lib/convocatoria-admin-data";
 
 export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
@@ -30,12 +30,36 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
   const ciclo = asignacion?.cicloSupervision ?? 1;
   const canEdit = Boolean(asignacion && asignacion.estado === "EN_SUPERVISION");
   const nombreCaso = etiquetaNombreCaso(data.nombreCaso);
-  const [avisoEntrada] = useState(() => {
-    const primera = data.asignaciones[0];
-    return primera
-      ? avisoEntradaSupervisor(primera.estado, primera.intencionPendiente)
-      : null;
-  });
+  const avisoEntrada = asignacion
+    ? avisoEntradaSupervisor(asignacion.estado, asignacion.intencionPendiente)
+    : null;
+  const idsModificadas = useMemo(() => {
+    return new Set(
+      preguntasModificadasEnUltimoEnvio({
+        respuestas: data.respuestas.map((respuesta) => ({
+          preguntaId: respuesta.preguntaId,
+          tipo: data.preguntas.find((pregunta) => pregunta.id === respuesta.preguntaId)?.tipo ?? "texto_corto",
+          versiones: respuesta.versiones,
+        })),
+        asignaciones: data.asignaciones.map((item) => ({
+          rondaActual: item.rondaActual,
+          revisiones: [
+            ...item.revisiones.map((revision) => ({
+              ronda: revision.ronda,
+              createdAt: revision.createdAt,
+            })),
+            ...item.revisionesGenerales.map((revision) => ({
+              ronda: revision.ronda,
+              createdAt: revision.createdAt,
+            })),
+          ],
+        })),
+      }),
+    );
+  }, [data.asignaciones, data.preguntas, data.respuestas]);
+  const preguntasModificadas = data.preguntas
+    .filter((pregunta) => idsModificadas.has(pregunta.id))
+    .map((pregunta) => ({ id: pregunta.id, enunciado: pregunta.enunciado }));
 
   if (!asignacion) {
     return (
@@ -45,6 +69,21 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
       </div>
     );
   }
+
+  const veredictosIniciales = esGeneral
+    ? {
+        general: revisionParaEditar(asignacion.supervisionesGenerales, ronda, ciclo)?.veredicto ?? "",
+      }
+    : Object.fromEntries(
+        data.preguntas.map((pregunta) => [
+          pregunta.id,
+          revisionParaEditar(
+            asignacion.supervisionesPregunta.filter((item) => item.preguntaId === pregunta.id),
+            ronda,
+            ciclo,
+          )?.veredicto ?? "",
+        ]),
+      );
 
   return (
     <>
@@ -62,12 +101,15 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
           {nombreCaso} · {data.convocatoriaTitulo}
         </h1>
       }
-      headerEvaluacion={`Revisión de ${asignacion.evaluadorNombre}`}
-      headerSupervision={
-        data.supervisorNombre
-          ? `Tu revisión de la evaluación de ${asignacion.evaluadorNombre}`
-          : "Supervisión"
+      headerEvaluacion={esGeneral ? "Comentario del caso" : "Comentarios por pregunta"}
+      veredictoSupervisionInicial={
+        esGeneral
+          ? (asignacion.supervisionesGenerales.find(
+              (item) => item.ronda === ronda && item.ciclo === ciclo,
+            )?.veredicto ?? "")
+          : ""
       }
+      veredictosIniciales={veredictosIniciales}
       meta={
         <div className="space-y-3">
           <FichaCasoMeta
@@ -102,14 +144,19 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
           ) : null}
         </div>
       }
-      caso={data.preguntas.map((pregunta) => {
+      caso={
+        <>
+          <ResumenCambiosReenvio preguntas={preguntasModificadas} />
+          {data.preguntas.map((pregunta) => {
         const respuesta = data.respuestas.find((item) => item.preguntaId === pregunta.id);
+        const modificada = idsModificadas.has(pregunta.id);
         return (
           <EvalDetalleCelda key={pregunta.id} panel="caso">
             <PreguntaCampo
               pregunta={pregunta}
               respuesta={respuesta ?? null}
               disabled
+              modificada={modificada}
               acciones={
                 respuesta?.versiones && respuesta.versiones.length > 0 ? (
                   <HistorialVersionesRespuesta
@@ -122,6 +169,7 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
                       createdAt: version.createdAt,
                       numero: respuesta.versiones.length - index,
                     }))}
+                    modificada={modificada}
                   />
                 ) : null
               }
@@ -129,97 +177,51 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
           </EvalDetalleCelda>
         );
       })}
+        </>
+      }
       evaluacion={
         esGeneral ? (
           <EvalDetalleCelda panel="eval">
-            <PanelObservacionGeneral
-              canEdit={false}
-              ronda={ronda}
-              cicloActual={ciclo}
-              namePrefix="eval-"
-              nombreResponsable={asignacion.evaluadorNombre}
-              notasPreguntas={notasParaEvaluacionGeneral(data.preguntas, asignacion.revisiones, ronda, ciclo)}
-              veredictoInicial={
-                revisionVigente(asignacion.revisionesGenerales, ronda, ciclo)?.veredicto
-              }
-              comentarioInicial={
-                revisionVigente(asignacion.revisionesGenerales, ronda, ciclo)?.comentario
-              }
-              historial={historialEvaluacion(asignacion.revisionesGenerales)}
+            <PanelHiloRevision
+              audiencia="equipo"
+              asignacion={{
+                estado: asignacion.estado,
+                rondaActual: ronda,
+                cicloSupervision: ciclo,
+              }}
+              revisiones={asignacion.revisionesGenerales}
+              supervisiones={asignacion.supervisionesGenerales}
+              nombreEvaluador={asignacion.evaluadorNombre}
+              nombreSupervisor={data.supervisorNombre}
+              canEdit={canEdit}
+              rolEditor={canEdit ? "supervisor" : null}
+              preguntasNotas={data.preguntas}
+              revisionesNotas={asignacion.revisiones}
             />
           </EvalDetalleCelda>
         ) : (
           data.preguntas.map((pregunta) => {
-            const actual = revisionVigente(
-              asignacion.revisiones.filter((item) => item.preguntaId === pregunta.id),
-              ronda,
-              ciclo,
-            );
-            const historial = asignacion.revisiones.filter((item) => item.preguntaId === pregunta.id);
             const escala = pregunta.conNotas ? parseEscalaNotas(pregunta.escalaNotas) : [];
             return (
               <EvalDetalleCelda key={pregunta.id} panel="eval">
-                <PanelEvaluacionPregunta
+                <PanelHiloRevision
+                  audiencia="equipo"
+                  asignacion={{
+                    estado: asignacion.estado,
+                    rondaActual: ronda,
+                    cicloSupervision: ciclo,
+                  }}
                   preguntaId={pregunta.id}
-                  canEdit={false}
-                  ronda={ronda}
-                  cicloActual={ciclo}
-                  veredictoInicial={actual?.veredicto}
-                  comentarioInicial={actual?.comentario}
-                  notaInicial={actual?.nota}
                   escala={escala}
-                  namePrefix="eval-"
-                  nombreResponsable={asignacion.evaluadorNombre}
-                  historial={historialEvaluacion(historial)}
-                />
-              </EvalDetalleCelda>
-            );
-          })
-        )
-      }
-      supervision={
-        esGeneral ? (
-          <EvalDetalleCelda panel="sup">
-            {!canEdit && asignacion.supervisionesGenerales.length === 0 ? (
-              <PanelSupervisionPendiente />
-            ) : (
-              <PanelObservacionGeneral
-                canEdit={canEdit}
-                ronda={ciclo}
-                tipo="supervision"
-                nombreResponsable={data.supervisorNombre}
-                veredictoInicial={
-                  asignacion.supervisionesGenerales.find(
-                    (item) => item.ronda === ronda && item.ciclo === ciclo,
-                  )?.veredicto
-                }
-                comentarioInicial={
-                  asignacion.supervisionesGenerales.find(
-                    (item) => item.ronda === ronda && item.ciclo === ciclo,
-                  )?.comentario
-                }
-                historial={historialSupervision(asignacion.supervisionesGenerales)}
-              />
-            )}
-          </EvalDetalleCelda>
-        ) : (
-          data.preguntas.map((pregunta) => {
-            const supervisiones = asignacion.supervisionesPregunta.filter(
-              (item) => item.preguntaId === pregunta.id,
-            );
-            const actualSup = supervisiones.find((item) => item.ronda === ronda && item.ciclo === ciclo);
-            return (
-              <EvalDetalleCelda key={pregunta.id} panel="sup">
-                <PanelEvaluacionPregunta
-                  preguntaId={pregunta.id}
+                  revisiones={asignacion.revisiones.filter((item) => item.preguntaId === pregunta.id)}
+                  supervisiones={asignacion.supervisionesPregunta.filter(
+                    (item) => item.preguntaId === pregunta.id,
+                  )}
+                  nombreEvaluador={asignacion.evaluadorNombre}
+                  nombreSupervisor={data.supervisorNombre}
                   canEdit={canEdit}
-                  ronda={ciclo}
-                  veredictoInicial={actualSup?.veredicto}
-                  comentarioInicial={actualSup?.comentario}
-                  escala={[]}
-                  tipo="supervision"
-                  nombreResponsable={data.supervisorNombre}
-                  historial={historialSupervision(supervisiones)}
+                  rolEditor={canEdit ? "supervisor" : null}
+                  respuestaModificada={idsModificadas.has(pregunta.id)}
                 />
               </EvalDetalleCelda>
             );

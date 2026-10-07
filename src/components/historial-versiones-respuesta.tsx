@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { Modal } from "@/components/modal";
 import { AdjuntosRespuesta, formatValorRespuesta } from "@/components/pregunta-campo";
-import { parseArchivos } from "@/lib/preguntas";
+import { TextoLargoVista } from "@/components/texto-largo-vista";
+import { parseArchivos, parseValor } from "@/lib/preguntas";
+import { versionesDistintas } from "@/lib/versiones-respuesta";
 
 function IconoHistorial() {
   return (
@@ -33,6 +35,11 @@ function IconoHistorial() {
   );
 }
 
+function htmlVersion(valorRaw: string): string {
+  const valor = parseValor(valorRaw);
+  return typeof valor === "string" ? valor : "";
+}
+
 export type VersionHistorial = {
   id: string;
   valor: string;
@@ -45,25 +52,30 @@ export function HistorialVersionesRespuesta({
   versiones,
   tipo,
   opciones,
+  modificada = false,
 }: {
   versiones: VersionHistorial[];
   tipo: string;
   opciones: string;
+  modificada?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
-  const cantidad = versiones.length;
-  if (cantidad === 0) return null;
+  const visibles = versionesDistintas(versiones, tipo).map((version, index, lista) => ({
+    ...version,
+    numero: lista.length - index,
+  }));
+  const cantidad = visibles.length;
+  if (cantidad < 2) return null;
 
-  const conCambios = cantidad > 1;
-  const etiqueta = conCambios
-    ? `Historial de versiones (${cantidad})`
-    : "Historial de versiones";
+  const etiqueta = modificada
+    ? `Esta respuesta cambió en el último envío. Modificada (${cantidad})`
+    : `Modificada (${cantidad})`;
 
   return (
     <>
-      <div className={`historial-versiones ${conCambios ? "is-changed" : "is-single"}`} data-tour="historial-versiones">
-        <span className="historial-versiones-label">Versiones</span>
+      <div className="historial-versiones is-changed" data-tour="historial-versiones">
+        <span className="historial-versiones-label">Modificada</span>
         <button
           type="button"
           className="historial-versiones-btn"
@@ -72,27 +84,25 @@ export function HistorialVersionesRespuesta({
           onClick={() => setOpen(true)}
         >
           <IconoHistorial />
-          {conCambios ? (
-            <span className="historial-versiones-count" aria-hidden="true">
-              {cantidad}
-            </span>
-          ) : null}
+          <span className="historial-versiones-count" aria-hidden="true">
+            {cantidad}
+          </span>
         </button>
       </div>
 
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Historial de versiones"
+        title="Modificada"
         tall
         className="modal-historial-versiones"
       >
         <ol className="historial-feed">
-          {versiones.map((version, index) => (
+          {visibles.map((version, index) => (
             <li key={version.id} className="historial-feed-item">
               <div className="historial-feed-rail" aria-hidden="true">
                 <span className="historial-feed-dot" />
-                {index < versiones.length - 1 ? <span className="historial-feed-line" /> : null}
+                {index < visibles.length - 1 ? <span className="historial-feed-line" /> : null}
               </div>
               <div className="historial-feed-card">
                 <div className="historial-feed-meta">
@@ -102,9 +112,15 @@ export function HistorialVersionesRespuesta({
                 <time className="historial-feed-date" dateTime={version.createdAt}>
                   {new Date(version.createdAt).toLocaleString("es-CL")}
                 </time>
-                <p className="historial-feed-valor">
-                  {formatValorRespuesta(version.valor, version.archivos, tipo, opciones)}
-                </p>
+                {tipo === "texto_largo" ? (
+                  <div className="historial-feed-valor">
+                    <TextoLargoVista html={htmlVersion(version.valor)} />
+                  </div>
+                ) : (
+                  <p className="historial-feed-valor">
+                    {formatValorRespuesta(version.valor, version.archivos, tipo, opciones)}
+                  </p>
+                )}
                 <AdjuntosRespuesta archivos={parseArchivos(version.archivos)} />
               </div>
             </li>

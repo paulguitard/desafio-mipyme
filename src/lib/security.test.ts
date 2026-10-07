@@ -12,6 +12,26 @@ describe("sanitizeRichText", () => {
     expect(clean).not.toMatch(/onclick/i);
     expect(clean).toMatch(/ok/);
   });
+
+  it("conserva negrita, destacado, tamaño y alineación del editor", () => {
+    const html =
+      '<p style="text-align: center"><span style="font-size: 1.25rem"><mark data-color="#fef08a" style="background-color: #fef08a; color: inherit"><strong>Hola</strong></mark></span></p>';
+    const clean = sanitizeRichText(html);
+    expect(clean).toContain("<strong>Hola</strong>");
+    expect(clean).toContain('data-color="#fef08a"');
+    expect(clean).toContain("background-color:#fef08a");
+    expect(clean).toContain("font-size:1.25rem");
+    expect(clean).toContain("text-align:center");
+  });
+
+  it("descarta estilos que no son del editor", () => {
+    const clean = sanitizeRichText(
+      '<p style="background-image: url(javascript:alert(1))">x</p><span style="font-size: 48px; color: red">y</span><mark data-color="red" style="background-color: red">z</mark>',
+    );
+    expect(clean).not.toMatch(/javascript|background-image|48px|color:\s*red|data-color/i);
+    expect(clean).toMatch(/x/);
+    expect(clean).toMatch(/<mark>z<\/mark>|<mark>z<\/mark>/);
+  });
 });
 
 describe("publicUploadUrl", () => {

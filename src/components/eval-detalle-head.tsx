@@ -24,7 +24,7 @@ export function useEvalPanelesColapsables() {
 
 function etiquetaPanel(panel: "eval" | "sup", collapsed: boolean) {
   if (panel === "eval") {
-    return collapsed ? "Ver evaluación" : "Ocultar evaluación";
+    return collapsed ? "Ver evaluación" : "Ocultar panel";
   }
   return collapsed ? "Ver supervisión" : "Ocultar supervisión";
 }

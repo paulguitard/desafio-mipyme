@@ -1,7 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+
+function quitarInerte(node: HTMLElement) {
+  if (node.hasAttribute("inert")) node.removeAttribute("inert");
+  for (const hijo of node.querySelectorAll("[inert]")) hijo.removeAttribute("inert");
+}
+
+function mostrarModal(node: HTMLDialogElement) {
+  if (!node.open) node.showModal();
+  quitarInerte(node);
+}
+
+export function cerrarDialogDesde(target: EventTarget | null) {
+  if (!(target instanceof Element)) return;
+  const dialog = target.closest("dialog");
+  if (!(dialog instanceof HTMLDialogElement) || !dialog.open) return;
+  dialog.dataset.cierreIntencional = "1";
+  dialog.close();
+}
 
 export function Modal({
   open,
@@ -17,6 +35,7 @@ export function Modal({
   tourContexto,
   tourAnclaTitulo,
   sinCerrar,
+  cierreExplicito,
 }: {
   open: boolean;
   title: ReactNode;
@@ -31,11 +50,17 @@ export function Modal({
   tourContexto?: string;
   tourAnclaTitulo?: string;
   sinCerrar?: boolean;
+  /** Solo se cierra con el botón de la acción, no con el fondo ni Escape. */
+  cierreExplicito?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const openRef = useRef(open);
   openRef.current = open;
   const [portalListo, setPortalListo] = useState(false);
+  const setDialogRef = useCallback((node: HTMLDialogElement | null) => {
+    if (node === null && ref.current?.open) cerrarDialogDesde(ref.current);
+    ref.current = node;
+  }, []);
 
   const className = [
     "modal-dialog",
@@ -52,38 +77,59 @@ export function Modal({
     setPortalListo(true);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const node = ref.current;
     if (!node) return;
-    if (open && !node.open) node.showModal();
-    if (!open && node.open) node.close();
+    if (open && !node.open) mostrarModal(node);
+    if (!open && node.open) cerrarDialogDesde(node);
+    if (node.open) quitarInerte(node);
+  }, [open, portalListo]);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || !open) return;
+    quitarInerte(node);
+    const observer = new MutationObserver(() => quitarInerte(node));
+    observer.observe(node, { attributes: true, subtree: true, attributeFilter: ["inert"] });
+    return () => observer.disconnect();
   }, [open, portalListo]);
 
   if (!portalListo) return null;
 
   return createPortal(
     <dialog
-      ref={ref}
+      ref={setDialogRef}
       className={className}
       data-tour-contexto={tourContexto || undefined}
       onCancel={(event) => {
         event.preventDefault();
-        onClose();
+        if (!cierreExplicito) onClose();
       }}
-      onClose={() => {
-        // Si otro dialog anidado provocó un close nativo, reabrimos.
+      onClose={(event) => {
+        const node = event.currentTarget;
+        if (node.dataset.cierreIntencional === "1") {
+          delete node.dataset.cierreIntencional;
+          return;
+        }
+        // Si otro dialog provocó un close nativo, reabrimos.
         if (openRef.current) {
           requestAnimationFrame(() => {
-            const node = ref.current;
-            if (node && openRef.current && !node.open) node.showModal();
+            const actual = ref.current;
+            if (actual?.isConnected && openRef.current && !actual.open) {
+              mostrarModal(actual);
+            }
           });
         }
       }}
       onClick={(event) => {
+        if (cierreExplicito) return;
         if (event.target === ref.current) onClose();
       }}
     >
-      <div className="modal-panel">
+      <div
+        className="modal-panel"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="modal-chrome">
           <div className="flex items-center justify-between gap-4">
             <h2 className="modal-title text-2xl font-semibold text-navy" data-tour={tourAnclaTitulo}>

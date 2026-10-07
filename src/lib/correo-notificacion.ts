@@ -302,7 +302,47 @@ export async function avisarTrasAprobacionSupervisor(input: {
       vars: {
         nombre: asignacion.postulacion.postulante.name,
         enlace: urlCasoParticipante(asignacion.postulacion.id),
-        actor: input.actorNombre,
+        ...caso,
+      },
+    });
+  }
+}
+
+export async function avisarCasoAprobado(postulacionId: string) {
+  const postulacion = await prisma.postulacion.findUnique({
+    where: { id: postulacionId },
+    select: {
+      ...casoSelect,
+      postulante: { select: { name: true, email: true } },
+      asignaciones: {
+        select: {
+          id: true,
+          evaluador: { select: { name: true, email: true } },
+        },
+      },
+    },
+  });
+  if (!postulacion) return;
+  const caso = contextoCaso(postulacion);
+  if (postulacion.postulante.email) {
+    await notifyNovedadCaso({
+      tipo: "CASO_APROBADO",
+      to: postulacion.postulante.email,
+      vars: {
+        nombre: postulacion.postulante.name,
+        enlace: urlCasoParticipante(postulacionId),
+        ...caso,
+      },
+    });
+  }
+  for (const asignacion of postulacion.asignaciones) {
+    if (!asignacion.evaluador.email) continue;
+    await notifyNovedadCaso({
+      tipo: "CASO_APROBADO",
+      to: asignacion.evaluador.email,
+      vars: {
+        nombre: asignacion.evaluador.name,
+        enlace: urlEvaluacion(asignacion.id),
         ...caso,
       },
     });

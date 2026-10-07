@@ -39,6 +39,7 @@ export type FiltroCaso = {
   id: string;
   label: string;
   labelCorto?: string;
+  descripcion?: string;
   banda: BandaPelota;
   estados?: readonly EstadoAsignacion[];
 };
@@ -49,7 +50,18 @@ export const FILTROS_EVALUADOR: FiltroCaso[] = [
     id: "pendientes",
     label: "Pendientes",
     banda: "tu-turno",
-    estados: ["PENDIENTE", "EN_REVISION", "DEVUELTA_SUPERVISOR"],
+    estados: ["PENDIENTE", "EN_REVISION"],
+    descripcion:
+      "Primer envío del participante: todavía no hay una evaluación enviada.",
+  },
+  {
+    id: "observadas-supervisor",
+    label: "Observadas por el supervisor",
+    labelCorto: "Observadas",
+    banda: "tu-turno",
+    estados: ["DEVUELTA_SUPERVISOR"],
+    descripcion:
+      "El supervisor revisó tu evaluación y te la devolvió con observaciones. Ajusta tu revisión y vuelve a enviarla.",
   },
   {
     id: "reparadas",
@@ -57,6 +69,8 @@ export const FILTROS_EVALUADOR: FiltroCaso[] = [
     labelCorto: "Reparadas",
     banda: "tu-turno",
     estados: ["REPARADA"],
+    descripcion:
+      "Casos que ya evaluaste y el participante corrigió o actualizó para que los vuelvas a revisar.",
   },
   {
     id: "supervision",
@@ -64,6 +78,7 @@ export const FILTROS_EVALUADOR: FiltroCaso[] = [
     labelCorto: "Supervisión",
     banda: "supervisor",
     estados: ["EN_SUPERVISION"],
+    descripcion: "Casos que ya enviaste al supervisor y están a la espera de su revisión.",
   },
   {
     id: "observaciones",
@@ -71,8 +86,15 @@ export const FILTROS_EVALUADOR: FiltroCaso[] = [
     labelCorto: "Respuesta",
     banda: "participante",
     estados: ["CON_OBSERVACIONES"],
+    descripcion: "Casos con observaciones enviadas al participante, a la espera de que las corrija.",
   },
-  { id: "finalizadas", label: "Finalizadas", banda: "cerrados", estados: ["FINALIZADA"] },
+  {
+    id: "finalizadas",
+    label: "Finalizadas",
+    banda: "cerrados",
+    estados: ["FINALIZADA"],
+    descripcion: "Casos cerrados. Ya no requieren acción tuya.",
+  },
 ];
 
 export const FILTROS_SUPERVISOR: FiltroCaso[] = [
@@ -82,30 +104,50 @@ export const FILTROS_SUPERVISOR: FiltroCaso[] = [
     label: "Observaciones por revisar",
     labelCorto: "Observaciones",
     banda: "tu-turno",
+    descripcion:
+      "El evaluador te envió observaciones para que las revises: puedes proceder o devolverlas.",
   },
   {
     id: "finalizar",
     label: "Finalización por revisar",
     labelCorto: "Finalización",
     banda: "tu-turno",
+    descripcion:
+      "El evaluador pidió finalizar el caso. Revisa y confirma el cierre o devuelve observaciones.",
   },
   {
     id: "esperando-evaluacion",
     label: "Esperando evaluación",
     labelCorto: "Evaluación",
     banda: "evaluador",
+    descripcion:
+      "Casos en manos del evaluador: primer envío, en revisión o reparados por el participante.",
+  },
+  {
+    id: "esperando-evaluacion-corregida",
+    label: "Esperando evaluación corregida",
+    labelCorto: "Corregida",
+    banda: "evaluador",
+    descripcion:
+      "Casos que devolviste al evaluador. Están a la espera de que envíe la evaluación corregida.",
   },
   {
     id: "esperando-respuesta",
     label: "Esperando respuesta",
     labelCorto: "Respuesta",
     banda: "participante",
+    descripcion: "Casos con observaciones ya enviadas al participante, a la espera de su corrección.",
   },
-  { id: "finalizadas", label: "Finalizadas", banda: "cerrados" },
+  {
+    id: "finalizadas",
+    label: "Finalizadas",
+    banda: "cerrados",
+    descripcion: "Casos cerrados. Ya no requieren acción tuya.",
+  },
 ];
 
 const FILTRO_SUPERVISOR_LEGADO: Record<string, string> = {
-  devueltas: "esperando-evaluacion",
+  devueltas: "esperando-evaluacion-corregida",
   en_curso: "esperando-evaluacion",
 };
 
@@ -115,8 +157,11 @@ const URGENCIA_PENDIENTE: Record<string, number> = {
   PENDIENTE: 2,
 };
 
-export function grupoFiltroEvaluador(estado: string): string {
-  if (estado === "PENDIENTE" || estado === "EN_REVISION" || estado === "DEVUELTA_SUPERVISOR") {
+export function grupoFiltroEvaluador(estado: string, cicloSupervision = 1): string {
+  if (estado === "DEVUELTA_SUPERVISOR" || (estado === "EN_REVISION" && cicloSupervision > 1)) {
+    return "observadas-supervisor";
+  }
+  if (estado === "PENDIENTE" || estado === "EN_REVISION") {
     return "pendientes";
   }
   if (estado === "REPARADA") return "reparadas";
@@ -150,7 +195,18 @@ export function resolverFiltroSupervisor(filtro?: string) {
 export type AsignacionSupervisionVista = {
   estado: string;
   intencionPendiente: string | null;
+  cicloSupervision?: number;
 };
+
+export function evaluadorDebeCorregirEvaluacion(asignacion: {
+  estado: string;
+  cicloSupervision?: number;
+}) {
+  return (
+    asignacion.estado === "DEVUELTA_SUPERVISOR" ||
+    (asignacion.estado === "EN_REVISION" && (asignacion.cicloSupervision ?? 1) > 1)
+  );
+}
 
 export function supervisorCoincideFiltro(
   filtroId: string,
@@ -166,8 +222,13 @@ export function supervisorCoincideFiltro(
   if (filtroId === "esperando-respuesta") {
     return estadoSupervisionFicha(evals) === "esperando-respuesta";
   }
+  const esperaEvaluacion = estadoSupervisionFicha(evals) === "esperando-evaluacion";
+  const hayCorreccion = evals.some(evaluadorDebeCorregirEvaluacion);
+  if (filtroId === "esperando-evaluacion-corregida") {
+    return esperaEvaluacion && hayCorreccion;
+  }
   if (filtroId === "esperando-evaluacion") {
-    return estadoSupervisionFicha(evals) === "esperando-evaluacion";
+    return esperaEvaluacion && !hayCorreccion;
   }
   if (filtroId === "finalizadas") {
     return evals.length > 0 && evals.every((a) => a.estado === "FINALIZADA");
@@ -202,7 +263,14 @@ export function gruposVisibles<T>(
   filtros: FiltroCaso[],
   activoId: string,
   itemsDe: (filtroId: string) => T[],
-): { id: string; label: string; labelCorto?: string; banda: BandaPelota; items: T[] }[] {
+): {
+  id: string;
+  label: string;
+  labelCorto?: string;
+  descripcion?: string;
+  banda: BandaPelota;
+  items: T[];
+}[] {
   const secciones = filtros.filter((f) => f.id !== "todas");
   const fuente = activoId === "todas" ? secciones : secciones.filter((f) => f.id === activoId);
   return fuente
@@ -210,6 +278,7 @@ export function gruposVisibles<T>(
       id: f.id,
       label: f.label,
       labelCorto: f.labelCorto,
+      descripcion: f.descripcion,
       banda: f.banda,
       items: itemsDe(f.id),
     }))

@@ -100,7 +100,7 @@ export default async function ParticipanteHomePage() {
                     cortoMovil
                   />
                 ) : (
-                  <BadgePostulacion estado={item.estado} cortoMovil />
+                  <BadgePostulacion estado={item.estado} cortoMovil vistaParticipante />
                 )}
                 <svg className="caso-fila-flecha" viewBox="0 0 16 16" aria-hidden="true">
                   <path
