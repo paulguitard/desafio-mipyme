@@ -1,7 +1,7 @@
 import { parseValor } from "@/lib/preguntas";
 
 export type PreguntaFiltro = { id: string; enunciado: string; obligatoria: boolean; opciones?: string };
-export type RespuestaFiltro = { preguntaId: string; valor: string };
+export type RespuestaFiltro = { preguntaId: string; valor: string; archivos?: string };
 export type AsignacionFiltro = { evaluadorId: string; estado: string };
 export type PostulacionFiltroItem = {
   estado: string;
@@ -16,6 +16,7 @@ export type PostulacionFiltroItem = {
 
 export const ESTADOS_RESPUESTA_FICHA: EstadoRespuestaFicha[] = [
   "pendiente",
+  "borrador",
   "observaciones",
   "esperando-evaluacion",
   "completa",
@@ -23,6 +24,7 @@ export const ESTADOS_RESPUESTA_FICHA: EstadoRespuestaFicha[] = [
 
 export type EstadoRespuestaFicha =
   | "pendiente"
+  | "borrador"
   | "observaciones"
   | "esperando-evaluacion"
   | "completa";
@@ -95,6 +97,30 @@ export function respuestaConValor(valor: string) {
   return String(parsed).trim().length > 0;
 }
 
+function respuestaTieneContenido(respuesta: RespuestaFiltro | undefined) {
+  if (!respuesta) return false;
+  if (respuestaConValor(respuesta.valor)) return true;
+  if (!respuesta.archivos) return false;
+  try {
+    const parsed = JSON.parse(respuesta.archivos) as unknown;
+    return Array.isArray(parsed) && parsed.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+const ESTADOS_EVALUACION_REALIZADA = new Set([
+  "EN_SUPERVISION",
+  "DEVUELTA_SUPERVISOR",
+  "CON_OBSERVACIONES",
+  "REPARADA",
+  "FINALIZADA",
+]);
+
+function evaluacionYaRealizada(asignaciones: { estado: string }[]) {
+  return asignaciones.some((item) => ESTADOS_EVALUACION_REALIZADA.has(item.estado));
+}
+
 export function estadoRespuestaFicha(
   postulacion: PostulacionFiltroItem,
   preguntas: PreguntaFiltro[],
@@ -115,25 +141,29 @@ export function estadoRespuestaFicha(
 
   if (postulacion.enviadaAt) return "esperando-evaluacion";
 
-  const porPregunta = new Map(
-    postulacion.respuestas.map((item) => [item.preguntaId, item.valor] as const),
-  );
+  const porPregunta = new Map(postulacion.respuestas.map((item) => [item.preguntaId, item] as const));
   const respondidas = preguntas.filter((pregunta) =>
-    respuestaConValor(porPregunta.get(pregunta.id) ?? ""),
+    respuestaTieneContenido(porPregunta.get(pregunta.id)),
   ).length;
 
   if (respondidas === 0) return "pendiente";
+  if (!evaluacionYaRealizada(postulacion.asignaciones)) return "borrador";
+  return "pendiente";
+}
 
+export function formularioListoParaEnviar(
+  postulacion: PostulacionFiltroItem,
+  preguntas: PreguntaFiltro[],
+) {
+  const porPregunta = new Map(postulacion.respuestas.map((item) => [item.preguntaId, item] as const));
   const obligatorias = preguntas.filter((pregunta) => pregunta.obligatoria);
   const base = obligatorias.length > 0 ? obligatorias : preguntas;
-  const completa =
-    Boolean(postulacion.enviadaAt) ||
-    base.every((pregunta) => respuestaConValor(porPregunta.get(pregunta.id) ?? ""));
-
-  return completa ? "completa" : "pendiente";
+  if (base.length === 0) return false;
+  return base.every((pregunta) => respuestaTieneContenido(porPregunta.get(pregunta.id)));
 }
 
 export function etiquetaEstadoRespuestaFicha(estado: EstadoRespuestaFicha) {
+  if (estado === "borrador") return "Borrador";
   if (estado === "observaciones") return "Respondiendo observaciones";
   if (estado === "esperando-evaluacion") return "Esperando evaluación";
   if (estado === "completa") return "Completa";
@@ -152,6 +182,7 @@ export function resumenNumerosAsesoria(
   const total = postulaciones.length;
   const porEstado: Record<EstadoRespuestaFicha, number> = {
     pendiente: 0,
+    borrador: 0,
     observaciones: 0,
     "esperando-evaluacion": 0,
     completa: 0,

@@ -353,8 +353,8 @@ export function ConvocatoriasAdmin({
                 </span>
                 <span className="modal-title-meta">
                   {panelEsContenido
-                    ? `(${evaluacion?.postulaciones.length ?? evaluacionConteo}) Participantes`
-                    : `(${evaluacion?.postulaciones.length ?? evaluacionConteo}) Respuestas`}
+                    ? `(${evaluacion?.totalPostulaciones ?? evaluacionConteo}) Participantes`
+                    : `(${evaluacion?.totalPostulaciones ?? evaluacionConteo}) Respuestas`}
                 </span>
               </>
             ) : null}

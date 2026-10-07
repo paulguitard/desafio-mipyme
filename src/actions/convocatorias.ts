@@ -755,9 +755,9 @@ export async function cargarRespuestasConvocatoria(convocatoriaId: string) {
   return { data };
 }
 
-export async function cargarPanelEvaluacion(convocatoriaId: string, page = 1) {
+export async function cargarPanelEvaluacion(convocatoriaId: string) {
   await requireUser("ADMIN");
-  const data = await getPanelEvaluacion(convocatoriaId, page);
+  const data = await getPanelEvaluacion(convocatoriaId);
   if (!data) return { error: "Asesoría no encontrada." };
   return { data };
 }

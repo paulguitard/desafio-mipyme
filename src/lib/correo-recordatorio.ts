@@ -1,6 +1,7 @@
 import {
   estadoRespuestaFicha,
   ESTADOS_TURNO_EVALUADOR,
+  formularioListoParaEnviar,
   type PreguntaFiltro,
   type PostulacionFiltroItem,
 } from "@/lib/convocatoria-evaluacion-filtros";
@@ -28,7 +29,14 @@ export function recordatorioParticipante(
   preguntas: PreguntaFiltro[],
 ): RecordatorioParticipante {
   const estado = estadoRespuestaFicha(postulacion, preguntas);
-  if (estado === "pendiente") {
+  if (
+    estado === "borrador" &&
+    !postulacion.enviadaAt &&
+    formularioListoParaEnviar(postulacion, preguntas)
+  ) {
+    return { habilitado: true, tipo: "PARTICIPANTE_RECORDATORIO_COMPLETA" };
+  }
+  if (estado === "pendiente" || estado === "borrador") {
     return { habilitado: true, tipo: "PARTICIPANTE_RECORDATORIO_PENDIENTE" };
   }
   if (estado === "observaciones") {

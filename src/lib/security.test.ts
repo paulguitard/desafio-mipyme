@@ -97,6 +97,84 @@ describe("estadoRespuestaFicha", () => {
       ),
     ).toBe("completa");
   });
+
+  it("keeps an untouched first draft as pendiente", () => {
+    expect(
+      estadoRespuestaFicha(
+        { ...base, estado: "BORRADOR", enviadaAt: null, asignaciones: [] },
+        [{ id: "p1", enunciado: "Nombre", obligatoria: true }],
+      ),
+    ).toBe("pendiente");
+  });
+
+  it("marks a first draft with answers as borrador", () => {
+    expect(
+      estadoRespuestaFicha(
+        {
+          ...base,
+          estado: "BORRADOR",
+          enviadaAt: null,
+          asignaciones: [],
+          respuestas: [{ preguntaId: "p1", valor: "Mi caso" }],
+        },
+        [
+          { id: "p1", enunciado: "Nombre", obligatoria: true },
+          { id: "p2", enunciado: "Detalle", obligatoria: true },
+        ],
+      ),
+    ).toBe("borrador");
+  });
+
+  it("marks a filled first draft as borrador until an evaluation exists", () => {
+    expect(
+      estadoRespuestaFicha(
+        {
+          ...base,
+          estado: "BORRADOR",
+          enviadaAt: null,
+          asignaciones: [],
+          respuestas: [{ preguntaId: "p1", valor: "listo" }],
+        },
+        [{ id: "p1", enunciado: "Nombre", obligatoria: true }],
+      ),
+    ).toBe("borrador");
+  });
+
+  it("does not use borrador once an evaluation exists, even if the form still has answers", () => {
+    expect(
+      estadoRespuestaFicha(
+        {
+          ...base,
+          estado: "BORRADOR",
+          enviadaAt: null,
+          asignaciones: [{ evaluadorId: "e", estado: "REPARADA" }],
+          respuestas: [{ preguntaId: "p1", valor: "Mi caso" }],
+        },
+        [
+          { id: "p1", enunciado: "Nombre", obligatoria: true },
+          { id: "p2", enunciado: "Detalle", obligatoria: true },
+        ],
+      ),
+    ).toBe("pendiente");
+  });
+
+  it("keeps a submitted case out of borrador", () => {
+    expect(
+      estadoRespuestaFicha(
+        {
+          ...base,
+          estado: "ENVIADA",
+          enviadaAt: "2026-01-01",
+          asignaciones: [{ evaluadorId: "e", estado: "REPARADA" }],
+          respuestas: [{ preguntaId: "p1", valor: "Mi caso" }],
+        },
+        [
+          { id: "p1", enunciado: "Nombre", obligatoria: true },
+          { id: "p2", enunciado: "Detalle", obligatoria: true },
+        ],
+      ),
+    ).toBe("esperando-evaluacion");
+  });
 });
 
 describe("resumenNumerosAsesoria", () => {

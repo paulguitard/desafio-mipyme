@@ -8,20 +8,16 @@ import { notFound } from "next/navigation";
 
 export default async function MentoriaDetallePage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ page?: string }>;
 }) {
   const { id } = await params;
-  const { page: pageRaw } = await searchParams;
-  const page = Number(pageRaw ?? "1");
   const [mentoria, panel] = await Promise.all([
     prisma.convocatoria.findUnique({
       where: { id },
       include: { formulario: true },
     }),
-    getPanelEvaluacion(id, page),
+    getPanelEvaluacion(id),
   ]);
   if (!mentoria || !panel) notFound();
 
@@ -66,9 +62,6 @@ export default async function MentoriaDetallePage({
         poolSupervisores={panel.poolSupervisores}
         supervisoresDisponibles={panel.supervisoresDisponibles}
         postulaciones={panel.postulaciones}
-        page={panel.page}
-        pageSize={panel.pageSize}
-        totalPostulaciones={panel.totalPostulaciones}
       />
     </div>
   );

@@ -25,6 +25,24 @@ describe("recordatorioParticipante", () => {
     ).toEqual({ habilitado: true, tipo: "PARTICIPANTE_RECORDATORIO_PENDIENTE" });
   });
 
+  it("reminds a partial first draft the same way as an empty one", () => {
+    expect(
+      recordatorioParticipante(
+        {
+          ...base,
+          estado: "BORRADOR",
+          enviadaAt: null,
+          asignaciones: [],
+          respuestas: [{ preguntaId: "p1", valor: "algo" }],
+        },
+        [
+          { id: "p1", enunciado: "Nombre", obligatoria: true },
+          { id: "p2", enunciado: "Detalle", obligatoria: true },
+        ],
+      ),
+    ).toEqual({ habilitado: true, tipo: "PARTICIPANTE_RECORDATORIO_PENDIENTE" });
+  });
+
   it("reminds to submit when required answers are complete", () => {
     expect(
       recordatorioParticipante(

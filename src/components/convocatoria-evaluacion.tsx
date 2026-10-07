@@ -39,6 +39,7 @@ import { parseValor } from "@/lib/preguntas";
 import { ESCUELAS } from "@/lib/escuelas";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
 import { rutaFichaPublica } from "@/lib/ficha-publica";
+import { filasExcelLinks } from "@/lib/excel-links";
 import { esMentoriaContenido, parseTipoFormulario, type TipoFormulario } from "@/lib/tipo-formulario";
 import { workbookXlsx } from "@/lib/xlsx-workbook";
 import {
@@ -139,25 +140,8 @@ function casoResumen(postulacion: PostulacionItem): CasoPoolResumen {
   };
 }
 
-function urlFichaPublica(postulacion: PostulacionItem, origen: string) {
-  if (!postulacion.tokenPublico) return "";
-  return `${origen}${rutaFichaPublica(postulacion.tokenPublico)}`;
-}
-
-function filasExcelLinks(filas: PostulacionItem[], origen: string) {
-  return [
-    ["Nombre del caso", "Participante", "Correo", "Link"],
-    ...filas.map((postulacion) => [
-      etiquetaNombreCaso(postulacion.nombreCaso),
-      postulacion.emprendedorNombre,
-      normalizarCorreo(postulacion.emprendedorEmail),
-      urlFichaPublica(postulacion, origen),
-    ]),
-  ];
-}
-
-function descargarExcelLinks(filas: PostulacionItem[]) {
-  const bytes = workbookXlsx("Links", filasExcelLinks(filas, window.location.origin));
+function descargarExcelLinks(filas: PostulacionItem[], preguntas: PreguntaFiltro[]) {
+  const bytes = workbookXlsx("Links", filasExcelLinks(filas, window.location.origin, preguntas));
   const blob = new Blob([new Uint8Array(bytes)], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
@@ -496,9 +480,6 @@ export function ConvocatoriaEvaluacion({
   postulaciones,
   poolSupervisores = [],
   supervisoresDisponibles = [],
-  page = 1,
-  pageSize = 40,
-  totalPostulaciones,
   onMutated,
   tipo = "FEEDBACK",
   piezas = [],
@@ -513,9 +494,6 @@ export function ConvocatoriaEvaluacion({
   postulaciones: PostulacionItem[];
   poolSupervisores?: PoolItem[];
   supervisoresDisponibles?: Evaluador[];
-  page?: number;
-  pageSize?: number;
-  totalPostulaciones?: number;
   onMutated?: () => Promise<void> | void;
   tipo?: TipoFormulario;
   piezas?: { id: string; titulo: string }[];
@@ -1312,7 +1290,7 @@ export function ConvocatoriaEvaluacion({
                 className="btn btn-sm btn-secondary"
                 type="button"
                 disabled={respuestas.length === 0}
-                onClick={() => descargarExcelLinks(respuestas)}
+                onClick={() => descargarExcelLinks(respuestas, preguntas)}
               >
                 Descargar excel
               </button>
@@ -1447,10 +1425,11 @@ export function ConvocatoriaEvaluacion({
                 onChange={(event) => setFiltroEstadoRespuesta(event.target.value)}
               >
                 <option value="">Todos</option>
-                <option value="pendiente">Pendiente</option>
-                <option value="observaciones">Respondiendo observaciones</option>
-                <option value="esperando-evaluacion">Esperando evaluación</option>
-                <option value="completa">Completa</option>
+                {ESTADOS_RESPUESTA_FICHA.map((estado) => (
+                  <option key={estado} value={estado}>
+                    {etiquetaEstadoRespuestaFicha(estado)}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="field">
@@ -1525,24 +1504,6 @@ export function ConvocatoriaEvaluacion({
         </div>
 
         <div className="respuestas-lista space-y-3">
-          {typeof totalPostulaciones === "number" && totalPostulaciones > pageSize ? (
-            <p className="text-sm text-muted">
-              Página {page} de {Math.ceil(totalPostulaciones / pageSize)} ({totalPostulaciones} casos).{" "}
-              {page > 1 ? (
-                <a className="text-accent underline" href={`?page=${page - 1}`}>
-                  Anterior
-                </a>
-              ) : null}
-              {page * pageSize < totalPostulaciones ? (
-                <>
-                  {page > 1 ? " · " : null}
-                  <a className="text-accent underline" href={`?page=${page + 1}`}>
-                    Siguiente
-                  </a>
-                </>
-              ) : null}
-            </p>
-          ) : null}
           {respuestasFiltradas.length > 0 ? (
             esContenido ? (
             <div className="eval-lista-cabecera is-contenido" style={columnasContenido} aria-hidden="true">
@@ -1725,9 +1686,11 @@ export function ConvocatoriaEvaluacion({
                         ? "Esperando respuesta"
                         : estadoRespuesta === "pendiente"
                           ? "Respuesta pendiente"
-                          : puedeAsignarEval
-                            ? "Arrastra un evaluador aquí"
-                            : "Sin evaluadores asignados"}
+                          : estadoRespuesta === "borrador"
+                            ? "Respuesta en borrador"
+                            : puedeAsignarEval
+                              ? "Arrastra un evaluador aquí"
+                              : "Sin evaluadores asignados"}
                     </p>
                   ) : (
                     <ul className="eval-ficha-avatars">

@@ -33,8 +33,6 @@ function resumenVacio(): ResumenPool {
   };
 }
 
-export const PANEL_PAGE_SIZE = 40;
-
 export async function getRespuestasConvocatoria(id: string) {
   const convocatoria = await prisma.convocatoria.findUnique({
     where: { id },
@@ -82,17 +80,14 @@ export async function getRespuestasConvocatoria(id: string) {
   };
 }
 
-export async function getPanelEvaluacion(id: string, page = 1) {
+export async function getPanelEvaluacion(id: string) {
   const existente = await prisma.convocatoria.findUnique({
     where: { id },
     select: { id: true },
   });
   if (!existente) return null;
 
-  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
-  const skip = (safePage - 1) * PANEL_PAGE_SIZE;
-
-  const [convocatoria, totalPostulaciones, evaluadores, supervisores, asignacionesStats, supervisionStats] =
+  const [convocatoria, evaluadores, supervisores, asignacionesStats, supervisionStats] =
     await Promise.all([
     prisma.convocatoria.findUnique({
       where: { id },
@@ -117,7 +112,7 @@ export async function getPanelEvaluacion(id: string, page = 1) {
         postulaciones: {
           include: {
             postulante: { select: USER_PUBLIC_SELECT },
-            respuestas: { select: { preguntaId: true, valor: true } },
+            respuestas: { select: { preguntaId: true, valor: true, archivos: true } },
             vistasContenido: { select: { piezaId: true } },
             asignaciones: {
               include: { evaluador: { select: USER_PUBLIC_SELECT } },
@@ -126,12 +121,9 @@ export async function getPanelEvaluacion(id: string, page = 1) {
             supervision: { include: { supervisor: { select: USER_PUBLIC_SELECT } } },
           },
           orderBy: { createdAt: "desc" },
-          skip,
-          take: PANEL_PAGE_SIZE,
         },
       },
     }),
-    prisma.postulacion.count({ where: { convocatoriaId: id } }),
     prisma.user.findMany({
       where: { role: "EVALUADOR" },
       orderBy: { name: "asc" },
@@ -221,9 +213,7 @@ export async function getPanelEvaluacion(id: string, page = 1) {
     estado: convocatoria.estado,
     tipo: parseTipoFormulario(convocatoria.tipo),
     evaluacionesPorPostulacion: convocatoria.evaluacionesPorPostulacion,
-    page: safePage,
-    pageSize: PANEL_PAGE_SIZE,
-    totalPostulaciones,
+    totalPostulaciones: convocatoria.postulaciones.length,
     preguntas: convocatoria.formulario.preguntas.map((pregunta) => ({
       id: pregunta.id,
       enunciado: pregunta.enunciado,
@@ -295,6 +285,7 @@ export async function getPanelEvaluacion(id: string, page = 1) {
       respuestas: postulacion.respuestas.map((respuesta) => ({
         preguntaId: respuesta.preguntaId,
         valor: respuesta.valor,
+        archivos: respuesta.archivos,
       })),
       vistasPiezaIds: postulacion.vistasContenido.map((item) => item.piezaId),
       nombreCaso: postulacion.nombreCaso || extraerNombreCaso(convocatoria.formulario.preguntas, postulacion.respuestas),
