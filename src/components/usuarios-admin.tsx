@@ -274,36 +274,39 @@ export function UsuariosAdmin({
         {vista === "perfiles" ? (
           <PerfilesParticipantesAdmin perfiles={perfiles} />
         ) : (
-        <div className="card min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain" data-tour="usuarios-tabla">
-          <table className="w-full text-left">
+        <div
+          className="card min-h-0 overflow-auto overscroll-contain [scrollbar-gutter:stable]"
+          data-tour="usuarios-tabla"
+        >
+          <table className="w-full table-fixed text-left">
             <thead className="sticky top-0 z-10 bg-[var(--card)]">
               <tr className="border-b border-border">
-                <th className="whitespace-nowrap px-5 py-3.5">Nombre</th>
-                <th className="whitespace-nowrap px-5 py-3.5">Correo</th>
-                <th className="whitespace-nowrap px-5 py-3.5">Rol</th>
-                <th className="whitespace-nowrap px-5 py-3.5">Escuela</th>
-                <th className="whitespace-nowrap px-5 py-3.5">Origen</th>
-                <th className="whitespace-nowrap px-5 py-3.5">Acciones</th>
+                <th className="w-[18%] px-4 py-3.5">Nombre</th>
+                <th className="w-[26%] px-4 py-3.5">Correo</th>
+                <th className="w-[14%] px-4 py-3.5">Rol</th>
+                <th className="w-[16%] px-4 py-3.5">Escuela</th>
+                <th className="w-[14%] px-4 py-3.5">Origen</th>
+                <th className="w-[12%] px-4 py-3.5">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {visibles.length === 0 ? (
                 <tr>
-                    <td className="px-5 py-6 text-muted" colSpan={6}>
+                    <td className="px-4 py-6 text-muted" colSpan={6}>
                     No hay usuarios en este filtro.
                   </td>
                 </tr>
               ) : null}
               {visibles.map((user) => (
                 <tr key={user.id} className="border-b border-border">
-                  <td className="whitespace-nowrap px-5 py-3.5">{user.name}</td>
-                  <td className="whitespace-nowrap px-5 py-3.5">{normalizarCorreo(user.email)}</td>
-                  <td className="whitespace-nowrap px-5 py-3.5">{ROLE_LABELS[user.role as Role] ?? user.role}</td>
-                  <td className="whitespace-nowrap px-5 py-3.5">{user.escuela ?? "—"}</td>
-                  <td className="whitespace-nowrap px-5 py-3.5">
+                  <td className="break-words px-4 py-3.5">{user.name}</td>
+                  <td className="break-all px-4 py-3.5">{normalizarCorreo(user.email)}</td>
+                  <td className="px-4 py-3.5">{ROLE_LABELS[user.role as Role] ?? user.role}</td>
+                  <td className="break-words px-4 py-3.5">{user.escuela ?? "—"}</td>
+                  <td className="px-4 py-3.5">
                     {user.origen === USER_ORIGEN.REGISTRO ? "Registro propio" : "Admin"}
                   </td>
-                  <td className="whitespace-nowrap px-5 py-3.5">
+                  <td className="px-4 py-3.5">
                     <button className="btn btn-ghost" type="button" onClick={() => abrirEditar(user)}>
                       Editar
                     </button>

@@ -1,9 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Modal } from "@/components/modal";
 import { formatearRut } from "@/lib/rut";
 import { workbookXlsx } from "@/lib/xlsx-workbook";
 import { normalizarCorreo } from "@/lib/correo";
+
+export type DocumentoFormalizacion = {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  url: string;
+};
 
 export type PerfilParticipanteRow = {
   id: string;
@@ -14,6 +22,7 @@ export type PerfilParticipanteRow = {
   telefonoMovil: string | null;
   contactoWhatsapp: boolean;
   formalizacionEmpresa: boolean;
+  documentos: DocumentoFormalizacion[];
 };
 
 type FiltroBinario = { si: boolean; no: boolean };
@@ -37,6 +46,13 @@ function rutVisible(value: string | null) {
 
 function marca(value: boolean) {
   return value ? "Sí" : "No";
+}
+
+function etiquetaDocumento(doc: DocumentoFormalizacion) {
+  const nombre = doc.originalName.toLowerCase();
+  if (doc.mimeType.includes("pdf") || nombre.endsWith(".pdf")) return "PDF";
+  const ext = doc.originalName.split(".").pop()?.toUpperCase();
+  return ext && ext.length <= 5 ? ext : "DOC";
 }
 
 function filasExcel(filas: PerfilParticipanteRow[]) {
@@ -102,6 +118,7 @@ function CheckGrupo({
 export function PerfilesParticipantesAdmin({ perfiles }: { perfiles: PerfilParticipanteRow[] }) {
   const [filtroWhatsapp, setFiltroWhatsapp] = useState<FiltroBinario>(FILTRO_VACIO);
   const [filtroFormalizacion, setFiltroFormalizacion] = useState<FiltroBinario>(FILTRO_VACIO);
+  const [documentosDe, setDocumentosDe] = useState<PerfilParticipanteRow | null>(null);
 
   const visibles = useMemo(
     () =>
@@ -159,41 +176,90 @@ export function PerfilesParticipantesAdmin({ perfiles }: { perfiles: PerfilParti
         </p>
       </div>
 
-      <div className="card min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain">
-        <table className="w-full text-left">
+      <div className="card min-h-0 overflow-auto overscroll-contain [scrollbar-gutter:stable]">
+        <table className="w-full table-fixed text-left">
           <thead className="sticky top-0 z-10 bg-[var(--card)]">
             <tr className="border-b border-border">
-              <th className="whitespace-nowrap px-5 py-3.5">Nombre</th>
-              <th className="whitespace-nowrap px-5 py-3.5">Correo</th>
-              <th className="whitespace-nowrap px-5 py-3.5">Rut personal</th>
-              <th className="whitespace-nowrap px-5 py-3.5">Dirección personal</th>
-              <th className="whitespace-nowrap px-5 py-3.5">Teléfono móvil</th>
-              <th className="whitespace-nowrap px-5 py-3.5">WhatsApp</th>
-              <th className="whitespace-nowrap px-5 py-3.5">Formalización empresa</th>
+              <th className="w-[14%] px-4 py-3.5">Nombre</th>
+              <th className="w-[17%] px-4 py-3.5">Correo</th>
+              <th className="w-[11%] px-4 py-3.5">Rut personal</th>
+              <th className="w-[14%] px-4 py-3.5">Dirección personal</th>
+              <th className="w-[11%] px-4 py-3.5">Teléfono móvil</th>
+              <th className="w-[8%] px-4 py-3.5">WhatsApp</th>
+              <th className="w-[10%] px-4 py-3.5">Formalización empresa</th>
+              <th className="w-[15%] px-2 py-3.5">Documentos</th>
             </tr>
           </thead>
           <tbody>
             {visibles.length === 0 ? (
               <tr>
-                <td className="px-5 py-6 text-muted" colSpan={7}>
+                <td className="px-4 py-6 text-muted" colSpan={8}>
                   No hay participantes en este filtro.
                 </td>
               </tr>
             ) : null}
             {visibles.map((perfil) => (
               <tr key={perfil.id} className="border-b border-border">
-                <td className="whitespace-nowrap px-5 py-3.5">{perfil.name}</td>
-                <td className="whitespace-nowrap px-5 py-3.5">{normalizarCorreo(perfil.email)}</td>
-                <td className="whitespace-nowrap px-5 py-3.5">{rutVisible(perfil.rutPersonal)}</td>
-                <td className="px-5 py-3.5">{celda(perfil.direccionPersonal)}</td>
-                <td className="whitespace-nowrap px-5 py-3.5">{celda(perfil.telefonoMovil)}</td>
-                <td className="whitespace-nowrap px-5 py-3.5">{marca(perfil.contactoWhatsapp)}</td>
-                <td className="whitespace-nowrap px-5 py-3.5">{marca(perfil.formalizacionEmpresa)}</td>
+                <td className="break-words px-4 py-3.5">{perfil.name}</td>
+                <td className="break-all px-4 py-3.5">{normalizarCorreo(perfil.email)}</td>
+                <td className="px-4 py-3.5">{rutVisible(perfil.rutPersonal)}</td>
+                <td className="break-words px-4 py-3.5">{celda(perfil.direccionPersonal)}</td>
+                <td className="px-4 py-3.5">{celda(perfil.telefonoMovil)}</td>
+                <td className="px-4 py-3.5">{marca(perfil.contactoWhatsapp)}</td>
+                <td className="px-4 py-3.5">{marca(perfil.formalizacionEmpresa)}</td>
+                <td className="px-2 py-3.5">
+                  <button
+                    className="btn btn-sm btn-secondary whitespace-nowrap px-2.5"
+                    type="button"
+                    disabled={perfil.documentos.length === 0}
+                    aria-label={`Ver documentos de ${perfil.name}`}
+                    onClick={() => setDocumentosDe(perfil)}
+                  >
+                    Ver documentos
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <Modal
+        open={documentosDe !== null}
+        title={documentosDe ? `Documentos de ${documentosDe.name}` : "Documentos"}
+        onClose={() => setDocumentosDe(null)}
+        wide
+      >
+        {documentosDe && documentosDe.documentos.length > 0 ? (
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
+            {documentosDe.documentos.map((doc) => (
+              <li key={doc.id}>
+                <a
+                  className="pregunta-adjuntos-doc"
+                  href={doc.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`Abrir ${doc.originalName}`}
+                  aria-label={`Abrir ${doc.originalName}`}
+                >
+                  <span className="pregunta-adjuntos-doc-sheet" aria-hidden="true">
+                    <span className="pregunta-adjuntos-doc-fold" />
+                    <span className="pregunta-adjuntos-doc-badge">{etiquetaDocumento(doc)}</span>
+                    <span className="pregunta-adjuntos-doc-lines">
+                      <span />
+                      <span />
+                      <span />
+                    </span>
+                  </span>
+                  <span className="pregunta-adjuntos-doc-name">{doc.originalName}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted">Este participante no tiene documentos de formalización.</p>
+        )}
+      </Modal>
     </div>
   );
 }

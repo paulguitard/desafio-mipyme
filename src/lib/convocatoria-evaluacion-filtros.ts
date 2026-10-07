@@ -147,6 +147,7 @@ export function estadoRespuestaFicha(
   ).length;
 
   if (respondidas === 0) return "pendiente";
+  if (formularioListoParaEnviar(postulacion, preguntas)) return "completa";
   if (!evaluacionYaRealizada(postulacion.asignaciones)) return "borrador";
   return "pendiente";
 }

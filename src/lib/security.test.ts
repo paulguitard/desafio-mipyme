@@ -125,7 +125,7 @@ describe("estadoRespuestaFicha", () => {
     ).toBe("borrador");
   });
 
-  it("marks a filled first draft as borrador until an evaluation exists", () => {
+  it("marks a first draft with every required answer as completa", () => {
     expect(
       estadoRespuestaFicha(
         {
@@ -137,7 +137,7 @@ describe("estadoRespuestaFicha", () => {
         },
         [{ id: "p1", enunciado: "Nombre", obligatoria: true }],
       ),
-    ).toBe("borrador");
+    ).toBe("completa");
   });
 
   it("does not use borrador once an evaluation exists, even if the form still has answers", () => {
