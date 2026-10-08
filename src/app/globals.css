@@ -6825,4 +6825,285 @@ textarea.input.is-comentario-pendiente,
   }
 }
 
+.ficha-publica-meta {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .ficha-publica-page {
+    background: var(--background);
+  }
+
+  .ficha-publica-chrome {
+    padding: 0.7rem 0.85rem 0.15rem;
+    background: var(--background);
+    border-bottom: none;
+  }
+
+  .ficha-publica-titulo {
+    display: block;
+    font-size: 1.05rem;
+    font-weight: 800;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    text-align: left;
+  }
+
+  .ficha-publica-page .modal-title-sep {
+    font-size: 0;
+  }
+
+  .ficha-publica-page .modal-title-sep::before {
+    content: " · ";
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    opacity: 1;
+  }
+
+  .ficha-publica-page .ficha-detalle-admin {
+    gap: 0.4rem;
+    padding: 0.1rem 0.85rem 1rem;
+    background: var(--background);
+    --ficha-detalle-fondo: var(--background);
+    --eval-detalle-chrome-bg: var(--background);
+  }
+
+  .ficha-publica-page .ficha-publica-meta {
+    display: block;
+    flex: none;
+  }
+
+  .ficha-publica-page .ficha-caso-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    width: 100%;
+    column-gap: 0.5rem;
+  }
+
+  .ficha-publica-page .ficha-caso-meta p {
+    width: auto;
+    max-width: calc(50% - 0.25rem);
+    font-size: 0.8rem;
+    line-height: 1.35;
+    text-align: left;
+  }
+
+  .ficha-publica-page .ficha-caso-meta p:last-child {
+    text-align: right;
+    margin-left: auto;
+  }
+
+  .ficha-publica-page .ficha-detalle-admin-meta {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .ficha-publica-page .ficha-detalle-admin-eval {
+    width: 100%;
+    min-width: 0;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ficha-publica-page .eval-detalle-shell {
+    min-height: 0;
+    height: 100%;
+  }
+
+  .ficha-publica-page .eval-detalle-movil {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .ficha-publica-page .eval-detalle-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0.3rem;
+    padding: 0 0 0.4rem;
+  }
+
+  .ficha-publica-page .eval-detalle-tab {
+    min-width: 0;
+    flex: 1 1 0;
+    min-height: 2.15rem;
+    padding: 0.3rem 0.35rem;
+    border: 1px solid var(--border);
+    border-radius: 0.55rem;
+    background: #fff;
+    color: var(--navy);
+    font-size: 0.78rem;
+    font-weight: 800;
+    line-height: 1.2;
+    cursor: pointer;
+  }
+
+  .ficha-publica-page .eval-detalle-tab.is-active {
+    background: var(--navy);
+    border-color: var(--navy);
+    color: #fff;
+  }
+
+  .ficha-publica-page .eval-detalle-body.is-columnas {
+    flex: 1 1 auto;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .ficha-publica-page .eval-detalle-col {
+    display: none;
+    flex: 1 1 auto;
+    max-height: none;
+    min-height: 0;
+  }
+
+  .ficha-publica-page .eval-detalle-body.is-tab-caso .eval-detalle-col.is-caso,
+  .ficha-publica-page .eval-detalle-body.is-tab-eval .eval-detalle-col.is-eval,
+  .ficha-publica-page .eval-detalle-body.is-tab-sup .eval-detalle-col.is-sup {
+    display: flex;
+  }
+
+  .ficha-publica-page .eval-detalle-collapse,
+  .ficha-publica-page .eval-detalle-head {
+    display: none;
+  }
+
+  .ficha-publica-page .eval-detalle-col-scroll {
+    font-size: 0.875rem;
+  }
+
+  .ficha-publica-page .eval-detalle-cell {
+    padding: 0.65rem 0.7rem;
+  }
+
+  .ficha-publica-page .eval-detalle-cell .card {
+    padding: 0.85rem 0.9rem;
+  }
+
+  .ficha-publica-page .eval-detalle-cell .card.pregunta-lectura {
+    padding: 0;
+  }
+
+  .ficha-publica-page .pregunta-lectura-enunciado,
+  .ficha-publica-page .pregunta-edicion-enunciado {
+    padding: 0.6rem 0.85rem;
+  }
+
+  .ficha-publica-page .pregunta-lectura-cuerpo,
+  .ficha-publica-page .pregunta-edicion-cuerpo {
+    padding: 0.7rem 0.85rem 0.85rem;
+    gap: 0.55rem;
+  }
+
+  .ficha-publica-page .eval-detalle-cell .card.space-y-3 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.55rem;
+  }
+
+  .ficha-publica-page h3.text-xl,
+  .ficha-publica-page .pregunta-lectura-enunciado h3,
+  .ficha-publica-page .pregunta-edicion-enunciado h3 {
+    font-size: 0.9rem;
+    line-height: 1.3;
+  }
+
+  .ficha-publica-page .hilo-ronda-titulo {
+    font-size: 1.1rem;
+    line-height: 1.3;
+  }
+
+  .ficha-publica-page .text-muted,
+  .ficha-publica-page .pregunta-descripcion {
+    font-size: 0.8rem;
+    line-height: 1.35;
+  }
+
+  .ficha-publica-page .input {
+    min-height: 2.5rem;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.875rem;
+  }
+
+  .ficha-publica-page .field,
+  .ficha-publica-page .input,
+  .ficha-publica-page .card {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .ficha-publica-page .gantt-wrap > .gantt-scroll {
+    display: none;
+  }
+
+  .ficha-publica-page .gantt-cards,
+  .ficha-publica-page .presupuesto-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.85rem;
+  }
+
+  .ficha-publica-page .gantt-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.85rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 0.85rem;
+    background: #fff;
+  }
+
+  .ficha-publica-page .gantt-card.is-editing {
+    background: #fafbfd;
+  }
+
+  .ficha-publica-page .gantt-card-empty {
+    margin: 0;
+    padding: 0.4rem 0.15rem;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  .ficha-publica-page .gantt-card-fechas {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  .ficha-publica-page .presupuesto-limites-resumen thead {
+    display: none;
+  }
+
+  .ficha-publica-page .presupuesto-limites-resumen,
+  .ficha-publica-page .presupuesto-limites-resumen tbody,
+  .ficha-publica-page .presupuesto-limites-resumen tfoot {
+    display: block;
+    width: 100%;
+  }
+
+  .ficha-publica-page .presupuesto-limites-resumen tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.15rem 0.75rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ficha-publica-page .presupuesto-limites-resumen th,
+  .ficha-publica-page .presupuesto-limites-resumen td {
+    display: block;
+    padding: 0;
+  }
+
+  .ficha-publica-page .presupuesto-limites-resumen td:nth-child(3) {
+    grid-column: 1 / -1;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+}
+
 

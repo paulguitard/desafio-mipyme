@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { EvalDetalleCelda, EvalDetalleColumnas } from "@/components/eval-detalle-head";
+import { FichaCasoMeta } from "@/components/ficha-caso-meta";
+import { useFichaPublicaToken } from "@/components/ficha-publica-token";
 import { HistorialVersionesRespuesta } from "@/components/historial-versiones-respuesta";
 import { PanelHiloRevision } from "@/components/hilo-revision";
 import { PreguntaCampo } from "@/components/pregunta-campo";
@@ -22,6 +24,7 @@ function lineaPersona(
 }
 
 export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
+  const tokenPublico = useFichaPublicaToken();
   const [asignacionId, setAsignacionId] = useState(data.asignaciones[0]?.id ?? "");
 
   const asignacion = useMemo(
@@ -32,10 +35,19 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
   const modoEvaluacion = parseModoEvaluacion(data.modoEvaluacion);
   const esGeneral = modoEvaluacion === "GENERAL";
   const esContenido = esMentoriaContenido(data.tipo);
+  const metaPublica = tokenPublico ? (
+    <div className="ficha-publica-meta">
+      <FichaCasoMeta
+        participante={data.emprendedorNombre}
+        evaluador={asignacion?.evaluadorNombre}
+      />
+    </div>
+  ) : null;
 
   if (esContenido) {
     return (
       <div className="ficha-detalle-admin eval-shell-open">
+        {metaPublica}
         <section className="eval-detalle-shell" aria-label="Contenido visto por el participante">
           <EvalDetalleColumnas
             sinSupervision
@@ -67,6 +79,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
 
   return (
     <div className="ficha-detalle-admin eval-shell-open">
+      {metaPublica}
       {data.asignaciones.length > 1 ? (
         <div className="ficha-detalle-admin-meta">
           <div className="ficha-detalle-admin-eval">
