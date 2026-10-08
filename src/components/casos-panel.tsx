@@ -7,6 +7,7 @@ import {
   agruparFiltrosPorBanda,
   BANDA_MOVIL_LABEL_EVALUADOR,
   conteosCasos,
+  esIdBandaFiltro,
   gruposVisibles,
   itemsDeGrupo,
   type BandaPelota,
@@ -39,7 +40,10 @@ export function CasosPanel({
   emptyLabel: string;
   labelsBandaMovil?: Record<BandaPelota, string>;
 }) {
-  const inicial = filtros.some((f) => f.id === filtroInicial) ? filtroInicial : "todas";
+  const inicial =
+    filtros.some((f) => f.id === filtroInicial) || esIdBandaFiltro(filtroInicial, filtros)
+      ? filtroInicial
+      : "tu-turno";
   const [activoId, setActivoId] = useState(inicial);
   const counts = useMemo(() => conteosCasos(casos, filtros), [casos, filtros]);
   const grupos = useMemo(
@@ -61,8 +65,14 @@ export function CasosPanel({
   }
 
   function etiquetaFiltroActivo() {
+    if (activoId === "todas") return labelsBandaMovil.todas;
+    if (activoId === "cerrados") return labelsBandaMovil.cerrados;
+    if (esIdBandaFiltro(activoId, filtros)) {
+      return labelsBandaMovil[activoId as BandaPelota];
+    }
     const actual = filtros.find((item) => item.id === activoId);
-    if (!actual || actual.banda === "todas") return labelsBandaMovil.todas;
+    if (!actual) return labelsBandaMovil["tu-turno"];
+    if (actual.banda === "todas") return labelsBandaMovil.todas;
     if (actual.banda === "cerrados") return labelsBandaMovil.cerrados;
     return actual.label;
   }
@@ -72,51 +82,19 @@ export function CasosPanel({
     aplicarFiltroEnUrl(id);
   }
 
-  function elegirFiltroMovil(id: string) {
+  function elegirFiltroDesdeModal(id: string) {
     elegirFiltro(id);
     setModalFiltro(false);
     setBandaAbierta(null);
   }
 
   return (
-    <div className="casos-panel page-workspace grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden">
+    <div className="casos-panel page-workspace grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
       <div className="casos-panel-head shrink-0 space-y-4 bg-background">
         <h1 className="text-3xl font-extrabold text-navy">{titulo}</h1>
         <div data-tour={tourFiltros}>
-          <div className="casos-filtros casos-filtros-desktop" role="tablist" aria-label="Filtros de casos">
-          {bandasFiltro.map((banda, indice) => (
-            <div key={banda.id} className="casos-filtros-slot">
-              {indice > 0 ? <span className="casos-filtros-sep" aria-hidden="true" /> : null}
-              <div className={`casos-filtros-banda${banda.id === "todas" ? " is-todas" : ""}`}>
-                <p className="casos-filtros-banda-label" aria-hidden={banda.label ? undefined : true}>
-                  {banda.label || "\u00a0"}
-                </p>
-                <div
-                  className={`casos-filtros-banda-chips${banda.filtros.length > 1 ? " is-apilada" : ""}`}
-                >
-                  {banda.filtros.map((item) => {
-                    const n = counts[item.id] ?? 0;
-                    const activo = item.id === activoId;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        role="tab"
-                        aria-selected={activo}
-                        onClick={() => elegirFiltro(item.id)}
-                        className={`casos-filtro${activo ? " is-activo" : ""}`}
-                      >
-                        <span>{item.label}</span>
-                        <span className="casos-filtro-n">{n}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ))}
-          </div>
-          <div className="casos-filtros-movil">
+          <div className="casos-filtros-barra">
+            <p className="casos-filtros-se-muestran">Se muestran:</p>
             <div className="casos-filtro-activo-row">
               <p className="casos-filtro is-activo" aria-current="true">
                 <span>{etiquetaFiltroActivo()}</span>
@@ -127,9 +105,10 @@ export function CasosPanel({
                 type="button"
                 onClick={() => {
                   const actual = filtros.find((item) => item.id === activoId);
-                  setBandaAbierta(
-                    actual && bandaDesplegable(actual.banda) ? actual.banda : null,
-                  );
+                  const banda =
+                    actual?.banda ??
+                    (esIdBandaFiltro(activoId, filtros) ? (activoId as BandaPelota) : null);
+                  setBandaAbierta(banda && bandaDesplegable(banda) ? banda : null);
                   setModalFiltro(true);
                 }}
               >
@@ -150,7 +129,9 @@ export function CasosPanel({
                 {bandasFiltro.map((banda) => {
                   const desplegable = bandaDesplegable(banda.id);
                   const abierta = bandaAbierta === banda.id;
-                  const activa = banda.filtros.some((item) => item.id === activoId);
+                  const activaHija = banda.filtros.some((item) => item.id === activoId);
+                  const activaBanda = activoId === banda.id;
+                  const activa = activaHija || activaBanda;
                   return (
                     <div
                       key={banda.id}
@@ -158,21 +139,28 @@ export function CasosPanel({
                     >
                       <button
                         type="button"
-                        className={`casos-filtro casos-filtro-cat-btn${activa && !desplegable ? " is-activo" : ""}${
-                          activa && desplegable ? " is-cat-activa" : ""
-                        }`}
+                        className={`casos-filtro casos-filtro-cat-btn${
+                          activaBanda || (activa && !desplegable) ? " is-activo" : ""
+                        }${activaHija && desplegable && !activaBanda ? " is-cat-activa" : ""}`}
                         aria-expanded={desplegable ? abierta : undefined}
                         onClick={() => {
                           if (desplegable) {
-                            setBandaAbierta(abierta ? null : banda.id);
+                            elegirFiltroDesdeModal(banda.id);
                             return;
                           }
-                          elegirFiltroMovil(banda.filtros[0]?.id ?? "todas");
+                          elegirFiltroDesdeModal(banda.filtros[0]?.id ?? "todas");
                         }}
                       >
                         <span>{labelsBandaMovil[banda.id]}</span>
                         {desplegable ? (
-                          <span className="casos-filtro-chevron" aria-hidden="true">
+                          <span
+                            className="casos-filtro-chevron"
+                            aria-hidden="true"
+                            onClick={(evento) => {
+                              evento.stopPropagation();
+                              setBandaAbierta(abierta ? null : banda.id);
+                            }}
+                          >
                             <svg viewBox="0 0 16 16" width="14" height="14">
                               <path
                                 fill="currentColor"
@@ -194,7 +182,7 @@ export function CasosPanel({
                                 type="button"
                                 role="tab"
                                 aria-selected={activo}
-                                onClick={() => elegirFiltroMovil(item.id)}
+                                onClick={() => elegirFiltroDesdeModal(item.id)}
                                 className={`casos-filtro${activo ? " is-activo" : ""}`}
                               >
                                 <span>{item.label}</span>
@@ -215,6 +203,8 @@ export function CasosPanel({
       <div className="page-scroll min-h-0 overflow-y-auto space-y-7 pr-1" data-tour={tourLista}>
         {!hayTarjetas && activoId === "todas" ? (
           <p className="text-muted">{emptyLabel}</p>
+        ) : !hayTarjetas && esIdBandaFiltro(activoId, filtros) ? (
+          <p className="text-muted">No hay casos en este estado.</p>
         ) : (
           bandasLista.map((banda) => (
             <section key={banda.id} className="casos-banda" aria-label={banda.label || undefined}>
@@ -257,11 +247,6 @@ export function CasosPanel({
                                     <li key={`${item.id}-${extraIdx}-${asignacion.nombre}`}>
                                       <span>{asignacion.nombre}</span>
                                       <BadgeAsignacion estado={asignacion.estado} etiqueta={asignacion.etiqueta} />
-                                      {asignacion.estado === "EN_SUPERVISION" && asignacion.intencion ? (
-                                        <span className="caso-fila-intencion">
-                                          {asignacion.intencion === "FINALIZAR" ? "Finalización" : "Observaciones"}
-                                        </span>
-                                      ) : null}
                                     </li>
                                   ))
                                 )}

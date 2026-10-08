@@ -3,13 +3,35 @@ import {
   avisoEntradaEvaluador,
   avisoEntradaParticipante,
   avisoEntradaSupervisor,
+  reabrirAvisoEntrada,
 } from "./aviso-entrada-caso";
+
+describe("reabrirAvisoEntrada", () => {
+  it("no reabre si el caso sigue en la misma ruta después de enviar", () => {
+    expect(
+      reabrirAvisoEntrada("/evaluador/supervision/1", "/evaluador/supervision/1"),
+    ).toBe(false);
+  });
+
+  it("reabre al entrar a otra ruta", () => {
+    expect(reabrirAvisoEntrada("/evaluador/evaluaciones/2", "/evaluador/evaluaciones/1")).toBe(
+      true,
+    );
+  });
+});
 
 describe("avisoEntradaEvaluador", () => {
   it("pide revisar el historial cuando el participante ya corrigió", () => {
     const aviso = avisoEntradaEvaluador("REPARADA");
     expect(aviso.title).toBe("El participante ya corrigió");
-    expect(aviso.parrafos[0]).toContain("historial de cada pregunta");
+    expect(aviso.parrafos[0]).toContain("qué cambió");
+    expect(aviso.pasos?.join(" ")).toContain("Modificada");
+  });
+
+  it("explica dónde leer las observaciones del supervisor", () => {
+    const aviso = avisoEntradaEvaluador("DEVUELTA_SUPERVISOR");
+    expect(aviso.parrafos[0]).toContain("observaciones del supervisor");
+    expect(aviso.pasos?.join(" ")).toContain("Evaluación y Supervisión");
   });
 
   it.each([
@@ -30,10 +52,16 @@ describe("avisoEntradaEvaluador", () => {
 describe("avisoEntradaSupervisor", () => {
   it("distingue finalizar de observaciones", () => {
     expect(avisoEntradaSupervisor("EN_SUPERVISION", "FINALIZAR").parrafos[0]).toContain(
-      "pidió finalizar",
+      "pidió cerrar",
     );
     expect(avisoEntradaSupervisor("EN_SUPERVISION", "OBSERVACIONES").parrafos[0]).toContain(
       "envió observaciones",
+    );
+    expect(avisoEntradaSupervisor("EN_SUPERVISION", "FINALIZAR").pasos?.join(" ")).toContain(
+      "Proceder cierra",
+    );
+    expect(avisoEntradaSupervisor("EN_SUPERVISION", "OBSERVACIONES").pasos?.join(" ")).toContain(
+      "llegan al participante",
     );
   });
 
@@ -57,6 +85,8 @@ describe("avisoEntradaParticipante", () => {
     });
     expect(aviso.title).toContain("observaciones");
     expect(aviso.parrafos[0]).toContain("evaluador");
+    expect(aviso.pasos?.join(" ")).toContain("Tu caso");
+    expect(aviso.pasos?.join(" ")).toContain("Enviar correcciones");
   });
 
   it("usa la descripción de la asesoría al completar el caso", () => {
@@ -86,6 +116,20 @@ describe("avisoEntradaParticipante", () => {
       expect(aviso.parrafos.length).toBeGreaterThan(0);
     },
   );
+
+  it("explica los paneles después de enviar correcciones", () => {
+    const aviso = avisoEntradaParticipante({
+      estado: "REPARADA_POR_EL_EMPRENDEDOR",
+      esCorreccion: false,
+      canEdit: false,
+      mentoriaAbierta: true,
+      conEvaluacionVisible: true,
+    });
+    expect(aviso.title).toBe("Ya enviaste tus correcciones");
+    expect(aviso.parrafos[0]).toContain("evaluador");
+    expect(aviso.pasos?.join(" ")).toContain("Evaluación");
+    expect(aviso.pasos?.join(" ")).toContain("Modificada");
+  });
 
   it("felicita cuando el caso quedó aprobado y finalizado", () => {
     const aviso = avisoEntradaParticipante({

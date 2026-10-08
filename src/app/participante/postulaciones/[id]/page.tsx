@@ -10,6 +10,7 @@ import { convocatoriaAbiertaParaPostular } from "@/lib/convocatoria";
 import { medioDesdeFila } from "@/lib/contenido";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { etiquetaNombreCaso, extraerNombreCaso } from "@/lib/nombre-caso";
+import { preguntasModificadasEnUltimoEnvio } from "@/lib/cambios-reenvio";
 import { esMentoriaContenido } from "@/lib/tipo-formulario";
 import { coincideRevisionCiclo, revisionesParaParticipante } from "@/lib/revision-ciclo";
 import { avisoEntradaParticipante } from "@/lib/aviso-entrada-caso";
@@ -154,13 +155,43 @@ export default async function PostulacionPage({
       (asignacion) =>
         asignacion.revisiones.length > 0 || asignacion.revisionesGenerales.length > 0,
     );
+  const conEvaluacionVisible = esCorreccion || asignacionesVista.length > 0;
+  const idsModificadas = new Set(
+    preguntasModificadasEnUltimoEnvio({
+      respuestas: postulacion.respuestas.map((respuesta) => ({
+        preguntaId: respuesta.preguntaId,
+        tipo:
+          postulacion.convocatoria.formulario.preguntas.find(
+            (pregunta) => pregunta.id === respuesta.preguntaId,
+          )?.tipo ?? "texto_corto",
+        versiones: respuesta.versiones.map((version) => ({
+          valor: version.valor,
+          archivos: version.archivos,
+          createdAt: version.createdAt.toISOString(),
+        })),
+      })),
+      asignaciones: postulacion.asignaciones.map((asignacion) => ({
+        rondaActual: asignacion.rondaActual,
+        revisiones: [
+          ...asignacion.revisiones.map((revision) => ({
+            ronda: revision.ronda,
+            createdAt: revision.createdAt.toISOString(),
+          })),
+          ...asignacion.revisionesGenerales.map((revision) => ({
+            ronda: revision.ronda,
+            createdAt: revision.createdAt.toISOString(),
+          })),
+        ],
+      })),
+    }),
+  );
 
   return (
     <FormularioPostulante
       postulacionId={postulacion.id}
       canEdit={canEdit}
       esCorreccion={esCorreccion}
-      layout={esCorreccion ? "paneles" : "formulario"}
+      layout={conEvaluacionVisible ? "paneles" : "formulario"}
       back={<BotonAtras href="/participante" />}
       title={
         <h1 className="formulario-caso-titulo text-3xl font-extrabold text-navy">
@@ -176,9 +207,10 @@ export default async function PostulacionPage({
         canEdit,
         mentoriaAbierta: abierta,
         descripcionMentoria: postulacion.convocatoria.descripcion,
+        conEvaluacionVisible,
       })}
     >
-      {esCorreccion ? (
+      {conEvaluacionVisible ? (
         <VistaCorreccionParticipante
           preguntas={postulacion.convocatoria.formulario.preguntas}
           respuestas={postulacion.respuestas.map((respuesta) => ({
@@ -194,6 +226,7 @@ export default async function PostulacionPage({
           }))}
           asignaciones={asignacionesVista}
           observadas={[...observadas]}
+          modificadas={[...idsModificadas]}
           esGeneral={esGeneral}
           canEdit={canEdit}
         />

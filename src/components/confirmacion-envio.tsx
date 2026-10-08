@@ -25,13 +25,14 @@ export function ConfirmacionEnvio({
       open={open}
       compact
       sinCerrar
+      className="modal-accion-caso"
       title={title}
       onClose={() => {
         if (!confirming) onCancel();
       }}
     >
       <div className="space-y-4">
-        <div className="space-y-2 text-sm leading-relaxed">{children}</div>
+        <div className="modal-accion-caso-texto space-y-2 text-sm leading-relaxed">{children}</div>
         <div className="flex flex-wrap justify-end gap-2">
           <button
             className="btn btn-sm btn-secondary"

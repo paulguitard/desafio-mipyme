@@ -1,5 +1,4 @@
-import { AppHeader } from "@/components/app-header";
-import { AppShell } from "@/components/app-shell";
+import { ParticipanteAppShell } from "@/components/participante-app-shell";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 
@@ -11,22 +10,8 @@ export default async function ParticipanteLayout({ children }: { children: React
   });
 
   return (
-    <AppShell
-      className="rol-movil rol-participante"
-      tourRole="EMPRENDEDOR"
-      maxWidthClass="max-w-none"
-      header={
-        <AppHeader
-          title="Panel de participante"
-          name={user?.name ?? sessionUser.name ?? "Participante"}
-          links={[
-            { href: "/participante", label: "Asesorías" },
-            { href: "/participante/perfil", label: "Mi Perfil" },
-          ]}
-        />
-      }
-    >
+    <ParticipanteAppShell name={user?.name ?? sessionUser.name ?? "Participante"}>
       {children}
-    </AppShell>
+    </ParticipanteAppShell>
   );
 }

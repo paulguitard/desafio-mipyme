@@ -11,6 +11,7 @@ import {
   gruposDeSupervisor,
   gruposVisibles,
   itemsDeGrupo,
+  resolverFiltroEvaluador,
   resolverFiltroSupervisor,
   supervisorCoincideFiltro,
 } from "@/lib/casos-panel";
@@ -111,6 +112,11 @@ describe("supervisorCoincideFiltro", () => {
     expect(resolverFiltroSupervisor("devueltas").id).toBe("esperando-evaluacion-corregida");
     expect(resolverFiltroSupervisor("en_curso").id).toBe("esperando-evaluacion");
   });
+
+  it("entra por defecto en tu turno", () => {
+    expect(resolverFiltroSupervisor().id).toBe("tu-turno");
+    expect(resolverFiltroEvaluador()).toBe("tu-turno");
+  });
 });
 
 describe("agruparFiltrosPorBanda", () => {
@@ -155,6 +161,13 @@ describe("gruposVisibles", () => {
     expect(grupos).toEqual([
       { id: "b", label: "B", descripcion: undefined, banda: "participante", items: [] },
     ]);
+  });
+
+  it("en tu turno lista las colas de esa banda con casos", () => {
+    const grupos = gruposVisibles(FILTROS_EVALUADOR, "tu-turno", (id) =>
+      id === "pendientes" || id === "reparadas" ? [1] : [],
+    );
+    expect(grupos.map((g) => g.id)).toEqual(["pendientes", "reparadas"]);
   });
 
   it("expone la explicación de cada filtro en la sección", () => {
@@ -204,6 +217,7 @@ describe("conteos e items en cliente", () => {
     expect(counts.todas).toBe(2);
     expect(counts.observaciones).toBe(1);
     expect(counts.pendientes).toBe(1);
+    expect(counts["tu-turno"]).toBe(1);
   });
 
   it("filtra un grupo", () => {

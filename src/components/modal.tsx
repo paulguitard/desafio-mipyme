@@ -58,8 +58,8 @@ export function Modal({
   openRef.current = open;
   const [portalListo, setPortalListo] = useState(false);
   const setDialogRef = useCallback((node: HTMLDialogElement | null) => {
-    if (node === null && ref.current?.open) cerrarDialogDesde(ref.current);
     ref.current = node;
+    if (node && openRef.current && !node.open) mostrarModal(node);
   }, []);
 
   const className = [
@@ -107,7 +107,8 @@ export function Modal({
       }}
       onClose={(event) => {
         const node = event.currentTarget;
-        if (node.dataset.cierreIntencional === "1") {
+        const intencional = node.dataset.cierreIntencional === "1";
+        if (intencional) {
           delete node.dataset.cierreIntencional;
           return;
         }
@@ -115,9 +116,7 @@ export function Modal({
         if (openRef.current) {
           requestAnimationFrame(() => {
             const actual = ref.current;
-            if (actual?.isConnected && openRef.current && !actual.open) {
-              mostrarModal(actual);
-            }
+            if (actual?.isConnected && openRef.current && !actual.open) mostrarModal(actual);
           });
         }
       }}

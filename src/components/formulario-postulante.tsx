@@ -16,6 +16,8 @@ import {
   MAX_FILE_BYTES,
   MAX_IMAGE_INPUT_BYTES,
 } from "@/lib/storage/limits";
+import { useAnchoDetalleParticipante } from "@/components/participante-app-shell";
+import { ANCHO_DETALLE } from "@/lib/ancho-layout";
 import { useAccionOptimista } from "@/lib/use-dato-optimista";
 
 function validarAdjuntosCliente(formData: FormData): string | null {
@@ -62,6 +64,7 @@ export function FormularioPostulante({
 }) {
   const router = useRouter();
   const conPaneles = layout === "paneles";
+  useAnchoDetalleParticipante(conPaneles);
   const [error, setError] = useState<string | null>(null);
   const [guardadoModal, setGuardadoModal] = useState<EstadoModalProgreso | null>(null);
   const [envioModal, setEnvioModal] = useState<EstadoModalProgreso | null>(null);
@@ -140,7 +143,7 @@ export function FormularioPostulante({
       className={
         [
           conPaneles
-            ? "page-workspace is-formulario-caso mx-auto grid h-full min-h-0 w-full max-w-7xl grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden"
+            ? `page-workspace is-formulario-caso mx-auto grid h-full min-h-0 w-full ${ANCHO_DETALLE} grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden`
             : "page-workspace is-formulario-caso mx-auto grid h-full min-h-0 w-full max-w-4xl grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden",
           canEdit && !bloqueado ? "has-acciones-caso" : "",
         ]

@@ -68,6 +68,12 @@ describe("revision de ciclo", () => {
       ),
     ).toEqual(["r1c2", "r2c2"]);
     expect(
+      revisionesParaParticipante(
+        historial.filter((item) => item.ronda === 1),
+        { estado: "REPARADA", rondaActual: 2 },
+      ).map((item) => item.id),
+    ).toEqual(["r1c2"]);
+    expect(
       historialEvaluacionParticipante(
         [
           {

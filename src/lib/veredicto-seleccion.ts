@@ -1,3 +1,5 @@
+import { esHtmlVacio } from "@/lib/preguntas";
+
 export const MENSAJE_SELECCION_VEREDICTO =
   "Tienes que seleccionar alguna de las opciones.";
 
@@ -14,7 +16,7 @@ export function mensajeVeredictosIncompletos(campos: CampoVeredicto[]): string |
     (campo) => campo.veredicto !== "OK" && campo.veredicto !== "OBSERVACION",
   );
   const faltaComentario = campos.some(
-    (campo) => campo.veredicto === "OBSERVACION" && campo.comentario.trim() === "",
+    (campo) => campo.veredicto === "OBSERVACION" && esHtmlVacio(campo.comentario),
   );
   const partes: string[] = [];
   if (faltaSeleccion) partes.push(MENSAJE_SELECCION_VEREDICTO);
@@ -24,6 +26,6 @@ export function mensajeVeredictosIncompletos(campos: CampoVeredicto[]): string |
 
 export function campoVeredictoIncompleto(campo: CampoVeredicto): "seleccion" | "comentario" | null {
   if (campo.veredicto !== "OK" && campo.veredicto !== "OBSERVACION") return "seleccion";
-  if (campo.veredicto === "OBSERVACION" && campo.comentario.trim() === "") return "comentario";
+  if (campo.veredicto === "OBSERVACION" && esHtmlVacio(campo.comentario)) return "comentario";
   return null;
 }

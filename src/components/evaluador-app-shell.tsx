@@ -3,9 +3,9 @@
 import { usePathname } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { AppShell } from "@/components/app-shell";
+import { ANCHO_DETALLE } from "@/lib/ancho-layout";
 import type { Role } from "@/lib/roles";
 
-const ANCHO_DETALLE = "max-w-[110rem]";
 const ANCHO_PAGINA = "max-w-6xl";
 
 export function EvaluadorAppShell({

@@ -18,6 +18,15 @@ describe("mensajeVeredictosIncompletos", () => {
     ).toBe(MENSAJE_COMENTARIO_VEREDICTO);
   });
 
+  it("trata el HTML vacío del editor como comentario faltante", () => {
+    expect(
+      mensajeVeredictosIncompletos([{ veredicto: "OBSERVACION", comentario: "<p></p>" }]),
+    ).toBe(MENSAJE_COMENTARIO_VEREDICTO);
+    expect(
+      mensajeVeredictosIncompletos([{ veredicto: "OBSERVACION", comentario: "<p><br></p>" }]),
+    ).toBe(MENSAJE_COMENTARIO_VEREDICTO);
+  });
+
   it("junta ambos avisos si hay preguntas en distinto estado", () => {
     expect(
       mensajeVeredictosIncompletos([
@@ -32,7 +41,7 @@ describe("mensajeVeredictosIncompletos", () => {
     expect(
       mensajeVeredictosIncompletos([
         { veredicto: "OK", comentario: "" },
-        { veredicto: "OBSERVACION", comentario: "Falta el monto" },
+        { veredicto: "OBSERVACION", comentario: "<p>Falta el monto</p>" },
       ]),
     ).toBeNull();
   });

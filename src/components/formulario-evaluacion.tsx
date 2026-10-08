@@ -74,11 +74,11 @@ function marcarVeredictosPendientes(form: HTMLFormElement) {
         "veredicto-",
         "comentario-",
       );
-      const textarea = form.querySelector<HTMLTextAreaElement>(
-        `textarea[name="${CSS.escape(name)}"]`,
-      );
-      textarea?.classList.add("is-comentario-pendiente");
-      primero ??= textarea ?? campo.grupo;
+      const campoComentario =
+        form.querySelector<HTMLElement>(`[name="${CSS.escape(name)}"]`)?.closest(".rte") ??
+        form.querySelector<HTMLTextAreaElement>(`textarea[name="${CSS.escape(name)}"]`);
+      campoComentario?.classList.add("is-comentario-pendiente");
+      primero ??= campoComentario ?? campo.grupo;
     }
   }
 
@@ -111,6 +111,8 @@ function enfocarVeredictoPendiente(nodo: HTMLElement) {
       nodo.scrollIntoView({ behavior: "smooth", block: "center" });
       if (nodo instanceof HTMLTextAreaElement) {
         nodo.focus({ preventScroll: true });
+      } else if (nodo.classList.contains("rte")) {
+        nodo.querySelector<HTMLElement>(".ProseMirror")?.focus({ preventScroll: true });
       } else {
         nodo.querySelector("button")?.focus({ preventScroll: true });
       }
@@ -215,7 +217,9 @@ export function FormularioEvaluacion({
     if (!(target instanceof Element)) return;
     const enOpciones = target.closest("[data-veredicto-opciones]");
     const enComentario =
-      target instanceof HTMLTextAreaElement && target.name.includes("comentario-");
+      (target instanceof HTMLTextAreaElement && target.name.includes("comentario-")) ||
+      (target instanceof HTMLInputElement && target.name.includes("comentario-")) ||
+      Boolean(target.closest(".rte"));
     if (!enOpciones && !enComentario) return;
     const form = formRef.current;
     if (!form?.querySelector(".is-seleccion-pendiente, .is-comentario-pendiente")) {

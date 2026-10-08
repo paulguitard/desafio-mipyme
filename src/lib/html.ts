@@ -35,3 +35,13 @@ export function sanitizeRichText(html: string): string {
     colorDestacado.test(value) ? full : "",
   );
 }
+
+/** Comentarios de evaluación: negrita, cursiva, subrayado y viñetas; sin tamaño, alineación ni destacados. */
+export function sanitizeComentarioRichText(html: string): string {
+  return sanitizeHtml(html, {
+    allowedTags: ["p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li"],
+    allowedAttributes: {},
+    allowedSchemes: [],
+    disallowedTagsMode: "discard",
+  });
+}

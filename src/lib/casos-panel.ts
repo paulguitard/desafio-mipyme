@@ -109,8 +109,8 @@ export const FILTROS_SUPERVISOR: FiltroCaso[] = [
   },
   {
     id: "finalizar",
-    label: "Finalización por revisar",
-    labelCorto: "Finalización",
+    label: "Aprobaciones por revisar",
+    labelCorto: "Aprobaciones",
     banda: "tu-turno",
     descripcion:
       "El evaluador pidió finalizar el caso. Revisa y confirma el cierre o devuelve observaciones.",
@@ -187,9 +187,39 @@ export function etiquetaAsignacionPanelSupervisor(estado: string) {
   return etiquetaEstadoAsignacionFicha(estadoAsignacionFicha(estado));
 }
 
+const FILTRO_BANDA_TU_TURNO: FiltroCaso = {
+  id: "tu-turno",
+  label: BANDA_MOVIL_LABEL_SUPERVISOR["tu-turno"],
+  banda: "tu-turno",
+};
+
+export function esIdBandaFiltro(id: string, filtros: FiltroCaso[]) {
+  return filtros.some((item) => item.banda === id && item.id !== id);
+}
+
+export function resolverFiltroEvaluador(filtro?: string) {
+  const id = filtro ?? "tu-turno";
+  if (
+    id === "tu-turno" ||
+    esIdBandaFiltro(id, FILTROS_EVALUADOR) ||
+    FILTROS_EVALUADOR.some((item) => item.id === id)
+  ) {
+    return id;
+  }
+  return "tu-turno";
+}
+
 export function resolverFiltroSupervisor(filtro?: string) {
-  const id = FILTRO_SUPERVISOR_LEGADO[filtro ?? ""] ?? filtro ?? "todas";
-  return FILTROS_SUPERVISOR.find((f) => f.id === id) ?? FILTROS_SUPERVISOR[0];
+  const id = FILTRO_SUPERVISOR_LEGADO[filtro ?? ""] ?? filtro ?? "tu-turno";
+  if (id === "tu-turno") return FILTRO_BANDA_TU_TURNO;
+  if (esIdBandaFiltro(id, FILTROS_SUPERVISOR)) {
+    return {
+      id,
+      label: BANDA_MOVIL_LABEL_SUPERVISOR[id as BandaPelota],
+      banda: id as BandaPelota,
+    };
+  }
+  return FILTROS_SUPERVISOR.find((f) => f.id === id) ?? FILTRO_BANDA_TU_TURNO;
 }
 
 export type AsignacionSupervisionVista = {
@@ -272,7 +302,13 @@ export function gruposVisibles<T>(
   items: T[];
 }[] {
   const secciones = filtros.filter((f) => f.id !== "todas");
-  const fuente = activoId === "todas" ? secciones : secciones.filter((f) => f.id === activoId);
+  const vistaBanda = esIdBandaFiltro(activoId, filtros);
+  const fuente =
+    activoId === "todas"
+      ? secciones
+      : vistaBanda
+        ? secciones.filter((f) => f.banda === activoId)
+        : secciones.filter((f) => f.id === activoId);
   return fuente
     .map((f) => ({
       id: f.id,
@@ -282,14 +318,13 @@ export function gruposVisibles<T>(
       banda: f.banda,
       items: itemsDe(f.id),
     }))
-    .filter((g) => activoId !== "todas" || g.items.length > 0);
+    .filter((g) => activoId === "todas" || vistaBanda ? g.items.length > 0 : true);
 }
 
 export type CasoPanelExtra = {
   nombre: string;
   estado: string;
   etiqueta: string;
-  intencion: string | null;
 };
 
 export type CasoPanelVista = {
@@ -309,6 +344,12 @@ export function conteosCasos(casos: CasoPanelVista[], filtros: FiltroCaso[]) {
   for (const item of filtros) {
     if (item.id === "todas") continue;
     counts[item.id] = casos.filter((caso) => caso.grupos.includes(item.id)).length;
+  }
+  const bandas = new Set(filtros.map((item) => item.banda));
+  for (const banda of bandas) {
+    if (banda === "todas") continue;
+    const ids = new Set(filtros.filter((item) => item.banda === banda).map((item) => item.id));
+    counts[banda] = casos.filter((caso) => caso.grupos.some((grupo) => ids.has(grupo))).length;
   }
   return counts;
 }

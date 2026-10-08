@@ -1,21 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { cerrarDialogDesde, Modal } from "@/components/modal";
-import type { AvisoEntradaCaso as AvisoEntradaCasoDatos } from "@/lib/aviso-entrada-caso";
-
-function firmaAviso(aviso: AvisoEntradaCasoDatos | null) {
-  if (!aviso) return "";
-  return `${aviso.title}\n${aviso.parrafos.join("\n")}`;
-}
+import {
+  reabrirAvisoEntrada,
+  type AvisoEntradaCaso as AvisoEntradaCasoDatos,
+} from "@/lib/aviso-entrada-caso";
 
 export function AvisoEntradaCaso({ aviso }: { aviso: AvisoEntradaCasoDatos | null }) {
-  const firma = firmaAviso(aviso);
-  const [firmaAbierta, setFirmaAbierta] = useState(firma);
+  const pathname = usePathname();
+  const [rutaVisitada, setRutaVisitada] = useState(pathname);
   const [cerrado, setCerrado] = useState(false);
 
-  if (firma !== firmaAbierta) {
-    setFirmaAbierta(firma);
+  if (reabrirAvisoEntrada(pathname, rutaVisitada)) {
+    setRutaVisitada(pathname);
     setCerrado(false);
   }
 
@@ -29,6 +28,8 @@ export function AvisoEntradaCaso({ aviso }: { aviso: AvisoEntradaCasoDatos | nul
 
   if (!aviso) return null;
 
+  const className = ["modal-aviso-entrada", aviso.claseModal].filter(Boolean).join(" ");
+
   return (
     <Modal
       open={!cerrado}
@@ -36,7 +37,7 @@ export function AvisoEntradaCaso({ aviso }: { aviso: AvisoEntradaCasoDatos | nul
       sinCerrar
       cierreExplicito
       title={aviso.title}
-      className={aviso.claseModal}
+      className={className}
       onClose={() => setCerrado(true)}
     >
       <div className="space-y-4">
@@ -46,6 +47,13 @@ export function AvisoEntradaCaso({ aviso }: { aviso: AvisoEntradaCasoDatos | nul
               {parrafo}
             </p>
           ))}
+          {aviso.pasos && aviso.pasos.length > 0 ? (
+            <ul className="aviso-entrada-pasos aviso-entrada-texto text-sm leading-relaxed">
+              {aviso.pasos.map((paso) => (
+                <li key={paso}>{paso}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
         <div className="flex justify-end">
           <button

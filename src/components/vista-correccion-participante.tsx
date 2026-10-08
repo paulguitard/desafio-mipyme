@@ -63,6 +63,7 @@ export function VistaCorreccionParticipante({
   respuestas,
   asignaciones,
   observadas,
+  modificadas = [],
   esGeneral,
   canEdit,
 }: {
@@ -70,10 +71,12 @@ export function VistaCorreccionParticipante({
   respuestas: RespuestaParticipanteVista[];
   asignaciones: AsignacionParticipanteVista[];
   observadas: string[];
+  modificadas?: string[];
   esGeneral: boolean;
   canEdit: boolean;
 }) {
   const observadasSet = useMemo(() => new Set(observadas), [observadas]);
+  const modificadasSet = useMemo(() => new Set(modificadas), [modificadas]);
   const inicial =
     asignaciones.find((item) => item.estado === "CON_OBSERVACIONES")?.id ??
     asignaciones.find((item) => item.revisionesGenerales.length + item.revisiones.length > 0)?.id ??
@@ -106,23 +109,25 @@ export function VistaCorreccionParticipante({
 
       <section
         className="eval-detalle-shell min-h-0 flex-1"
-        aria-label="Participante y evaluación"
+        aria-label="Tu caso y evaluación"
         data-tour="formulario-caso"
       >
         <EvalDetalleColumnas
           sinSupervision
-          casoTitle="Participante"
+          casoTitle="Tu caso"
           casoSubtitle="Tu respuesta"
           caso={preguntas.map((pregunta) => {
             const respuesta = respuestas.find((item) => item.preguntaId === pregunta.id);
             const locked =
               !esGeneral && canEdit && observadasSet.size > 0 && !observadasSet.has(pregunta.id);
+            const modificada = modificadasSet.has(pregunta.id);
             return (
               <EvalDetalleCelda key={pregunta.id} panel="caso">
                 <PreguntaCampo
                   pregunta={pregunta}
                   respuesta={respuesta ?? null}
                   disabled={!canEdit || locked}
+                  modificada={modificada}
                   acciones={
                     respuesta?.versiones && respuesta.versiones.length > 0 ? (
                       <HistorialVersionesRespuesta
@@ -135,6 +140,7 @@ export function VistaCorreccionParticipante({
                           createdAt: version.createdAt,
                           numero: respuesta.versiones.length - index,
                         }))}
+                        modificada={modificada}
                       />
                     ) : null
                   }

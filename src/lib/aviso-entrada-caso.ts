@@ -1,8 +1,14 @@
 export type AvisoEntradaCaso = {
   title: string;
   parrafos: string[];
+  pasos?: string[];
   claseModal?: string;
 };
+
+/** Solo al entrar a otra ruta. Un envío cambia el texto del aviso, pero no es una visita nueva. */
+export function reabrirAvisoEntrada(rutaActual: string, rutaVisitada: string) {
+  return rutaActual !== rutaVisitada;
+}
 
 export function parrafosDescripcionMentoria(descripcion: string): string[] {
   const texto = descripcion.trim();
@@ -11,28 +17,31 @@ export function parrafosDescripcionMentoria(descripcion: string): string[] {
 }
 
 const EXTRA_HISTORIAL =
-  "En cada pregunta, Modificada abre el historial de cambios de la respuesta.";
-const EXTRA_PESTANAS =
-  "Usa las pestañas Caso, Evaluación y Supervisión para pasar de las respuestas a los comentarios.";
+  "Si una pregunta dice Modificada, ábrela para ver qué cambió.";
+const PANELES_EVALUACION =
+  "En Caso ves las respuestas. En Evaluación y Supervisión ves los comentarios.";
+const PANELES_PARTICIPANTE =
+  "En Evaluación ves los comentarios. En Tu caso ves tu respuesta.";
 
 export function avisoEntradaEvaluador(estado: string): AvisoEntradaCaso {
   if (estado === "EN_SUPERVISION") {
     return {
       title: "Esperando al supervisor",
       parrafos: [
-        "Esperando que el supervisor revise esta evaluación.",
-        "Puedes consultar el caso, pero no editarás hasta que el supervisor responda.",
-        EXTRA_PESTANAS,
-        EXTRA_HISTORIAL,
+        "El supervisor todavía no revisa esta evaluación. Puedes leer el caso, pero no editar hasta que responda.",
       ],
+      pasos: [PANELES_EVALUACION, EXTRA_HISTORIAL],
     };
   }
   if (estado === "DEVUELTA_SUPERVISOR") {
     return {
       title: "El supervisor devolvió la evaluación",
       parrafos: [
-        "El supervisor devolvió esta evaluación. Revisa sus observaciones y vuelve a enviar.",
-        "Los comentarios están en la pestaña Supervisión. Ajusta tu revisión y envía de nuevo.",
+        "Hay observaciones del supervisor. Revísalas y vuelve a enviar tu evaluación.",
+      ],
+      pasos: [
+        "Léelas en Evaluación y Supervisión.",
+        "Ajusta tu evaluación y pulsa Enviar a supervisor, o Finalizar evaluación si ya no hay nada que corregir.",
         EXTRA_HISTORIAL,
       ],
     };
@@ -41,38 +50,37 @@ export function avisoEntradaEvaluador(estado: string): AvisoEntradaCaso {
     return {
       title: "Esperando al participante",
       parrafos: [
-        "Esperando que el participante corrija las observaciones de esta evaluación.",
-        "Cuando reenvíe, verás los cambios en el historial de cada pregunta.",
-        EXTRA_PESTANAS,
+        "El participante todavía no corrige. Puedes consultar el caso, pero no editar.",
+      ],
+      pasos: [
+        PANELES_EVALUACION,
+        "Cuando reenvíe, lo que cambió dirá Modificada.",
       ],
     };
   }
   if (estado === "REPARADA") {
     return {
       title: "El participante ya corrigió",
-      parrafos: [
-        "El participante ya corrigió. Revisa los cambios en el historial de cada pregunta.",
-        "Abre Modificada en las preguntas que cambió, actualiza tu revisión y envía al supervisor o finaliza si corresponde.",
-        EXTRA_PESTANAS,
+      parrafos: ["Revisa qué cambió y actualiza tu evaluación."],
+      pasos: [
+        "En Caso, abre Modificada en las preguntas que cambiaron.",
+        "Luego pulsa Enviar a supervisor o Finalizar evaluación.",
       ],
     };
   }
   if (estado === "FINALIZADA") {
     return {
       title: "Evaluación finalizada",
-      parrafos: [
-        "Esta evaluación está cerrada. Puedes consultar el caso y el historial, pero ya no se edita.",
-        EXTRA_PESTANAS,
-        EXTRA_HISTORIAL,
-      ],
+      parrafos: ["Este caso está cerrado. Puedes consultarlo, pero ya no se edita."],
+      pasos: [PANELES_EVALUACION, EXTRA_HISTORIAL],
     };
   }
   return {
     title: "Revisar el caso",
-    parrafos: [
-      "Revisa las respuestas del participante y deja tu evaluación.",
-      "Puedes guardar un borrador, enviar al supervisor o pedir finalizar.",
-      EXTRA_PESTANAS,
+    parrafos: ["Lee las respuestas y escribe tu evaluación."],
+    pasos: [
+      "En Caso lees las respuestas. En Evaluación y Supervisión escribes tu comentario.",
+      "Puedes usar Guardar revisión, Enviar a supervisor y Finalizar evaluación.",
       EXTRA_HISTORIAL,
     ],
   };
@@ -83,14 +91,19 @@ export function avisoEntradaSupervisor(
   intencionPendiente?: string | null,
 ): AvisoEntradaCaso {
   if (estado === "EN_SUPERVISION") {
+    const pidioFinalizar = intencionPendiente === "FINALIZAR";
     return {
       title: "Toca revisar esta evaluación",
       parrafos: [
-        intencionPendiente === "FINALIZAR"
-          ? "El evaluador pidió finalizar. Revisa y procede o devuelve observaciones."
-          : "El evaluador envió observaciones. Revisa y procede o devuelve observaciones.",
-        "Proceder confirma lo enviado. Enviar observaciones las devuelve al evaluador.",
-        EXTRA_PESTANAS,
+        pidioFinalizar
+          ? "El evaluador pidió cerrar el caso. Revisa y decide si cierra o si hay que corregir."
+          : "El evaluador envió observaciones para el participante. Revisa y decide si proceden.",
+      ],
+      pasos: [
+        PANELES_EVALUACION,
+        pidioFinalizar
+          ? "Proceder cierra la evaluación. Enviar observaciones la devuelve al evaluador."
+          : "Proceder las aprueba y llegan al participante. Enviar observaciones las devuelve al evaluador.",
         EXTRA_HISTORIAL,
       ],
     };
@@ -99,29 +112,26 @@ export function avisoEntradaSupervisor(
     return {
       title: "Esperando al evaluador",
       parrafos: [
-        "Esperando que el evaluador corrija según tu última supervisión.",
-        "Puedes consultar el caso y el historial; la edición se habilita cuando vuelva a enviar.",
-        EXTRA_PESTANAS,
+        "Devolviste esta evaluación. El evaluador todavía no responde. Puedes consultar; podrás editar cuando vuelva a enviar.",
       ],
+      pasos: [PANELES_EVALUACION],
     };
   }
   if (estado === "FINALIZADA") {
     return {
       title: "Supervisión cerrada",
       parrafos: [
-        "Esta evaluación está finalizada. Puedes consultar el caso y el historial.",
-        EXTRA_PESTANAS,
-        EXTRA_HISTORIAL,
+        "Esta evaluación está cerrada. Puedes consultar el caso y los comentarios.",
       ],
+      pasos: [PANELES_EVALUACION, EXTRA_HISTORIAL],
     };
   }
   return {
     title: "Consultar el caso",
     parrafos: [
-      "Esta evaluación aún no está en tu turno de supervisión. Puedes consultar el caso y el historial.",
-      EXTRA_PESTANAS,
-      EXTRA_HISTORIAL,
+      "Todavía no es tu turno. Puedes leer el caso y los comentarios, pero no editar.",
     ],
+    pasos: [PANELES_EVALUACION, EXTRA_HISTORIAL],
   };
 }
 
@@ -131,30 +141,37 @@ export function avisoEntradaParticipante(args: {
   canEdit: boolean;
   mentoriaAbierta: boolean;
   descripcionMentoria?: string;
+  conEvaluacionVisible?: boolean;
 }): AvisoEntradaCaso {
   if (args.estado === "FINALIZADA") {
     return {
       title: "Tu caso fue aprobado",
       parrafos: [
-        "¡Felicidades! Tu caso fue aprobado por los evaluadores. El equipo del desafío te informará pronto los siguientes pasos.",
+        "¡Felicidades! Los evaluadores aprobaron tu caso. El equipo del desafío te avisará los siguientes pasos.",
       ],
+      pasos: [PANELES_PARTICIPANTE, EXTRA_HISTORIAL],
     };
   }
   if (!args.mentoriaAbierta && !args.canEdit) {
     return {
       title: "Asesoría cerrada",
       parrafos: [
-        "La asesoría está cerrada. Solo puedes consultar.",
-        EXTRA_HISTORIAL,
+        "Esta asesoría ya no recibe cambios. Solo puedes consultar lo que enviaste.",
       ],
+      pasos: args.conEvaluacionVisible
+        ? [PANELES_PARTICIPANTE, EXTRA_HISTORIAL]
+        : [EXTRA_HISTORIAL],
     };
   }
   if (args.esCorreccion) {
     return {
       title: "Hay observaciones para corregir",
       parrafos: [
-        "El evaluador dejó observaciones. Revisa los comentarios y corrige lo indicado.",
-        "En Evaluación ves los comentarios. En Caso editas tu respuesta. Luego guarda o envía las correcciones.",
+        "El evaluador dejó comentarios. Revísalos y corrige tu caso.",
+      ],
+      pasos: [
+        "En Evaluación lees qué cambiar. En Tu caso editas tu respuesta.",
+        "Luego usa Guardar borrador o Enviar correcciones.",
         EXTRA_HISTORIAL,
       ],
     };
@@ -166,11 +183,24 @@ export function avisoEntradaParticipante(args: {
       claseModal: "modal-aviso-completa-caso",
     };
   }
+  if (args.conEvaluacionVisible) {
+    return {
+      title: args.estado === "REPARADA_POR_EL_EMPRENDEDOR"
+        ? "Ya enviaste tus correcciones"
+        : "Caso enviado",
+      parrafos: [
+        args.estado === "REPARADA_POR_EL_EMPRENDEDOR"
+          ? "El evaluador las está revisando. Puedes consultar el caso y los comentarios, pero no editar hasta que haya nuevas observaciones."
+          : "Tu caso ya está en evaluación. Si hay observaciones, podrás corregirlas desde aquí.",
+      ],
+      pasos: [PANELES_PARTICIPANTE, EXTRA_HISTORIAL],
+    };
+  }
   return {
     title: "Caso enviado",
     parrafos: [
-      "El caso ya fue enviado. Espera la evaluación; si hay observaciones, podrás corregir desde aquí.",
-      EXTRA_HISTORIAL,
+      "Tu caso ya está en evaluación. Si hay observaciones, podrás corregirlas desde aquí.",
     ],
+    pasos: [EXTRA_HISTORIAL],
   };
 }

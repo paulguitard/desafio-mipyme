@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { SelectorVeredicto } from "@/components/selector-veredicto";
 import { useReportarVeredictoSupervision } from "@/components/veredicto-supervision-context";
 import {
@@ -11,11 +12,18 @@ import {
   type RevisionHilo,
   type SupervisionHilo,
 } from "@/lib/hilo-revision";
+import { htmlParaVistaComentario } from "@/lib/comentario-observacion";
 import type { NotaPreguntaGeneral, PeldanoEscala } from "@/lib/preguntas";
-import { parseEscalaNotas } from "@/lib/preguntas";
+import { esHtmlVacio, parseEscalaNotas } from "@/lib/preguntas";
 import { revisionParaEditar, revisionVigente } from "@/lib/revision-ciclo";
 import { irAPreguntaCaso } from "@/components/resumen-cambios-reenvio";
-import { textoContinuo } from "@/lib/texto-continuo";
+
+const EditorTextoLargo = dynamic(
+  () => import("@/components/editor-texto-largo").then((mod) => mod.EditorTextoLargo),
+);
+const TextoLargoVista = dynamic(
+  () => import("@/components/texto-largo-vista").then((mod) => mod.TextoLargoVista),
+);
 
 type PreguntaNotas = {
   id: string;
@@ -37,10 +45,18 @@ function etiquetaNota(nota: number | null, escala: PeldanoEscala[]) {
   return peldano?.etiqueta ? `Nota: ${nota} · ${peldano.etiqueta}` : `Nota: ${nota}`;
 }
 
-function textoMensaje(mensaje: MensajeHilo) {
-  if (mensaje.veredicto === "OBSERVACION") return textoContinuo(mensaje.comentario);
-  if (mensaje.veredicto === "OK") return "Sin observaciones";
-  return "";
+function cuerpoMensaje(mensaje: MensajeHilo, className: string): ReactNode {
+  if (mensaje.veredicto === "OK") {
+    return <p className={className}>Sin observaciones</p>;
+  }
+  if (mensaje.veredicto !== "OBSERVACION") return null;
+  const html = htmlParaVistaComentario(mensaje.comentario);
+  if (esHtmlVacio(html)) return null;
+  return (
+    <div className={className}>
+      <TextoLargoVista html={html} />
+    </div>
+  );
 }
 
 function notasGeneralesDelCiclo(
@@ -146,7 +162,7 @@ function EditorHilo({
   notasPreguntas: NotaPreguntaGeneral[];
 }) {
   const [veredicto, setVeredicto] = useState(veredictoInicial);
-  const [comentario, setComentario] = useState(comentarioInicial);
+  const [comentario, setComentario] = useState(() => htmlParaVistaComentario(comentarioInicial));
   const [nota, setNota] = useState<number | null>(notaInicial);
   const reportar = useReportarVeredictoSupervision();
   const sufijo = preguntaId ?? "general";
@@ -208,15 +224,13 @@ function EditorHilo({
         {muestraComentario ? (
           <div className="field">
             <label htmlFor={campoComentario}>Comentario (obligatorio)</label>
-            <textarea
-              className="input"
-              id={campoComentario}
+            <EditorTextoLargo
               name={campoComentario}
-              value={comentario}
-              onChange={(event) => {
-                event.currentTarget.classList.remove("is-comentario-pendiente");
-                setComentario(event.target.value);
-              }}
+              defaultValue={comentario}
+              destacados={false}
+              tamano={false}
+              alinear={false}
+              onChange={setComentario}
             />
             <p className="veredicto-comentario-aviso text-danger" role="alert">
               Debes incluir un comentario.
@@ -240,7 +254,6 @@ function GloboHilo({
   escala: PeldanoEscala[];
   notasGenerales: { enunciado: string; texto: string }[];
 }) {
-  const texto = textoMensaje(mensaje);
   const notaTexto = mensaje.rol === "evaluador" ? etiquetaNota(mensaje.nota, escala) : null;
   const rol = mensaje.rol === "evaluador" ? "Evaluador" : "Supervisor";
 
@@ -254,7 +267,7 @@ function GloboHilo({
             <span className="hilo-ticker">Versión final mostrada al participante</span>
           ) : null}
         </div>
-        {texto ? <p className="hilo-globo-texto">{texto}</p> : null}
+        {cuerpoMensaje(mensaje, "hilo-globo-texto")}
         {notaTexto ? <p className="hilo-globo-nota">{notaTexto}</p> : null}
         {notasGenerales.length > 0 ? (
           <ul className="hilo-globo-notas">
@@ -343,11 +356,15 @@ export function PanelHiloRevision({
           Respuesta modificada
         </button>
       ) : null}
-      {tarjetas.map((tarjeta) => {
+      {tarjetas.map((tarjeta, index) => {
         const editorAqui = mostrarEditor && tarjeta.ronda === asignacion.rondaActual;
-        return (
-          <article key={tarjeta.ronda} className="hilo-ronda">
-            <h3 className="hilo-ronda-titulo">{tarjeta.titulo}</h3>
+        const esMasReciente = audiencia === "participante" && index === 0;
+        const ronda = (
+          <article className="hilo-ronda">
+            <h3 className="hilo-ronda-titulo">
+              <span>{tarjeta.titulo}</span>
+              {esMasReciente ? <span className="hilo-ticker">Más reciente</span> : null}
+            </h3>
             {editorAqui && rolEditor ? (
               <EditorHilo
                 rol={rolEditor}
@@ -368,13 +385,9 @@ export function PanelHiloRevision({
               audiencia === "participante" ? (
                 <div className="hilo-textos-participante">
                   {tarjeta.mensajes.map((mensaje) => {
-                    const texto = textoMensaje(mensaje);
-                    if (!texto) return null;
-                    return (
-                      <p key={`${mensaje.rol}-${mensaje.id}`} className="hilo-texto-participante">
-                        {texto}
-                      </p>
-                    );
+                    const cuerpo = cuerpoMensaje(mensaje, "hilo-texto-participante");
+                    if (!cuerpo) return null;
+                    return <div key={`${mensaje.rol}-${mensaje.id}`}>{cuerpo}</div>;
                   })}
                 </div>
               ) : (
@@ -403,6 +416,15 @@ export function PanelHiloRevision({
               <p className="hilo-ronda-vacio text-muted">Todavía no hay comentarios enviados.</p>
             )}
           </article>
+        );
+        return esMasReciente ? (
+          <div key={tarjeta.ronda} className="hilo-ronda-halo">
+            <span className="hilo-ronda-halo__glow" aria-hidden="true" />
+            <span className="hilo-ronda-halo__ring" aria-hidden="true" />
+            {ronda}
+          </div>
+        ) : (
+          <div key={tarjeta.ronda}>{ronda}</div>
         );
       })}
     </div>

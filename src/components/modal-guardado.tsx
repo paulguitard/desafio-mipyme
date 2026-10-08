@@ -60,6 +60,7 @@ export function ModalProgreso({
       open={open}
       compact
       sinCerrar
+      className="modal-accion-caso"
       title={title}
       onClose={() => {
         if (!enCurso) onAceptar();
@@ -69,14 +70,14 @@ export function ModalProgreso({
         {enCurso ? (
           <div className="flex flex-col items-center gap-3 py-2" role="status" aria-live="polite">
             <span className="modal-guardado-spinner" aria-hidden="true" />
-            <p className="text-sm text-muted">{copy.detalleEnCurso}</p>
+            <p className="modal-accion-caso-texto text-sm text-muted">{copy.detalleEnCurso}</p>
           </div>
         ) : (
           <>
             {estado === "error" ? (
-              <p className="text-sm leading-relaxed text-danger">{error ?? copy.errorFallback}</p>
+              <p className="modal-accion-caso-texto text-sm leading-relaxed text-danger">{error ?? copy.errorFallback}</p>
             ) : (
-              <p className="text-sm leading-relaxed">{detalleExito ?? copy.detalleExito}</p>
+              <p className="modal-accion-caso-texto text-sm leading-relaxed">{detalleExito ?? copy.detalleExito}</p>
             )}
             <div className="flex justify-end">
               <button

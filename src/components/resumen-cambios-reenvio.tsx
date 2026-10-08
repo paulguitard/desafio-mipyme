@@ -17,7 +17,7 @@ export function ResumenCambiosReenvio({
 
   return (
     <nav className="cambios-reenvio" aria-label="Preguntas modificadas en el último envío">
-      <span>Modificó {cantidad}</span>
+      <span>El participante modificó {cantidad}:</span>
       {preguntas.map((pregunta) => (
         <button
           key={pregunta.id}

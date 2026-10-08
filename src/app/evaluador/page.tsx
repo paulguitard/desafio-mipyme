@@ -4,6 +4,7 @@ import {
   etiquetaAsignacionPanelEvaluador,
   FILTROS_EVALUADOR,
   grupoFiltroEvaluador,
+  resolverFiltroEvaluador,
 } from "@/lib/casos-panel";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
 import { requireCatalogoEvaluador } from "@/lib/session";
@@ -19,7 +20,8 @@ export default async function EvaluadorHomePage({
     return <SupervisorHome supervisorId={user.id} searchParams={searchParams} />;
   }
 
-  const { filtro = "todas" } = await searchParams;
+  const { filtro } = await searchParams;
+  const filtroActivo = resolverFiltroEvaluador(filtro);
   const asignaciones = await prisma.asignacionEvaluador.findMany({
     where: { evaluadorId: user.id },
     include: {
@@ -48,7 +50,7 @@ export default async function EvaluadorHomePage({
     <CasosPanel
       titulo="Evaluaciones asignadas"
       filtros={FILTROS_EVALUADOR}
-      filtroInicial={filtro}
+      filtroInicial={filtroActivo}
       casos={casos}
       tourFiltros="filtros-evaluacion"
       tourLista="lista-evaluaciones"

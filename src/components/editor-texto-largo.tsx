@@ -137,13 +137,23 @@ export function EditorTextoLargo({
   name,
   defaultValue = "",
   disabled,
+  destacados = true,
+  tamano = true,
+  alinear = true,
+  onChange,
 }: {
   name: string;
   defaultValue?: string;
   disabled?: boolean;
+  destacados?: boolean;
+  tamano?: boolean;
+  alinear?: boolean;
+  onChange?: (html: string) => void;
 }) {
   const fieldId = useId();
   const hiddenRef = useRef<HTMLInputElement>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
   const initial = defaultValue.trim() ? defaultValue : "<p></p>";
   const [html, setHtml] = useState(() => htmlParaFormulario(defaultValue));
   const [menuAbierto, setMenuAbierto] = useState<"tamano" | "destacar" | "alinear" | null>(null);
@@ -151,7 +161,11 @@ export function EditorTextoLargo({
   const syncHtml = (raw: string) => {
     const next = htmlParaFormulario(raw);
     setHtml(next);
-    if (hiddenRef.current) hiddenRef.current.value = next;
+    if (hiddenRef.current) {
+      hiddenRef.current.value = next;
+      hiddenRef.current.closest(".rte")?.classList.remove("is-comentario-pendiente");
+    }
+    onChangeRef.current?.(next);
   };
 
   const editor = useEditor({
@@ -168,10 +182,9 @@ export function EditorTextoLargo({
         orderedList: false,
         strike: false,
       }),
-      Highlight.configure({ multicolor: true }),
-      TextStyle,
-      FontSize,
-      TextAlign.configure({ types: ["paragraph"] }),
+      ...(destacados ? [Highlight.configure({ multicolor: true })] : []),
+      ...(tamano ? [TextStyle, FontSize] : []),
+      ...(alinear ? [TextAlign.configure({ types: ["paragraph"] })] : []),
     ],
     content: initial,
     onCreate: ({ editor: ed }) => syncHtml(ed.getHTML()),
@@ -303,62 +316,66 @@ export function EditorTextoLargo({
       <input
         ref={hiddenRef}
         type="hidden"
-        id={fieldId}
+        id={name || fieldId}
         name={name}
         value={html}
         readOnly
       />
       {!disabled ? (
         <div className="rte-toolbar" role="toolbar" aria-label="Formato de texto">
-          <label className="rte-select-wrap">
-            <span className="sr-only">Tamaño de letra</span>
-            <select
-              className="rte-select"
-              value={tamanoActual}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (!editor) return;
-                if (!v) {
-                  editor.chain().focus().unsetFontSize().run();
-                } else {
-                  editor.chain().focus().setFontSize(v).run();
-                }
-              }}
-            >
-              {TAMANOS.map((t) => (
-                <option key={t.label} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <ToolbarMenu
-            className="rte-menu-tamano"
-            label={etiquetaTamano}
-            title="Tamaño de letra"
-            open={menuAbierto === "tamano"}
-            disabled={!editor}
-            onToggle={() => setMenuAbierto((actual) => (actual === "tamano" ? null : "tamano"))}
-          >
-            {TAMANOS.map((t) => (
-              <ToolbarButton
-                key={t.label}
-                title={t.label}
-                active={tamanoActual === t.value}
+          {tamano ? (
+            <>
+              <label className="rte-select-wrap">
+                <span className="sr-only">Tamaño de letra</span>
+                <select
+                  className="rte-select"
+                  value={tamanoActual}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!editor) return;
+                    if (!v) {
+                      editor.chain().focus().unsetFontSize().run();
+                    } else {
+                      editor.chain().focus().setFontSize(v).run();
+                    }
+                  }}
+                >
+                  {TAMANOS.map((t) => (
+                    <option key={t.label} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <ToolbarMenu
+                className="rte-menu-tamano"
+                label={etiquetaTamano}
+                title="Tamaño de letra"
+                open={menuAbierto === "tamano"}
                 disabled={!editor}
-                onClick={() => {
-                  if (!editor) return;
-                  if (!t.value) editor.chain().focus().unsetFontSize().run();
-                  else editor.chain().focus().setFontSize(t.value).run();
-                  setMenuAbierto(null);
-                }}
+                onToggle={() => setMenuAbierto((actual) => (actual === "tamano" ? null : "tamano"))}
               >
-                {t.label}
-              </ToolbarButton>
-            ))}
-          </ToolbarMenu>
+                {TAMANOS.map((t) => (
+                  <ToolbarButton
+                    key={t.label}
+                    title={t.label}
+                    active={tamanoActual === t.value}
+                    disabled={!editor}
+                    onClick={() => {
+                      if (!editor) return;
+                      if (!t.value) editor.chain().focus().unsetFontSize().run();
+                      else editor.chain().focus().setFontSize(t.value).run();
+                      setMenuAbierto(null);
+                    }}
+                  >
+                    {t.label}
+                  </ToolbarButton>
+                ))}
+              </ToolbarMenu>
 
-          <span className="rte-sep" aria-hidden />
+              <span className="rte-sep" aria-hidden />
+            </>
+          ) : null}
 
           <ToolbarButton
             title="Negrita"
@@ -385,38 +402,46 @@ export function EditorTextoLargo({
             <span className="underline">S</span>
           </ToolbarButton>
 
-          <span className="rte-sep" aria-hidden />
+          {destacados ? (
+            <>
+              <span className="rte-sep" aria-hidden />
 
-          <div className="rte-highlights" role="group" aria-label="Color destacador">
-            {botonesDestacar}
-          </div>
-          <ToolbarMenu
-            label="Destacar"
-            title="Destacar"
-            open={menuAbierto === "destacar"}
-            active={destacarActivo}
-            disabled={!editor}
-            onToggle={() => setMenuAbierto((actual) => (actual === "destacar" ? null : "destacar"))}
-          >
-            {botonesDestacar}
-          </ToolbarMenu>
+              <div className="rte-highlights" role="group" aria-label="Color destacador">
+                {botonesDestacar}
+              </div>
+              <ToolbarMenu
+                label="Destacar"
+                title="Destacar"
+                open={menuAbierto === "destacar"}
+                active={destacarActivo}
+                disabled={!editor}
+                onToggle={() => setMenuAbierto((actual) => (actual === "destacar" ? null : "destacar"))}
+              >
+                {botonesDestacar}
+              </ToolbarMenu>
+            </>
+          ) : null}
 
-          <span className="rte-sep" aria-hidden />
+          {alinear ? (
+            <>
+              <span className="rte-sep" aria-hidden />
 
-          <div className="rte-aligns" role="group" aria-label="Alineación">
-            {botonesAlinear}
-          </div>
-          <ToolbarMenu
-            label="Alinear"
-            title="Alinear"
-            open={menuAbierto === "alinear"}
-            active={alinearActivo}
-            disabled={!editor}
-            alignEnd
-            onToggle={() => setMenuAbierto((actual) => (actual === "alinear" ? null : "alinear"))}
-          >
-            {botonesAlinear}
-          </ToolbarMenu>
+              <div className="rte-aligns" role="group" aria-label="Alineación">
+                {botonesAlinear}
+              </div>
+              <ToolbarMenu
+                label="Alinear"
+                title="Alinear"
+                open={menuAbierto === "alinear"}
+                active={alinearActivo}
+                disabled={!editor}
+                alignEnd
+                onToggle={() => setMenuAbierto((actual) => (actual === "alinear" ? null : "alinear"))}
+              >
+                {botonesAlinear}
+              </ToolbarMenu>
+            </>
+          ) : null}
 
           <span className="rte-sep" aria-hidden />
 

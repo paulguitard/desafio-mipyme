@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { sanitizarComentarioObservacion } from "@/lib/comentario-observacion";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { requireUser } from "@/lib/session";
 import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
@@ -35,10 +36,14 @@ function revalidateSupervision(asignacionId: string, postulacionId: string) {
   revalidatePath("/participante");
 }
 
+function leerComentario(formData: FormData, name: string) {
+  return sanitizarComentarioObservacion(String(formData.get(name) ?? ""));
+}
+
 function leerVeredictoGeneral(formData: FormData) {
   return {
     veredicto: String(formData.get("veredicto-general") ?? ""),
-    comentario: String(formData.get("comentario-general") ?? "").trim(),
+    comentario: leerComentario(formData, "comentario-general"),
   };
 }
 
@@ -51,7 +56,7 @@ async function guardarSupervisionPorPregunta(
 ) {
   for (const pregunta of preguntas) {
     const veredicto = String(formData.get(`veredicto-${pregunta.id}`) ?? "");
-    const comentario = String(formData.get(`comentario-${pregunta.id}`) ?? "").trim();
+    const comentario = leerComentario(formData, `comentario-${pregunta.id}`);
     if (veredicto !== "OK" && veredicto !== "OBSERVACION") continue;
 
     await prisma.supervisionPregunta.upsert({
@@ -152,7 +157,7 @@ export async function enviarObservacionesSupervision(formData: FormData) {
     const preguntas = asignacion.postulacion.convocatoria.formulario.preguntas;
     const items = preguntas.map((pregunta) => ({
       veredicto: String(formData.get(`veredicto-${pregunta.id}`) ?? ""),
-      comentario: String(formData.get(`comentario-${pregunta.id}`) ?? "").trim(),
+      comentario: leerComentario(formData, `comentario-${pregunta.id}`),
     }));
     if (items.some((item) => item.veredicto !== "OK" && item.veredicto !== "OBSERVACION")) {
       return { error: "Marca todas las preguntas como Sin observaciones o Comentar observaciones." };

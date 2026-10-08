@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
+import { sanitizarComentarioObservacion } from "@/lib/comentario-observacion";
 import { parseEscalaNotas } from "@/lib/preguntas";
 import { requireUser } from "@/lib/session";
 import { evaluadorPuedeEditar } from "@/lib/estado";
@@ -24,10 +25,14 @@ async function cargaAsignacion(id: string, evaluadorId: string) {
   });
 }
 
+function leerComentario(formData: FormData, name: string) {
+  return sanitizarComentarioObservacion(String(formData.get(name) ?? ""));
+}
+
 function leerVeredictoGeneral(formData: FormData) {
   return {
     veredicto: String(formData.get("veredicto-general") ?? ""),
-    comentario: String(formData.get("comentario-general") ?? "").trim(),
+    comentario: leerComentario(formData, "comentario-general"),
   };
 }
 
@@ -48,7 +53,7 @@ async function guardarRevisionPorPregunta(
       : veredictoRaw;
     const comentario = opciones?.forzarOkSinComentario
       ? ""
-      : String(formData.get(`comentario-${pregunta.id}`) ?? "").trim();
+      : leerComentario(formData, `comentario-${pregunta.id}`);
     if (veredicto !== "OK" && veredicto !== "OBSERVACION") continue;
     const notaRaw = String(formData.get(`nota-${pregunta.id}`) ?? "").trim();
     const notaParsed = Number(notaRaw);
@@ -151,7 +156,7 @@ async function leerVeredictos(formData: FormData, preguntaIds: string[]) {
   return preguntaIds.map((preguntaId) => ({
     preguntaId,
     veredicto: String(formData.get(`veredicto-${preguntaId}`) ?? ""),
-    comentario: String(formData.get(`comentario-${preguntaId}`) ?? "").trim(),
+    comentario: leerComentario(formData, `comentario-${preguntaId}`),
     notaRaw: String(formData.get(`nota-${preguntaId}`) ?? "").trim(),
   }));
 }

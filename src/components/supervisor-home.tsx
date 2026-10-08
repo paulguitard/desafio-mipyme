@@ -16,7 +16,7 @@ export async function SupervisorHome({
   supervisorId: string;
   searchParams: Promise<{ filtro?: string }>;
 }) {
-  const { filtro = "todas" } = await searchParams;
+  const { filtro } = await searchParams;
   const activo = resolverFiltroSupervisor(filtro);
 
   const asignaciones = await prisma.asignacionSupervisor.findMany({
@@ -46,13 +46,12 @@ export async function SupervisorHome({
       nombre: asignacion.evaluador.name,
       estado: asignacion.estado,
       etiqueta: etiquetaAsignacionPanelSupervisor(asignacion.estado),
-      intencion: asignacion.intencionPendiente,
     })),
   }));
 
   return (
     <CasosPanel
-      titulo="Participaciones a supervisar"
+      titulo="Evaluaciones a supervisar"
       filtros={FILTROS_SUPERVISOR}
       filtroInicial={activo.id}
       casos={casos}

@@ -185,7 +185,7 @@ export function resolverTutorial(
           ancla: "filtros-evaluacion",
           titulo: "Filtros de estado",
           descripcion:
-            "Los filtros están separados por turno: el tuyo, el del supervisor o el del participante. En Todas se listan agrupados igual.",
+            "Arriba ves el filtro activo. Usa Filtrar para elegir el turno: el tuyo, el del supervisor o el del participante.",
         },
         {
           ancla: "lista-evaluaciones",
@@ -264,7 +264,7 @@ export function resolverTutorial(
           ancla: "filtros-supervision",
           titulo: "Filtros de supervisión",
           descripcion:
-            "Los filtros están separados por turno: el tuyo, el del evaluador o el del participante.",
+            "Arriba ves el filtro activo. Usa Filtrar para elegir el turno: el tuyo, el del evaluador o el del participante.",
         },
         {
           ancla: "lista-supervision",
