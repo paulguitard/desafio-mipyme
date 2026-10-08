@@ -1901,6 +1901,14 @@ h1.formulario-caso-titulo {
   background: var(--ficha-detalle-fondo);
 }
 
+@media (min-width: 768px) {
+  .ficha-detalle-admin {
+    padding-top: 1.5rem;
+    padding-left: 2.25rem;
+    padding-right: 2.25rem;
+  }
+}
+
 .ficha-detalle-admin-meta {
   display: flex;
   flex-wrap: wrap;

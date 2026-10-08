@@ -67,7 +67,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
 
   return (
     <div className="ficha-detalle-admin eval-shell-open">
-      {data.asignaciones.length > 0 ? (
+      {data.asignaciones.length > 1 ? (
         <div className="ficha-detalle-admin-meta">
           <div className="ficha-detalle-admin-eval">
             <label htmlFor="ficha-detalle-evaluador">Evaluación de</label>
