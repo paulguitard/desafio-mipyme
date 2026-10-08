@@ -75,7 +75,7 @@ function marcarVeredictosPendientes(form: HTMLFormElement) {
         "comentario-",
       );
       const campoComentario =
-        form.querySelector<HTMLElement>(`[name="${CSS.escape(name)}"]`)?.closest(".rte") ??
+        form.querySelector<HTMLElement>(`[name="${CSS.escape(name)}"]`)?.closest<HTMLElement>(".rte") ??
         form.querySelector<HTMLTextAreaElement>(`textarea[name="${CSS.escape(name)}"]`);
       campoComentario?.classList.add("is-comentario-pendiente");
       primero ??= campoComentario ?? campo.grupo;
