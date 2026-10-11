@@ -6,6 +6,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
 import { TextStyle, FontSize } from "@tiptap/extension-text-style";
+import { avisarCambioFormulario } from "@/lib/autoguardado";
 import { esHtmlVacio } from "@/lib/preguntas";
 
 function htmlParaFormulario(html: string) {
@@ -154,11 +155,12 @@ export function EditorTextoLargo({
   const hiddenRef = useRef<HTMLInputElement>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const aceptaSenalEdicion = useRef(false);
   const initial = defaultValue.trim() ? defaultValue : "<p></p>";
   const [html, setHtml] = useState(() => htmlParaFormulario(defaultValue));
   const [menuAbierto, setMenuAbierto] = useState<"tamano" | "destacar" | "alinear" | null>(null);
 
-  const syncHtml = (raw: string) => {
+  const syncHtml = (raw: string, opciones?: { senal?: boolean }) => {
     const next = htmlParaFormulario(raw);
     setHtml(next);
     if (hiddenRef.current) {
@@ -166,6 +168,9 @@ export function EditorTextoLargo({
       hiddenRef.current.closest(".rte")?.classList.remove("is-comentario-pendiente");
     }
     onChangeRef.current?.(next);
+    if (opciones?.senal && aceptaSenalEdicion.current) {
+      avisarCambioFormulario(hiddenRef.current);
+    }
   };
 
   const editor = useEditor({
@@ -187,8 +192,15 @@ export function EditorTextoLargo({
       ...(alinear ? [TextAlign.configure({ types: ["paragraph"] })] : []),
     ],
     content: initial,
-    onCreate: ({ editor: ed }) => syncHtml(ed.getHTML()),
-    onUpdate: ({ editor: ed }) => syncHtml(ed.getHTML()),
+    onCreate: ({ editor: ed }) => {
+      syncHtml(ed.getHTML());
+      queueMicrotask(() => {
+        aceptaSenalEdicion.current = true;
+      });
+    },
+    onUpdate: ({ editor: ed }) => {
+      syncHtml(ed.getHTML(), { senal: true });
+    },
     editorProps: {
       attributes: {
         class: "rte-content",

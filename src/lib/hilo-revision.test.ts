@@ -81,6 +81,27 @@ describe("hilo de revisión", () => {
     ]);
   });
 
+  it("oculta un borrador sin veredicto guardado por autoguardado", () => {
+    const tarjetas = armarHiloRevision({
+      revisiones: [
+        {
+          id: "auto",
+          ronda: 1,
+          ciclo: 1,
+          veredicto: "",
+          comentario: "",
+          nota: 4,
+          createdAt: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+      asignacion: { estado: "PENDIENTE", rondaActual: 1, cicloSupervision: 1 },
+      audiencia: "equipo",
+    });
+    expect(tarjetas).toEqual([
+      { ronda: 1, titulo: "Primera evaluación", mensajes: [] },
+    ]);
+  });
+
   it("muestra la evaluación enviada y oculta la supervisión guardada sin enviar", () => {
     const tarjetas = armarHiloRevision({
       revisiones: [

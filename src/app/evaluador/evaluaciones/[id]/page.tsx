@@ -124,6 +124,7 @@ export default async function EvaluacionDetallePage({
       asignacionId={asignacion.id}
       canEdit={canEdit}
       modoEvaluacion={modoEvaluacion}
+      versionInicial={asignacion.updatedAt.toISOString()}
       back={<BotonAtras href="/evaluador" />}
       title={
         <h1 className="formulario-caso-titulo text-3xl font-extrabold text-navy">

@@ -405,6 +405,7 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
       rondaActual: asignacion.rondaActual,
       cicloSupervision: asignacion.cicloSupervision,
       intencionPendiente: asignacion.intencionPendiente,
+      updatedAt: asignacion.updatedAt.toISOString(),
       orden: asignacion.orden,
       revisiones: asignacion.revisiones.map((revision) => ({
         id: revision.id,

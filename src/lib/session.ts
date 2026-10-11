@@ -18,7 +18,7 @@ type SessionUser = {
   email?: string | null;
 };
 
-async function loadActor(): Promise<SessionUser | null> {
+export async function getActor(): Promise<SessionUser | null> {
   const session = await auth();
   if (!session?.user?.id) return null;
   const dbUser = await prisma.user.findUnique({
@@ -35,7 +35,7 @@ async function loadActor(): Promise<SessionUser | null> {
 }
 
 export async function requireUser(expected: Role) {
-  const user = await loadActor();
+  const user = await getActor();
   if (!user) {
     redirect(loginPathForRole(expected));
   }
@@ -47,7 +47,7 @@ export async function requireUser(expected: Role) {
 
 /** Evaluador o supervisor (panel /evaluador). */
 export async function requireCatalogoEvaluador() {
-  const user = await loadActor();
+  const user = await getActor();
   if (!user) {
     redirect(loginPathForRole("EVALUADOR"));
   }

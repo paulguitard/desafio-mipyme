@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { avisarCambioFormulario } from "@/lib/autoguardado";
 import {
   CUENTAS_PRESUPUESTO,
   formatearPesosCLP,
@@ -197,7 +198,17 @@ function indicadorVacio(): IndicadorObjetivo {
 }
 
 function HiddenJson({ name, value }: { name: string; value: unknown }) {
-  return <input type="hidden" name={name} value={JSON.stringify(value)} />;
+  const ref = useRef<HTMLInputElement>(null);
+  const serializado = JSON.stringify(value);
+  const primerRender = useRef(true);
+  useEffect(() => {
+    if (primerRender.current) {
+      primerRender.current = false;
+      return;
+    }
+    avisarCambioFormulario(ref.current);
+  }, [serializado]);
+  return <input ref={ref} type="hidden" name={name} value={serializado} />;
 }
 
 function GanttMonths({ timeline }: { timeline: GanttTimeline | null }) {

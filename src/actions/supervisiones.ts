@@ -1,8 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import {
+  esVeredictoValido,
+  leerComentario,
+  leerVeredictoGeneral,
+  persistirBorradorSupervision,
+} from "@/lib/borrador-revision";
 import { prisma } from "@/lib/db";
-import { sanitizarComentarioObservacion } from "@/lib/comentario-observacion";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { requireUser } from "@/lib/session";
 import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
@@ -36,97 +41,25 @@ function revalidateSupervision(asignacionId: string, postulacionId: string) {
   revalidatePath("/participante");
 }
 
-function leerComentario(formData: FormData, name: string) {
-  return sanitizarComentarioObservacion(String(formData.get(name) ?? ""));
-}
-
-function leerVeredictoGeneral(formData: FormData) {
-  return {
-    veredicto: String(formData.get("veredicto-general") ?? ""),
-    comentario: leerComentario(formData, "comentario-general"),
-  };
-}
-
-async function guardarSupervisionPorPregunta(
-  formData: FormData,
-  asignacionId: string,
-  ronda: number,
-  ciclo: number,
-  preguntas: { id: string }[],
-) {
-  for (const pregunta of preguntas) {
-    const veredicto = String(formData.get(`veredicto-${pregunta.id}`) ?? "");
-    const comentario = leerComentario(formData, `comentario-${pregunta.id}`);
-    if (veredicto !== "OK" && veredicto !== "OBSERVACION") continue;
-
-    await prisma.supervisionPregunta.upsert({
-      where: {
-        asignacionId_preguntaId_ronda_ciclo: {
-          asignacionId,
-          preguntaId: pregunta.id,
-          ronda,
-          ciclo,
-        },
-      },
-      update: { veredicto, comentario: veredicto === "OBSERVACION" ? comentario : "" },
-      create: {
-        asignacionId,
-        preguntaId: pregunta.id,
-        ronda,
-        ciclo,
-        veredicto,
-        comentario: veredicto === "OBSERVACION" ? comentario : "",
-      },
-    });
-  }
-}
-
-async function guardarSupervisionGeneral(
-  formData: FormData,
-  asignacionId: string,
-  ronda: number,
-  ciclo: number,
-) {
-  const { veredicto, comentario } = leerVeredictoGeneral(formData);
-  if (veredicto !== "OK" && veredicto !== "OBSERVACION") return;
-
-  await prisma.supervisionGeneral.upsert({
-    where: {
-      asignacionId_ronda_ciclo: { asignacionId, ronda, ciclo },
-    },
-    update: { veredicto, comentario: veredicto === "OBSERVACION" ? comentario : "" },
-    create: {
-      asignacionId,
-      ronda,
-      ciclo,
-      veredicto,
-      comentario: veredicto === "OBSERVACION" ? comentario : "",
-    },
-  });
-}
-
 export async function guardarSupervision(formData: FormData) {
   const user = await requireUser("SUPERVISOR");
+  const resultado = await persistirBorradorSupervision({
+    userId: user.id,
+    formData,
+    permitirSinVeredicto: false,
+  });
+  if ("error" in resultado) return { error: resultado.error };
+  if ("conflict" in resultado) return { error: "No se pudo guardar." };
+
   const asignacionId = String(formData.get("asignacionId") ?? "");
-  const asignacion = await cargaAsignacionParaSupervisor(asignacionId, user.id);
-  if (!asignacion) return { error: "Evaluación no encontrada." };
-  if (asignacion.estado !== "EN_SUPERVISION") {
-    return { error: "Solo puedes supervisar evaluaciones enviadas al supervisor." };
+  const asignacion = await prisma.asignacionEvaluador.findUnique({
+    where: { id: asignacionId },
+    select: { postulacionId: true },
+  });
+  if (asignacion) {
+    revalidateSupervision(asignacionId, asignacion.postulacionId);
   }
-
-  const ronda = asignacion.rondaActual;
-  const ciclo = asignacion.cicloSupervision;
-  const preguntas = asignacion.postulacion.convocatoria.formulario.preguntas;
-  const modo = parseModoEvaluacion(asignacion.postulacion.convocatoria.formulario.modoEvaluacion);
-
-  if (modo === "GENERAL") {
-    await guardarSupervisionGeneral(formData, asignacionId, ronda, ciclo);
-  } else {
-    await guardarSupervisionPorPregunta(formData, asignacionId, ronda, ciclo, preguntas);
-  }
-
-  revalidateSupervision(asignacionId, asignacion.postulacionId);
-  return { ok: true };
+  return { ok: true as const, updatedAt: resultado.updatedAt };
 }
 
 export async function enviarObservacionesSupervision(formData: FormData) {
@@ -142,7 +75,6 @@ export async function enviarObservacionesSupervision(formData: FormData) {
   if (guardado?.error) return guardado;
 
   const modo = parseModoEvaluacion(asignacion.postulacion.convocatoria.formulario.modoEvaluacion);
-  const ronda = asignacion.rondaActual;
   const ciclo = asignacion.cicloSupervision;
 
   if (modo === "GENERAL") {
@@ -159,7 +91,7 @@ export async function enviarObservacionesSupervision(formData: FormData) {
       veredicto: String(formData.get(`veredicto-${pregunta.id}`) ?? ""),
       comentario: leerComentario(formData, `comentario-${pregunta.id}`),
     }));
-    if (items.some((item) => item.veredicto !== "OK" && item.veredicto !== "OBSERVACION")) {
+    if (items.some((item) => !esVeredictoValido(item.veredicto))) {
       return { error: "Marca todas las preguntas como Sin observaciones o Comentar observaciones." };
     }
     const observadas = items.filter((item) => item.veredicto === "OBSERVACION");

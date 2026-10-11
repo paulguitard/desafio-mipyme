@@ -191,6 +191,7 @@ export default async function PostulacionPage({
       postulacionId={postulacion.id}
       canEdit={canEdit}
       esCorreccion={esCorreccion}
+      versionInicial={postulacion.updatedAt.toISOString()}
       layout={conEvaluacionVisible ? "paneles" : "formulario"}
       back={<BotonAtras href="/participante" />}
       title={

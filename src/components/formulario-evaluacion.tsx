@@ -25,6 +25,7 @@ import {
   type CampoVeredicto,
 } from "@/lib/veredicto-seleccion";
 import { useAccionOptimista } from "@/lib/use-dato-optimista";
+import { useAutoguardado } from "@/lib/use-autoguardado";
 import type { IntencionSupervision } from "@/lib/estado";
 import type { ModoEvaluacion } from "@/lib/modo-evaluacion";
 
@@ -35,7 +36,6 @@ type AccionEnvio =
   | "proceder";
 
 type PendienteEnvio = {
-  formData: FormData;
   accion: AccionEnvio;
 };
 
@@ -126,6 +126,7 @@ export function FormularioEvaluacion({
   modoEvaluacion = "POR_PREGUNTA",
   rolAccion = "evaluador",
   intencionPendiente = null,
+  versionInicial,
   back,
   title,
   meta,
@@ -141,6 +142,7 @@ export function FormularioEvaluacion({
   modoEvaluacion?: ModoEvaluacion;
   rolAccion?: "evaluador" | "supervisor" | "lectura";
   intencionPendiente?: IntencionSupervision | string | null;
+  versionInicial: string;
   back: React.ReactNode;
   title: React.ReactNode;
   meta?: React.ReactNode;
@@ -173,6 +175,12 @@ export function FormularioEvaluacion({
     );
   }, []);
   const mostrarAcciones = canEdit && rolAccion !== "lectura" && !bloqueado;
+  const autoguardado = useAutoguardado({
+    enabled: mostrarAcciones,
+    kind: esSupervisor ? "supervision" : "evaluacion",
+    formRef,
+    versionInicial,
+  });
   const veredictoGeneral = veredictos.general ?? "";
   const valoresVeredicto = esGeneral
     ? [veredictoGeneral]
@@ -201,15 +209,14 @@ export function FormularioEvaluacion({
 
   function abrirConfirmacion(tipo: AccionEnvio) {
     const form = formRef.current;
-    const formData = datosDelFormulario();
-    if (!form || !formData) return;
+    if (!form) return;
     const mensaje = marcarVeredictosPendientes(form);
     if (mensaje) {
       setError(mensaje);
       return;
     }
     setError(null);
-    setPendienteEnvio({ formData, accion: tipo });
+    setPendienteEnvio({ accion: tipo });
   }
 
   function limpiarAvisoSiQuedoCompleto(event: React.SyntheticEvent) {
@@ -229,10 +236,12 @@ export function FormularioEvaluacion({
 
   function confirmarEnvio() {
     if (!pendienteEnvio) return;
-    const { formData, accion: tipo } = pendienteEnvio;
+    const { accion: tipo } = pendienteEnvio;
     setPendienteEnvio(null);
     setError(null);
-    let persistir: (data: FormData) => Promise<{ error?: string } | { ok: boolean } | void>;
+    let persistir: (
+      data: FormData,
+    ) => Promise<{ error?: string; ok?: boolean; updatedAt?: string } | void>;
     let detalleExito: string;
     if (tipo === "enviar-observaciones-supervisor") {
       persistir = enviarObservaciones;
@@ -253,36 +262,61 @@ export function FormularioEvaluacion({
     setBloqueado(true);
     setDetalleEnvio(detalleExito);
     setEnvioModal("enCurso");
-    void accion.ejecutar(() => persistir(formData), {
-      onOk: () => {
-        setEnvioModal("exito");
-      },
-      onError: (mensajeError) => {
+    void (async () => {
+      await autoguardado.esperarAutoguardado();
+      const formData = datosDelFormulario();
+      if (!formData) {
         setEnvioModal("error");
-        setError(mensajeError);
+        setError("No se pudo enviar.");
         setBloqueado(false);
-      },
-    });
+        return;
+      }
+      void accion.ejecutar(() => persistir(formData), {
+        onOk: () => {
+          autoguardado.marcarLimpio();
+          setEnvioModal("exito");
+        },
+        onError: (mensajeError) => {
+          setEnvioModal("error");
+          setError(mensajeError);
+          setBloqueado(false);
+        },
+      });
+    })();
   }
 
   function guardarRevisionActual(
-    persistir: (data: FormData) => Promise<{ error?: string } | { ok: boolean } | void>,
+    persistir: (
+      data: FormData,
+    ) => Promise<{ error?: string; ok?: boolean; updatedAt?: string } | void>,
   ) {
     return () => {
       if (accion.guardando || guardadoModal || envioModal) return;
-      const formData = datosDelFormulario();
-      if (!formData) return;
       setError(null);
       setGuardadoModal("enCurso");
-      void accion.ejecutar(() => persistir(formData), {
-        onOk: () => {
-          setGuardadoModal("exito");
-        },
-        onError: (mensajeError) => {
+      void (async () => {
+        await autoguardado.esperarAutoguardado();
+        const formData = datosDelFormulario();
+        if (!formData) {
           setGuardadoModal("error");
-          setError(mensajeError);
-        },
-      });
+          setError("No se pudo guardar.");
+          return;
+        }
+        void accion.ejecutar(() => persistir(formData), {
+          onOk: (result) => {
+            const updatedAt =
+              result && typeof result === "object" && "updatedAt" in result
+                ? String((result as { updatedAt?: unknown }).updatedAt ?? "")
+                : "";
+            autoguardado.marcarLimpio(updatedAt || undefined);
+            setGuardadoModal("exito");
+          },
+          onError: (mensajeError) => {
+            setGuardadoModal("error");
+            setError(mensajeError);
+          },
+        });
+      })();
     };
   }
 

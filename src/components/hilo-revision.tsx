@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { SelectorVeredicto } from "@/components/selector-veredicto";
 import { useReportarVeredictoSupervision } from "@/components/veredicto-supervision-context";
+import { avisarCambioFormulario } from "@/lib/autoguardado";
 import {
   armarHiloRevision,
   type AsignacionHilo,
@@ -93,11 +94,20 @@ function SelectoresNotasGenerales({
   const [valores, setValores] = useState<Record<string, number | null>>(() =>
     Object.fromEntries(notas.map((item) => [item.preguntaId, item.notaInicial])),
   );
+  const anclaRef = useRef<HTMLDivElement>(null);
+  const primerRender = useRef(true);
+  useEffect(() => {
+    if (primerRender.current) {
+      primerRender.current = false;
+      return;
+    }
+    avisarCambioFormulario(anclaRef.current);
+  }, [valores]);
 
   if (notas.length === 0) return null;
 
   return (
-    <div className="space-y-3">
+    <div ref={anclaRef} className="space-y-3">
       <div>
         <h4 className="font-semibold text-navy">Notas</h4>
         <p className="text-sm text-muted">Calificación de las preguntas que se evalúan con nota.</p>
@@ -164,6 +174,8 @@ function EditorHilo({
   const [veredicto, setVeredicto] = useState(veredictoInicial);
   const [comentario, setComentario] = useState(() => htmlParaVistaComentario(comentarioInicial));
   const [nota, setNota] = useState<number | null>(notaInicial);
+  const anclaRef = useRef<HTMLInputElement>(null);
+  const primerRender = useRef(true);
   const reportar = useReportarVeredictoSupervision();
   const sufijo = preguntaId ?? "general";
   const campoVeredicto = `${namePrefix}veredicto-${sufijo}`;
@@ -177,6 +189,15 @@ function EditorHilo({
   useEffect(() => {
     reportar(preguntaId ?? "general", veredicto);
   }, [preguntaId, reportar, veredicto]);
+
+  useEffect(() => {
+    if (primerRender.current) {
+      primerRender.current = false;
+      return;
+    }
+    // El comentario lo avisa EditorTextoLargo al escribir.
+    avisarCambioFormulario(anclaRef.current);
+  }, [veredicto, nota]);
 
   return (
     <div className="hilo-editor-halo">
@@ -192,7 +213,7 @@ function EditorHilo({
         <SelectorVeredicto campo={campoVeredicto} veredicto={veredicto} onChange={setVeredicto} />
       </div>
       <div className="pregunta-edicion-cuerpo space-y-3">
-        <input type="hidden" name={campoVeredicto} value={veredicto} />
+        <input ref={anclaRef} type="hidden" name={campoVeredicto} value={veredicto} />
         {muestraNota ? <input type="hidden" name={campoNota} value={nota ?? ""} /> : null}
         {veredicto !== "OBSERVACION" ? (
           <input type="hidden" name={campoComentario} value={comentario} />

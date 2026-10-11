@@ -1,9 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import {
+  esVeredictoValido,
+  leerComentario,
+  leerVeredictoGeneral,
+  persistirBorradorEvaluacion,
+} from "@/lib/borrador-revision";
 import { prisma } from "@/lib/db";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
-import { sanitizarComentarioObservacion } from "@/lib/comentario-observacion";
 import { parseEscalaNotas } from "@/lib/preguntas";
 import { requireUser } from "@/lib/session";
 import { evaluadorPuedeEditar } from "@/lib/estado";
@@ -25,131 +30,21 @@ async function cargaAsignacion(id: string, evaluadorId: string) {
   });
 }
 
-function leerComentario(formData: FormData, name: string) {
-  return sanitizarComentarioObservacion(String(formData.get(name) ?? ""));
-}
-
-function leerVeredictoGeneral(formData: FormData) {
-  return {
-    veredicto: String(formData.get("veredicto-general") ?? ""),
-    comentario: leerComentario(formData, "comentario-general"),
-  };
-}
-
-async function guardarRevisionPorPregunta(
-  formData: FormData,
-  asignacionId: string,
-  ronda: number,
-  ciclo: number,
-  preguntas: { id: string; conNotas: boolean }[],
-  opciones?: { forzarOkSinComentario?: boolean },
-) {
-  for (const pregunta of preguntas) {
-    const veredictoRaw = String(formData.get(`veredicto-${pregunta.id}`) ?? "");
-    const veredicto = opciones?.forzarOkSinComentario
-      ? veredictoRaw === "OK" || veredictoRaw === "OBSERVACION"
-        ? "OK"
-        : veredictoRaw
-      : veredictoRaw;
-    const comentario = opciones?.forzarOkSinComentario
-      ? ""
-      : leerComentario(formData, `comentario-${pregunta.id}`);
-    if (veredicto !== "OK" && veredicto !== "OBSERVACION") continue;
-    const notaRaw = String(formData.get(`nota-${pregunta.id}`) ?? "").trim();
-    const notaParsed = Number(notaRaw);
-    const nota = pregunta.conNotas && notaRaw !== "" && Number.isFinite(notaParsed) ? notaParsed : null;
-
-    await prisma.revisionPregunta.upsert({
-      where: {
-        asignacionId_preguntaId_ronda_ciclo: {
-          asignacionId,
-          preguntaId: pregunta.id,
-          ronda,
-          ciclo,
-        },
-      },
-      update: { veredicto, comentario, nota },
-      create: {
-        asignacionId,
-        preguntaId: pregunta.id,
-        ronda,
-        ciclo,
-        veredicto,
-        comentario,
-        nota,
-      },
-    });
-  }
-}
-
-async function guardarRevisionGeneral(
-  formData: FormData,
-  asignacionId: string,
-  ronda: number,
-  ciclo: number,
-) {
-  const { veredicto, comentario } = leerVeredictoGeneral(formData);
-  if (veredicto !== "OK" && veredicto !== "OBSERVACION") return;
-
-  await prisma.revisionGeneral.upsert({
-    where: {
-      asignacionId_ronda_ciclo: { asignacionId, ronda, ciclo },
-    },
-    update: { veredicto, comentario: veredicto === "OBSERVACION" ? comentario : "" },
-    create: {
-      asignacionId,
-      ronda,
-      ciclo,
-      veredicto,
-      comentario: veredicto === "OBSERVACION" ? comentario : "",
-    },
-  });
-}
-
 export async function guardarRevision(formData: FormData) {
   const user = await requireUser("EVALUADOR");
+  const resultado = await persistirBorradorEvaluacion({
+    userId: user.id,
+    formData,
+    cambiarEstado: true,
+    permitirSinVeredicto: false,
+  });
+  if ("error" in resultado) return { error: resultado.error };
+  if ("conflict" in resultado) return { error: "No se pudo guardar." };
+
   const asignacionId = String(formData.get("asignacionId") ?? "");
-  const asignacion = await cargaAsignacion(asignacionId, user.id);
-  if (!asignacion) return { error: "Evaluación no encontrada." };
-  if (asignacion.estado === "FINALIZADA") {
-    return { error: "Esta evaluación ya está finalizada." };
-  }
-  if (asignacion.estado === "CON_OBSERVACIONES") {
-    return { error: "Espera la corrección del participante." };
-  }
-  if (asignacion.estado === "EN_SUPERVISION") {
-    return { error: "Espera la revisión del supervisor." };
-  }
-
-  if (
-    asignacion.estado === "PENDIENTE" ||
-    asignacion.estado === "REPARADA" ||
-    asignacion.estado === "DEVUELTA_SUPERVISOR"
-  ) {
-    await prisma.asignacionEvaluador.update({
-      where: { id: asignacionId },
-      data: { estado: "EN_REVISION" },
-    });
-  }
-
-  const ronda = asignacion.rondaActual;
-  const ciclo = asignacion.cicloSupervision;
-  const preguntas = asignacion.postulacion.convocatoria.formulario.preguntas;
-  const modo = parseModoEvaluacion(asignacion.postulacion.convocatoria.formulario.modoEvaluacion);
-
-  if (modo === "GENERAL") {
-    await guardarRevisionGeneral(formData, asignacionId, ronda, ciclo);
-    await guardarRevisionPorPregunta(formData, asignacionId, ronda, ciclo, preguntas, {
-      forzarOkSinComentario: true,
-    });
-  } else {
-    await guardarRevisionPorPregunta(formData, asignacionId, ronda, ciclo, preguntas);
-  }
-
-  await sincronizarEstadoPostulacion(asignacion.postulacionId);
   revalidatePath(`/evaluador/evaluaciones/${asignacionId}`);
   revalidatePath("/evaluador");
-  return { ok: true };
+  return { ok: true as const, updatedAt: resultado.updatedAt };
 }
 
 async function leerVeredictos(formData: FormData, preguntaIds: string[]) {
@@ -170,7 +65,8 @@ export async function enviarObservaciones(formData: FormData) {
     return { error: "No puedes enviar observaciones en este estado." };
   }
 
-  await guardarRevision(formData);
+  const guardado = await guardarRevision(formData);
+  if (guardado && "error" in guardado && guardado.error) return guardado;
 
   const modo = parseModoEvaluacion(asignacion.postulacion.convocatoria.formulario.modoEvaluacion);
 
@@ -189,7 +85,7 @@ export async function enviarObservaciones(formData: FormData) {
       preguntas.map((p) => p.id),
     );
 
-    if (items.some((item) => item.veredicto !== "OK" && item.veredicto !== "OBSERVACION")) {
+    if (items.some((item) => !esVeredictoValido(item.veredicto))) {
       return { error: "Marca todas las preguntas como Sin observaciones o Comentar observaciones." };
     }
     const observadas = items.filter((item) => item.veredicto === "OBSERVACION");
@@ -225,7 +121,8 @@ export async function finalizarEvaluacion(formData: FormData) {
     return { error: "No puedes finalizar en este estado." };
   }
 
-  await guardarRevision(formData);
+  const guardado = await guardarRevision(formData);
+  if (guardado && "error" in guardado && guardado.error) return guardado;
 
   const preguntas = asignacion.postulacion.convocatoria.formulario.preguntas;
   const modo = parseModoEvaluacion(asignacion.postulacion.convocatoria.formulario.modoEvaluacion);

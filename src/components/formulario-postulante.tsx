@@ -19,6 +19,7 @@ import {
 import { useAnchoDetalleParticipante } from "@/components/participante-app-shell";
 import { ANCHO_DETALLE } from "@/lib/ancho-layout";
 import { useAccionOptimista } from "@/lib/use-dato-optimista";
+import { useAutoguardado } from "@/lib/use-autoguardado";
 
 function validarAdjuntosCliente(formData: FormData): string | null {
   for (const [key, value] of formData.entries()) {
@@ -45,6 +46,7 @@ export function FormularioPostulante({
   postulacionId,
   canEdit,
   esCorreccion,
+  versionInicial,
   layout = "formulario",
   back,
   title,
@@ -55,6 +57,7 @@ export function FormularioPostulante({
   postulacionId: string;
   canEdit: boolean;
   esCorreccion: boolean;
+  versionInicial: string;
   layout?: "formulario" | "paneles";
   back: React.ReactNode;
   title: React.ReactNode;
@@ -68,7 +71,7 @@ export function FormularioPostulante({
   const [error, setError] = useState<string | null>(null);
   const [guardadoModal, setGuardadoModal] = useState<EstadoModalProgreso | null>(null);
   const [envioModal, setEnvioModal] = useState<EstadoModalProgreso | null>(null);
-  const [pendienteEnvio, setPendienteEnvio] = useState<FormData | null>(null);
+  const [pendienteEnvio, setPendienteEnvio] = useState(false);
   const [bloqueado, setBloqueado] = useState(false);
   const accion = useAccionOptimista();
   const savingRef = useRef(false);
@@ -76,64 +79,102 @@ export function FormularioPostulante({
   const camposVisibles = useRef(children);
   const conservarCampos = bloqueado || envioModal === "exito";
   if (!conservarCampos) camposVisibles.current = children;
+  const autoguardado = useAutoguardado({
+    enabled: canEdit && !bloqueado,
+    kind: "caso",
+    formRef,
+    versionInicial,
+  });
 
   function datosDelFormulario() {
     return formRef.current ? new FormData(formRef.current) : null;
   }
 
   function conGuardado(
-    formData: FormData,
-    persistir: (formData: FormData) => Promise<{ error?: string } | { ok?: boolean } | void>,
+    persistir: (
+      formData: FormData,
+    ) => Promise<{ error?: string; ok?: boolean; updatedAt?: string } | void>,
   ) {
     if (savingRef.current) return;
-    const adjuntoError = validarAdjuntosCliente(formData);
-    if (adjuntoError) {
-      setError(adjuntoError);
-      return;
-    }
     savingRef.current = true;
     setError(null);
     setGuardadoModal("enCurso");
-    void accion.ejecutar(() => persistir(formData), {
-      onOk: () => {
-        limpiarInputsArchivo(formRef.current);
-        savingRef.current = false;
-        setGuardadoModal("exito");
-      },
-      onError: (mensajeError) => {
+    void (async () => {
+      await autoguardado.esperarAutoguardado();
+      const formData = datosDelFormulario();
+      if (!formData) {
         savingRef.current = false;
         setGuardadoModal("error");
-        setError(mensajeError);
-      },
-    });
+        setError("No se pudo guardar.");
+        return;
+      }
+      const adjuntoError = validarAdjuntosCliente(formData);
+      if (adjuntoError) {
+        savingRef.current = false;
+        setGuardadoModal("error");
+        setError(adjuntoError);
+        return;
+      }
+      void accion.ejecutar(() => persistir(formData), {
+        onOk: (result) => {
+          const updatedAt =
+            result && typeof result === "object" && "updatedAt" in result
+              ? String((result as { updatedAt?: unknown }).updatedAt ?? "")
+              : "";
+          autoguardado.marcarLimpio(updatedAt || undefined);
+          limpiarInputsArchivo(formRef.current);
+          savingRef.current = false;
+          setGuardadoModal("exito");
+        },
+        onError: (mensajeError) => {
+          savingRef.current = false;
+          setGuardadoModal("error");
+          setError(mensajeError);
+        },
+      });
+    })();
   }
 
   function confirmarEnvio() {
     if (!pendienteEnvio) return;
-    const data = pendienteEnvio;
-    setPendienteEnvio(null);
+    setPendienteEnvio(false);
     if (savingRef.current) return;
-    const adjuntoError = validarAdjuntosCliente(data);
-    if (adjuntoError) {
-      setError(adjuntoError);
-      return;
-    }
     savingRef.current = true;
     setError(null);
     setBloqueado(true);
     setEnvioModal("enCurso");
-    void accion.ejecutar(() => enviarPostulacion(data), {
-      onOk: () => {
-        savingRef.current = false;
-        setEnvioModal("exito");
-      },
-      onError: (mensajeError) => {
+    void (async () => {
+      await autoguardado.esperarAutoguardado();
+      const data = datosDelFormulario();
+      if (!data) {
         savingRef.current = false;
         setEnvioModal("error");
-        setError(mensajeError);
+        setError("No se pudo enviar.");
         setBloqueado(false);
-      },
-    });
+        return;
+      }
+      const adjuntoError = validarAdjuntosCliente(data);
+      if (adjuntoError) {
+        savingRef.current = false;
+        setEnvioModal("error");
+        setError(adjuntoError);
+        setBloqueado(false);
+        return;
+      }
+      void accion.ejecutar(() => enviarPostulacion(data), {
+        onOk: () => {
+          autoguardado.marcarLimpio();
+          savingRef.current = false;
+          setEnvioModal("exito");
+        },
+        onError: (mensajeError) => {
+          savingRef.current = false;
+          setEnvioModal("error");
+          setError(mensajeError);
+          setBloqueado(false);
+        },
+      });
+    })();
   }
 
   return (
@@ -165,11 +206,7 @@ export function FormularioPostulante({
                 data-tour="guardar-borrador"
                 type="button"
                 disabled={Boolean(guardadoModal) || accion.guardando}
-                onClick={() => {
-                  const formData = datosDelFormulario();
-                  if (!formData) return;
-                  conGuardado(formData, guardarBorrador);
-                }}
+                onClick={() => conGuardado(guardarBorrador)}
               >
                 Guardar borrador
               </button>
@@ -180,9 +217,7 @@ export function FormularioPostulante({
                 disabled={Boolean(guardadoModal) || accion.guardando}
                 onClick={() => {
                   if (savingRef.current) return;
-                  const formData = datosDelFormulario();
-                  if (!formData) return;
-                  setPendienteEnvio(formData);
+                  setPendienteEnvio(true);
                 }}
               >
                 {esCorreccion ? "Enviar correcciones" : "Enviar caso"}
@@ -219,11 +254,11 @@ export function FormularioPostulante({
 
       <AvisoEntradaCaso aviso={avisoEntrada} />
       <ConfirmacionEnvio
-        open={pendienteEnvio !== null}
+        open={pendienteEnvio}
         title={esCorreccion ? "¿Enviar correcciones?" : "¿Enviar caso?"}
         confirmLabel={esCorreccion ? "Enviar correcciones" : "Enviar caso"}
         confirming={false}
-        onCancel={() => setPendienteEnvio(null)}
+        onCancel={() => setPendienteEnvio(false)}
         onConfirm={confirmarEnvio}
       >
         {esCorreccion ? (
