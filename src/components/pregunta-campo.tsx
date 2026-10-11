@@ -430,6 +430,7 @@ export function PreguntaCampo({
   preview,
   acciones,
   modificada = false,
+  ocultarAdjuntos = false,
 }: {
   pregunta: {
     id: string;
@@ -448,6 +449,7 @@ export function PreguntaCampo({
   preview?: boolean;
   acciones?: ReactNode;
   modificada?: boolean;
+  ocultarAdjuntos?: boolean;
 }) {
   const opciones = parseOpciones(pregunta.opciones);
   const valor = parseValor(respuesta?.valor ?? "");
@@ -507,7 +509,7 @@ export function PreguntaCampo({
         </p>
       );
 
-    const hayAdjuntos = archivos.length > 0;
+    const hayAdjuntos = !ocultarAdjuntos && archivos.length > 0;
 
     return (
       <MarcoPregunta id={anclaId} className={clasePregunta} modificada={modificada}>
@@ -515,7 +517,7 @@ export function PreguntaCampo({
         <div className="pregunta-lectura-cuerpo">
           <div className={hayAdjuntos ? "pregunta-con-adjuntos" : undefined}>
             <div className="pregunta-valor min-w-0">{valorNodo}</div>
-            <AdjuntosRespuesta archivos={archivos} />
+            {ocultarAdjuntos ? null : <AdjuntosRespuesta archivos={archivos} />}
           </div>
         </div>
       </MarcoPregunta>

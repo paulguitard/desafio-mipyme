@@ -50,6 +50,12 @@ const FILTROS_ROL: { id: Role; roles: Role[] }[] = [
   { id: "ADMIN", roles: ["ADMIN"] },
 ];
 
+function contieneTexto(haystack: string, needle: string) {
+  const q = needle.trim().toLocaleLowerCase("es-CL");
+  if (!q) return true;
+  return haystack.toLocaleLowerCase("es-CL").includes(q);
+}
+
 function EscuelaSelect({
   id,
   name,
@@ -103,20 +109,28 @@ export function UsuariosAdmin({
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [modal, setModal] = useState<ModalActivo>(null);
   const [filtro, setFiltro] = useState<Filtro>({ kind: "todos" });
+  const [filtroNombre, setFiltroNombre] = useState("");
+  const [filtroCorreo, setFiltroCorreo] = useState("");
   const [crearRole, setCrearRole] = useState<Role>("EMPRENDEDOR");
   const [crearEscuela, setCrearEscuela] = useState("");
   const [editRole, setEditRole] = useState<Role>("EMPRENDEDOR");
   const [editEscuela, setEditEscuela] = useState("");
 
   const visibles = useMemo(() => {
-    if (filtro.kind === "todos") return filas;
+    let listaFiltrada = filas;
     if (filtro.kind === "origen") {
-      return filas.filter((user) => user.origen === filtro.value);
+      listaFiltrada = listaFiltrada.filter((user) => user.origen === filtro.value);
+    } else if (filtro.kind === "rol") {
+      const grupo = FILTROS_ROL.find((item) => item.id === filtro.value);
+      const roles = grupo?.roles ?? [filtro.value];
+      listaFiltrada = listaFiltrada.filter((user) => roles.includes(user.role as Role));
     }
-    const grupo = FILTROS_ROL.find((item) => item.id === filtro.value);
-    const roles = grupo?.roles ?? [filtro.value];
-    return filas.filter((user) => roles.includes(user.role as Role));
-  }, [filas, filtro]);
+    return listaFiltrada.filter(
+      (user) =>
+        contieneTexto(user.name, filtroNombre) &&
+        contieneTexto(normalizarCorreo(user.email), filtroCorreo),
+    );
+  }, [filas, filtro, filtroNombre, filtroCorreo]);
 
   const conteoOrigenAdmin = filas.filter((u) => u.origen === USER_ORIGEN.ADMIN).length;
   const conteoRegistro = filas.filter((u) => u.origen === USER_ORIGEN.REGISTRO).length;
@@ -197,7 +211,33 @@ export function UsuariosAdmin({
         <div className="shrink-0 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-3xl font-extrabold text-navy">Usuarios</h1>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {vista === "usuarios" ? (
+                <div className="flex flex-wrap items-center gap-2" data-tour="usuarios-buscadores">
+                  <label className="sr-only" htmlFor="filtro-nombre-usuario">
+                    Nombre
+                  </label>
+                  <input
+                    className="input !min-h-9 w-44 !py-1.5 text-sm"
+                    id="filtro-nombre-usuario"
+                    value={filtroNombre}
+                    onChange={(event) => setFiltroNombre(event.target.value)}
+                    placeholder="Buscar por nombre"
+                    autoComplete="off"
+                  />
+                  <label className="sr-only" htmlFor="filtro-correo-usuario">
+                    Correo
+                  </label>
+                  <input
+                    className="input !min-h-9 w-52 !py-1.5 text-sm"
+                    id="filtro-correo-usuario"
+                    value={filtroCorreo}
+                    onChange={(event) => setFiltroCorreo(event.target.value)}
+                    placeholder="Buscar por correo"
+                    autoComplete="off"
+                  />
+                </div>
+              ) : null}
               <button
                 className={`btn btn-sm ${vista === "perfiles" ? "btn-navy" : "btn-secondary"}`}
                 type="button"

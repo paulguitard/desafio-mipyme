@@ -21,6 +21,7 @@ import {
   quitarEvaluadorDelPool,
   quitarSupervisorDelPool,
 } from "@/actions/convocatorias";
+import { descargarCasoPdfDesdeDetalle } from "@/lib/descargar-caso-pdf";
 import {
   enviarRecordatorioEvaluadorCaso,
   enviarRecordatorioEvaluadoresResumen,
@@ -321,14 +322,47 @@ function AccionesCasoModal({
   onRecordatorioEvaluador: () => void;
   onRecordatorioSupervisor: () => void;
 }) {
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [errorPdf, setErrorPdf] = useState<string | null>(null);
   const participante = recordatorioParticipante(postulacion, preguntas);
   const evaluador = recordatorioEvaluadorCaso(postulacion.asignaciones);
   const supervisor = recordatorioSupervisorCaso(postulacion.asignaciones, postulacion.supervision);
-  const ocupado = enviando != null;
+  const ocupado = enviando != null || generandoPdf;
+
+  async function onDescargarPdf() {
+    if (generandoPdf) return;
+    setErrorPdf(null);
+    setGenerandoPdf(true);
+    try {
+      const result = await cargarDetalleFichaAdmin(postulacion.id);
+      if (result?.error) {
+        setErrorPdf(result.error);
+        return;
+      }
+      if (!result?.data) {
+        setErrorPdf("No se pudo cargar el caso.");
+        return;
+      }
+      await descargarCasoPdfDesdeDetalle(result.data);
+    } catch {
+      setErrorPdf("No se pudo generar el PDF. Intenta de nuevo.");
+    } finally {
+      setGenerandoPdf(false);
+    }
+  }
+
   return (
     <div className="eval-acciones-caso">
-      <button className="btn btn-sm btn-secondary" type="button" onClick={onVerCaso}>
+      <button className="btn btn-sm btn-secondary" type="button" disabled={ocupado} onClick={onVerCaso}>
         Ver caso
+      </button>
+      <button
+        className="btn btn-sm btn-secondary"
+        type="button"
+        disabled={ocupado}
+        onClick={() => void onDescargarPdf()}
+      >
+        {generandoPdf ? "Generando…" : "Descargar PDF"}
       </button>
       <button
         className="btn btn-sm btn-secondary"
@@ -359,6 +393,7 @@ function AccionesCasoModal({
         {enviando === "supervisor" ? "Enviando…" : "Enviar recordatorio al supervisor"}
       </button>
       {supervisor.habilitado ? null : <p className="eval-acciones-hint">{supervisor.motivo}</p>}
+      {errorPdf ? <p className="eval-acciones-aviso text-danger">{errorPdf}</p> : null}
       {error ? <p className="eval-acciones-aviso text-danger">{error}</p> : null}
       {mensaje ? <p className="eval-acciones-aviso">{mensaje}</p> : null}
     </div>
