@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { enviarObservaciones, finalizarEvaluacion, guardarRevision } from "@/actions/evaluaciones";
 import {
@@ -19,6 +19,16 @@ import {
 import { EvalDetalleColumnas } from "@/components/eval-detalle-head";
 import { ProveedorVeredictoSupervision } from "@/components/veredicto-supervision-context";
 import type { AvisoEntradaCaso as AvisoEntradaCasoDatos } from "@/lib/aviso-entrada-caso";
+import {
+  aplicarCopiaAlFormulario,
+  borrarCopiaLocal,
+  debeRestaurarCopiaLocal,
+  escribirCopiaLocal,
+  esResultadoBorradorOk,
+  leerCopiaLocal,
+  mensajeErrorEnvio,
+  mensajeErrorGuardado,
+} from "@/lib/integridad-borrador";
 import {
   campoVeredictoIncompleto,
   mensajeVeredictosIncompletos,
@@ -199,9 +209,34 @@ export function FormularioEvaluacion({
   const ocultarEnviarSupervisor = !esSupervisor && !puedeEnviarObservaciones;
   const ocultarFinalizar = !esSupervisor && !todosSinObservaciones;
   const finalizaAlProceder = intencionPendiente === "FINALIZAR";
-  const conservarCampos = bloqueado || envioModal === "exito";
+  const conservarCampos = bloqueado || envioModal !== null;
   const camposVisibles = useRef({ caso, evaluacion });
+  const restauradoRef = useRef(false);
   if (!conservarCampos) camposVisibles.current = { caso, evaluacion };
+  const kindAutoguardado = esSupervisor ? "supervision" : "evaluacion";
+
+  useEffect(() => {
+    if (!mostrarAcciones || restauradoRef.current) return;
+    const form = formRef.current;
+    if (!form) return;
+    const storage = typeof sessionStorage !== "undefined" ? sessionStorage : null;
+    const copia = leerCopiaLocal(storage, kindAutoguardado, asignacionId);
+    if (!copia) return;
+    if (
+      !debeRestaurarCopiaLocal({
+        copiaSavedAt: copia.savedAt,
+        serverUpdatedAt: versionInicial,
+        versionBase: copia.versionBase,
+      })
+    ) {
+      return;
+    }
+    restauradoRef.current = true;
+    requestAnimationFrame(() => {
+      aplicarCopiaAlFormulario(form, copia.fields);
+      autoguardado.marcarSucio();
+    });
+  }, [asignacionId, autoguardado, kindAutoguardado, mostrarAcciones, versionInicial]);
 
   function datosDelFormulario() {
     return formRef.current ? new FormData(formRef.current) : null;
@@ -259,26 +294,47 @@ export function FormularioEvaluacion({
       persistir = procederSupervision;
       detalleExito = "Las observaciones se enviaron al participante.";
     }
-    setBloqueado(true);
     setDetalleEnvio(detalleExito);
     setEnvioModal("enCurso");
     void (async () => {
-      await autoguardado.esperarAutoguardado();
       const formData = datosDelFormulario();
       if (!formData) {
         setEnvioModal("error");
-        setError("No se pudo enviar.");
-        setBloqueado(false);
+        setError(mensajeErrorEnvio({ borradorGuardado: false }));
         return;
       }
-      void accion.ejecutar(() => persistir(formData), {
+      const storage = typeof sessionStorage !== "undefined" ? sessionStorage : null;
+      escribirCopiaLocal(storage, kindAutoguardado, asignacionId, {
+        versionBase: autoguardado.versionActual(),
+        formData,
+      });
+
+      const borrador = await autoguardado.esperarAutoguardado({ forzar: true });
+      if (!esResultadoBorradorOk(borrador)) {
+        setEnvioModal("error");
+        setError(mensajeErrorEnvio({ borradorGuardado: false, sinRed: true }));
+        return;
+      }
+
+      const updatedAtBorrador = borrador.updatedAt;
+      setBloqueado(true);
+      const paraEnviar = datosDelFormulario() ?? formData;
+      paraEnviar.set("expectedUpdatedAt", updatedAtBorrador);
+
+      void accion.ejecutar(() => persistir(paraEnviar), {
+        mensajeCatch: mensajeErrorEnvio({ borradorGuardado: true }),
         onOk: () => {
           autoguardado.marcarLimpio();
+          borrarCopiaLocal(storage, kindAutoguardado, asignacionId);
           setEnvioModal("exito");
         },
         onError: (mensajeError) => {
           setEnvioModal("error");
-          setError(mensajeError);
+          const yaDiceBorrador =
+            mensajeError.includes("borrador") || mensajeError.includes("Se guardó");
+          setError(
+            yaDiceBorrador ? mensajeError : mensajeErrorEnvio({ borradorGuardado: true }),
+          );
           setBloqueado(false);
         },
       });
@@ -295,14 +351,21 @@ export function FormularioEvaluacion({
       setError(null);
       setGuardadoModal("enCurso");
       void (async () => {
-        await autoguardado.esperarAutoguardado();
+        await autoguardado.esperarAutoguardado({ forzar: true });
         const formData = datosDelFormulario();
         if (!formData) {
           setGuardadoModal("error");
-          setError("No se pudo guardar.");
+          setError(mensajeErrorGuardado());
           return;
         }
+        const storage = typeof sessionStorage !== "undefined" ? sessionStorage : null;
+        escribirCopiaLocal(storage, kindAutoguardado, asignacionId, {
+          versionBase: autoguardado.versionActual(),
+          formData,
+        });
+        formData.set("expectedUpdatedAt", autoguardado.versionActual());
         void accion.ejecutar(() => persistir(formData), {
+          mensajeCatch: mensajeErrorGuardado(),
           onOk: (result) => {
             const updatedAt =
               result && typeof result === "object" && "updatedAt" in result
@@ -543,11 +606,13 @@ export function FormularioEvaluacion({
         onAceptar={() => {
           if (envioModal === "exito") {
             setEnvioModal(null);
-            router.push("/evaluador");
+            router.push(esSupervisor ? "/supervisor" : "/evaluador");
             return;
           }
+          const eraError = envioModal === "error";
           setEnvioModal(null);
           setError(null);
+          if (eraError) router.refresh();
         }}
       />
     </form>

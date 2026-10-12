@@ -234,8 +234,19 @@ export function EditorTextoLargo({
     const onFormData = (event: FormDataEvent) => {
       event.formData.set(name, htmlParaFormulario(editor.getHTML()));
     };
+    const onRestaurar = (event: Event) => {
+      const detail = (event as CustomEvent<{ name?: string; value?: string }>).detail;
+      if (!detail || detail.name !== name) return;
+      const html = detail.value?.trim() ? detail.value : "<p></p>";
+      editor.commands.setContent(html);
+      syncHtml(editor.getHTML(), { senal: true });
+    };
     form.addEventListener("formdata", onFormData);
-    return () => form.removeEventListener("formdata", onFormData);
+    form.addEventListener("borrador:restaurar", onRestaurar);
+    return () => {
+      form.removeEventListener("formdata", onFormData);
+      form.removeEventListener("borrador:restaurar", onRestaurar);
+    };
   }, [editor, name]);
 
   const tamanoActual = (() => {

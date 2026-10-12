@@ -32,14 +32,18 @@ async function cargaAsignacion(id: string, evaluadorId: string) {
 
 export async function guardarRevision(formData: FormData) {
   const user = await requireUser("EVALUADOR");
+  const expectedUpdatedAt = String(formData.get("expectedUpdatedAt") ?? "").trim() || null;
   const resultado = await persistirBorradorEvaluacion({
     userId: user.id,
     formData,
+    expectedUpdatedAt,
     cambiarEstado: true,
     permitirSinVeredicto: false,
   });
   if ("error" in resultado) return { error: resultado.error };
-  if ("conflict" in resultado) return { error: "No se pudo guardar." };
+  if ("conflict" in resultado) {
+    return { error: "No se pudo guardar.", conflict: true as const, updatedAt: resultado.updatedAt };
+  }
 
   const asignacionId = String(formData.get("asignacionId") ?? "");
   revalidatePath(`/evaluador/evaluaciones/${asignacionId}`);

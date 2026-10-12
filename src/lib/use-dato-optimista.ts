@@ -114,6 +114,8 @@ export function useDatoOptimista<T>(servidor: T) {
 
 type OpcionesEjecutar<R> = {
   mensajeOk?: string;
+  /** Mensaje cuando la promesa se rechaza (red, cuerpo rechazado, etc.). */
+  mensajeCatch?: string;
   onOk?: (result: R) => void;
   onError?: (error: string) => void;
 };
@@ -140,7 +142,7 @@ export function useAccionOptimista() {
       return result;
     } catch (caught) {
       if (esNavegacionNext(caught)) throw caught;
-      const err = "No se pudo guardar.";
+      const err = opciones?.mensajeCatch ?? "No se pudo completar la acción. Intentá de nuevo.";
       setError(err);
       setMensaje(null);
       opciones?.onError?.(err);

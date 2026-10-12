@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { IndicadorGuardando } from "@/components/indicador-guardando";
 import { useDatoOptimista } from "@/lib/use-dato-optimista";
 import {
@@ -307,7 +308,9 @@ function AccionesCasoModal({
   enviando,
   error,
   mensaje,
+  mostrarEditar,
   onVerCaso,
+  onEditarCaso,
   onRecordatorioParticipante,
   onRecordatorioEvaluador,
   onRecordatorioSupervisor,
@@ -317,7 +320,9 @@ function AccionesCasoModal({
   enviando: string | null;
   error: string | null;
   mensaje: string | null;
+  mostrarEditar: boolean;
   onVerCaso: () => void;
+  onEditarCaso: () => void;
   onRecordatorioParticipante: () => void;
   onRecordatorioEvaluador: () => void;
   onRecordatorioSupervisor: () => void;
@@ -356,6 +361,16 @@ function AccionesCasoModal({
       <button className="btn btn-sm btn-secondary" type="button" disabled={ocupado} onClick={onVerCaso}>
         Ver caso
       </button>
+      {mostrarEditar ? (
+        <button
+          className="btn btn-sm btn-secondary"
+          type="button"
+          disabled={ocupado}
+          onClick={onEditarCaso}
+        >
+          Editar caso
+        </button>
+      ) : null}
       <button
         className="btn btn-sm btn-secondary"
         type="button"
@@ -534,6 +549,7 @@ export function ConvocatoriaEvaluacion({
   piezas?: { id: string; titulo: string }[];
   vista?: "lista" | "numeros" | "links";
 }) {
+  const router = useRouter();
   const servidor = useMemo(
     () => ({
       evaluacionesPorPostulacion,
@@ -2027,10 +2043,16 @@ export function ConvocatoriaEvaluacion({
                   enviando={recordatorioEnviando}
                   error={recordatorioError}
                   mensaje={recordatorioMensaje}
+                  mostrarEditar={!esContenido}
                   onVerCaso={() => {
                     const caso = accionesCaso;
                     cerrarAccionesCaso();
                     void abrirDetalle(caso);
+                  }}
+                  onEditarCaso={() => {
+                    const caso = accionesCaso;
+                    cerrarAccionesCaso();
+                    router.push(`/admin/mentorias/${convocatoriaId}/casos/${caso.id}`);
                   }}
                   onRecordatorioParticipante={() =>
                     void ejecutarRecordatorio(

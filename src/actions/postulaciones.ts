@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  errorFormatoRespuestasFormulario,
   persistirBorradorCaso,
   persistirRespuestas,
   preguntasObservadas,
@@ -74,17 +75,29 @@ export async function iniciarPostulacion(formData: FormData) {
 export async function guardarBorrador(formData: FormData) {
   const user = await requireUser("EMPRENDEDOR");
   const id = String(formData.get("postulacionId") ?? "");
-  const resultado = await persistirBorradorCaso({ userId: user.id, formData });
+  const expectedUpdatedAt = String(formData.get("expectedUpdatedAt") ?? "").trim() || null;
+  const resultado = await persistirBorradorCaso({
+    userId: user.id,
+    formData,
+    expectedUpdatedAt,
+  });
   if ("error" in resultado) return { error: resultado.error };
-  if ("conflict" in resultado) return { error: "No se pudo guardar." };
+  if ("conflict" in resultado) {
+    return { error: "No se pudo guardar.", conflict: true as const, updatedAt: resultado.updatedAt };
+  }
 
   revalidatePath(`/participante/postulaciones/${id}`);
-  return { ok: true as const, updatedAt: resultado.updatedAt };
+  return {
+    ok: true as const,
+    updatedAt: resultado.updatedAt,
+    ...(resultado.archivoError ? { archivoError: resultado.archivoError } : {}),
+  };
 }
 
 export async function enviarPostulacion(formData: FormData) {
   const user = await requireUser("EMPRENDEDOR");
   const id = String(formData.get("postulacionId") ?? "");
+  const expectedUpdatedAt = String(formData.get("expectedUpdatedAt") ?? "").trim() || null;
   const postulacion = await cargaPostulacionDelUsuario(id, user.id);
   if (!postulacion) return { error: "Caso no encontrado." };
   if (esMentoriaContenido(postulacion.convocatoria.tipo)) {
@@ -100,13 +113,21 @@ export async function enviarPostulacion(formData: FormData) {
     estado === "CON_OBSERVACIONES" ? preguntasObservadas(postulacion) : null;
 
   try {
-    await persistirRespuestas({
+    const persistido = await persistirRespuestas({
       postulacionId: id,
       formData,
       preguntas: postulacion.convocatoria.formulario.preguntas,
       editableIds: observadas && observadas.size > 0 ? observadas : null,
       crearVersion: true,
+      expectedUpdatedAt,
     });
+    if ("conflict" in persistido) {
+      return {
+        error: "No se pudo enviar. Tu borrador quedó guardado.",
+        conflict: true as const,
+        updatedAt: persistido.updatedAt,
+      };
+    }
   } catch (error) {
     return { error: error instanceof Error ? error.message : "No se pudo enviar." };
   }
@@ -173,6 +194,59 @@ export async function enviarPostulacion(formData: FormData) {
   revalidatePath("/participante");
   revalidatePath("/evaluador");
   return { ok: true };
+}
+
+export async function guardarCasoAdmin(formData: FormData) {
+  await requireUser("ADMIN");
+  const id = String(formData.get("postulacionId") ?? "");
+  if (!id) return { error: "Caso no encontrado." };
+
+  const postulacion = await prisma.postulacion.findUnique({
+    where: { id },
+    include: {
+      convocatoria: {
+        include: { formulario: { include: { preguntas: { orderBy: { orden: "asc" } } } } },
+      },
+      respuestas: true,
+    },
+  });
+  if (!postulacion) return { error: "Caso no encontrado." };
+  if (esMentoriaContenido(postulacion.convocatoria.tipo)) {
+    return { error: "Esta asesoría de contenido no se edita." };
+  }
+
+  const preguntas = postulacion.convocatoria.formulario.preguntas;
+  const errorFormato = errorFormatoRespuestasFormulario({
+    formData,
+    preguntas,
+    respuestasExistentes: postulacion.respuestas,
+  });
+  if (errorFormato) return { error: errorFormato };
+
+  const expectedUpdatedAt = String(formData.get("expectedUpdatedAt") ?? "").trim() || null;
+  try {
+    const persistido = await persistirRespuestas({
+      postulacionId: id,
+      formData,
+      preguntas,
+      editableIds: null,
+      crearVersion: false,
+      reescribirVersionVigente: true,
+      expectedUpdatedAt,
+    });
+    if ("conflict" in persistido) {
+      return { error: "No se pudo guardar.", conflict: true as const, updatedAt: persistido.updatedAt };
+    }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudo guardar." };
+  }
+
+  revalidatePath(`/admin/mentorias/${postulacion.convocatoriaId}`);
+  revalidatePath(`/admin/mentorias/${postulacion.convocatoriaId}/casos/${id}`);
+  revalidatePath(`/participante/postulaciones/${id}`);
+  revalidatePath("/evaluador");
+  revalidatePath("/supervisor");
+  return { ok: true as const };
 }
 
 export async function marcarVistaPieza(postulacionId: string, piezaId: string) {

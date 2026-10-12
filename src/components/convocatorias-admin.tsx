@@ -54,9 +54,12 @@ export type FormularioOpcion = { id: string; titulo: string; tipo: TipoFormulari
 export function ConvocatoriasAdmin({
   convocatorias,
   formularios,
+  panelInicialId = null,
 }: {
   convocatorias: ConvocatoriaListaItem[];
   formularios: FormularioOpcion[];
+  /** Si viene (p. ej. al volver de Editar caso), reabre el panel de esa asesoría. */
+  panelInicialId?: string | null;
 }) {
   const router = useRouter();
   const lista = useDatoOptimista(convocatorias);
@@ -85,6 +88,7 @@ export function ConvocatoriasAdmin({
   const tituloModal = editing ? "Editar asesoría" : "Crear asesoría";
   const tipoBloqueado = Boolean(editing && editing.postulaciones > 0);
   const formulariosDelTipo = formularios.filter((form) => form.tipo === tipoMentoria);
+  const panelAutoAbiertoRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -175,6 +179,15 @@ export function ConvocatoriasAdmin({
     }
     if ("data" in result && result.data) setEvaluacion(result.data);
   }
+
+  useEffect(() => {
+    if (!panelInicialId || panelAutoAbiertoRef.current) return;
+    const item = convocatorias.find((fila) => fila.id === panelInicialId);
+    if (!item) return;
+    panelAutoAbiertoRef.current = true;
+    void abrirEvaluacion(item);
+    router.replace("/admin/mentorias", { scroll: false });
+  }, [panelInicialId, convocatorias, router]);
 
   async function refrescarEvaluacion() {
     if (!evaluacion) return;

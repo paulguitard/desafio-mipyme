@@ -31,6 +31,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Tipo de borrador no válido." }, { status: 400 });
   }
   const expectedUpdatedAt = String(formData.get("expectedUpdatedAt") ?? "").trim() || null;
+  const omitirArchivosNuevos = String(formData.get("omitirArchivosNuevos") ?? "") === "1";
 
   let resultado;
   if (kindRaw === "caso") {
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
       userId: user.id,
       formData,
       expectedUpdatedAt,
+      omitirArchivosNuevos,
     });
   } else if (kindRaw === "evaluacion") {
     if (user.role !== "EVALUADOR") {
@@ -74,5 +76,11 @@ export async function POST(request: Request) {
       { status: 409 },
     );
   }
-  return Response.json({ ok: true, updatedAt: resultado.updatedAt });
+  return Response.json({
+    ok: true,
+    updatedAt: resultado.updatedAt,
+    ...("archivoError" in resultado && resultado.archivoError
+      ? { archivoError: resultado.archivoError }
+      : {}),
+  });
 }

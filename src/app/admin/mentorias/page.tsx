@@ -4,7 +4,12 @@ import { parseImagenConvocatoria, parseImagenPosicion } from "@/lib/convocatoria
 import { directStoredImageUrl } from "@/lib/storage/image-url";
 import { parseTipoFormulario } from "@/lib/tipo-formulario";
 
-export default async function MentoriasPage() {
+export default async function MentoriasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ panel?: string }>;
+}) {
+  const { panel: panelInicialId } = await searchParams;
   const [convocatorias, formularios] = await Promise.all([
     prisma.convocatoria.findMany({
       orderBy: { createdAt: "desc" },
@@ -18,6 +23,7 @@ export default async function MentoriasPage() {
 
   return (
     <ConvocatoriasAdmin
+      panelInicialId={panelInicialId ?? null}
       convocatorias={convocatorias.map((item) => {
         const imagen = parseImagenConvocatoria(item.imagen);
         return {

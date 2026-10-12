@@ -43,13 +43,17 @@ function revalidateSupervision(asignacionId: string, postulacionId: string) {
 
 export async function guardarSupervision(formData: FormData) {
   const user = await requireUser("SUPERVISOR");
+  const expectedUpdatedAt = String(formData.get("expectedUpdatedAt") ?? "").trim() || null;
   const resultado = await persistirBorradorSupervision({
     userId: user.id,
     formData,
+    expectedUpdatedAt,
     permitirSinVeredicto: false,
   });
   if ("error" in resultado) return { error: resultado.error };
-  if ("conflict" in resultado) return { error: "No se pudo guardar." };
+  if ("conflict" in resultado) {
+    return { error: "No se pudo guardar.", conflict: true as const, updatedAt: resultado.updatedAt };
+  }
 
   const asignacionId = String(formData.get("asignacionId") ?? "");
   const asignacion = await prisma.asignacionEvaluador.findUnique({

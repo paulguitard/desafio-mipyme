@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { enviarPostulacion, guardarBorrador } from "@/actions/postulaciones";
 import { AvisoEntradaCaso } from "@/components/aviso-entrada-caso";
@@ -12,6 +12,16 @@ import {
   type EstadoModalProgreso,
 } from "@/components/modal-guardado";
 import type { AvisoEntradaCaso as AvisoEntradaCasoDatos } from "@/lib/aviso-entrada-caso";
+import {
+  aplicarCopiaAlFormulario,
+  borrarCopiaLocal,
+  debeRestaurarCopiaLocal,
+  escribirCopiaLocal,
+  esResultadoBorradorOk,
+  leerCopiaLocal,
+  mensajeErrorEnvio,
+  mensajeErrorGuardado,
+} from "@/lib/integridad-borrador";
 import {
   MAX_FILE_BYTES,
   MAX_IMAGE_INPUT_BYTES,
@@ -76,8 +86,11 @@ export function FormularioPostulante({
   const accion = useAccionOptimista();
   const savingRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
+  const restauradoRef = useRef(false);
   const camposVisibles = useRef(children);
-  const conservarCampos = bloqueado || envioModal === "exito";
+  // Conservar campos también en error de envío: si no, al desbloquear se remontan
+  // los children del servidor (aún sin refresh) y se pierde lo escrito en pantalla.
+  const conservarCampos = bloqueado || envioModal !== null;
   if (!conservarCampos) camposVisibles.current = children;
   const autoguardado = useAutoguardado({
     enabled: canEdit && !bloqueado,
@@ -86,6 +99,30 @@ export function FormularioPostulante({
     versionInicial,
   });
 
+  useEffect(() => {
+    if (!canEdit || restauradoRef.current) return;
+    const form = formRef.current;
+    if (!form) return;
+    const storage = typeof sessionStorage !== "undefined" ? sessionStorage : null;
+    const copia = leerCopiaLocal(storage, "caso", postulacionId);
+    if (!copia) return;
+    if (
+      !debeRestaurarCopiaLocal({
+        copiaSavedAt: copia.savedAt,
+        serverUpdatedAt: versionInicial,
+        versionBase: copia.versionBase,
+      })
+    ) {
+      return;
+    }
+    restauradoRef.current = true;
+    // Esperar a que TipTap monte listeners de restauración.
+    requestAnimationFrame(() => {
+      aplicarCopiaAlFormulario(form, copia.fields);
+      autoguardado.marcarSucio();
+    });
+  }, [autoguardado, canEdit, postulacionId, versionInicial]);
+
   function datosDelFormulario() {
     return formRef.current ? new FormData(formRef.current) : null;
   }
@@ -93,21 +130,27 @@ export function FormularioPostulante({
   function conGuardado(
     persistir: (
       formData: FormData,
-    ) => Promise<{ error?: string; ok?: boolean; updatedAt?: string } | void>,
+    ) => Promise<{ error?: string; ok?: boolean; updatedAt?: string; archivoError?: string } | void>,
   ) {
     if (savingRef.current) return;
     savingRef.current = true;
     setError(null);
     setGuardadoModal("enCurso");
     void (async () => {
-      await autoguardado.esperarAutoguardado();
+      await autoguardado.esperarAutoguardado({ forzar: true });
       const formData = datosDelFormulario();
       if (!formData) {
         savingRef.current = false;
         setGuardadoModal("error");
-        setError("No se pudo guardar.");
+        setError(mensajeErrorGuardado());
         return;
       }
+      const storage = typeof sessionStorage !== "undefined" ? sessionStorage : null;
+      escribirCopiaLocal(storage, "caso", postulacionId, {
+        versionBase: autoguardado.versionActual(),
+        formData,
+      });
+      formData.set("expectedUpdatedAt", autoguardado.versionActual());
       const adjuntoError = validarAdjuntosCliente(formData);
       if (adjuntoError) {
         savingRef.current = false;
@@ -116,14 +159,24 @@ export function FormularioPostulante({
         return;
       }
       void accion.ejecutar(() => persistir(formData), {
+        mensajeCatch: mensajeErrorGuardado(),
         onOk: (result) => {
           const updatedAt =
             result && typeof result === "object" && "updatedAt" in result
               ? String((result as { updatedAt?: unknown }).updatedAt ?? "")
               : "";
+          const archivoError =
+            result && typeof result === "object" && "archivoError" in result
+              ? String((result as { archivoError?: unknown }).archivoError ?? "")
+              : "";
           autoguardado.marcarLimpio(updatedAt || undefined);
-          limpiarInputsArchivo(formRef.current);
+          if (!archivoError) limpiarInputsArchivo(formRef.current);
           savingRef.current = false;
+          if (archivoError) {
+            setGuardadoModal("error");
+            setError(archivoError);
+            return;
+          }
           setGuardadoModal("exito");
         },
         onError: (mensajeError) => {
@@ -141,36 +194,59 @@ export function FormularioPostulante({
     if (savingRef.current) return;
     savingRef.current = true;
     setError(null);
-    setBloqueado(true);
     setEnvioModal("enCurso");
     void (async () => {
-      await autoguardado.esperarAutoguardado();
       const data = datosDelFormulario();
       if (!data) {
         savingRef.current = false;
         setEnvioModal("error");
-        setError("No se pudo enviar.");
-        setBloqueado(false);
+        setError(mensajeErrorEnvio({ borradorGuardado: false }));
         return;
       }
+      const storage = typeof sessionStorage !== "undefined" ? sessionStorage : null;
+      escribirCopiaLocal(storage, "caso", postulacionId, {
+        versionBase: autoguardado.versionActual(),
+        formData: data,
+      });
+
       const adjuntoError = validarAdjuntosCliente(data);
       if (adjuntoError) {
         savingRef.current = false;
         setEnvioModal("error");
         setError(adjuntoError);
-        setBloqueado(false);
         return;
       }
-      void accion.ejecutar(() => enviarPostulacion(data), {
+
+      // Confirmar borrador ANTES de bloquear (el hook sigue activo).
+      const borrador = await autoguardado.esperarAutoguardado({ forzar: true });
+      if (!esResultadoBorradorOk(borrador)) {
+        savingRef.current = false;
+        setEnvioModal("error");
+        setError(mensajeErrorEnvio({ borradorGuardado: false, sinRed: true }));
+        return;
+      }
+
+      const updatedAtBorrador = borrador.updatedAt;
+      setBloqueado(true);
+      const paraEnviar = datosDelFormulario() ?? data;
+      paraEnviar.set("expectedUpdatedAt", updatedAtBorrador);
+
+      void accion.ejecutar(() => enviarPostulacion(paraEnviar), {
+        mensajeCatch: mensajeErrorEnvio({ borradorGuardado: true }),
         onOk: () => {
           autoguardado.marcarLimpio();
+          borrarCopiaLocal(storage, "caso", postulacionId);
           savingRef.current = false;
           setEnvioModal("exito");
         },
         onError: (mensajeError) => {
           savingRef.current = false;
           setEnvioModal("error");
-          setError(mensajeError);
+          const yaDiceBorrador =
+            mensajeError.includes("borrador") || mensajeError.includes("Se guardó");
+          setError(
+            yaDiceBorrador ? mensajeError : mensajeErrorEnvio({ borradorGuardado: true }),
+          );
           setBloqueado(false);
         },
       });
@@ -298,8 +374,10 @@ export function FormularioPostulante({
             router.push("/participante");
             return;
           }
+          const eraError = envioModal === "error";
           setEnvioModal(null);
           setError(null);
+          if (eraError) router.refresh();
         }}
       />
     </form>

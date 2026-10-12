@@ -25,6 +25,22 @@ export function decisionTrasGuardado(args: {
   return { sucio: false, mantenerTimer: false } as const;
 }
 
+/** Al apagar el hook: no borrar la marca de cambios ni el reloj si aún hay texto sin confirmar. */
+export function decisionAlDesactivar(args: { sucio: boolean }) {
+  if (args.sucio) {
+    return { limpiarSucio: false, detenerTimer: false } as const;
+  }
+  return { limpiarSucio: true, detenerTimer: true } as const;
+}
+
+/** marcarLimpio no limpia si la persona escribió durante la petición. */
+export function decisionMarcarLimpioTrasOk(args: { huboCambiosDuranteVuelo: boolean }) {
+  if (args.huboCambiosDuranteVuelo) {
+    return { limpiar: false } as const;
+  }
+  return { limpiar: true } as const;
+}
+
 export function debePersistirCampoRevision(args: {
   veredicto: string;
   comentario: string;
