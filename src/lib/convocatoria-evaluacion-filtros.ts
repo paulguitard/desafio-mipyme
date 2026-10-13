@@ -20,6 +20,7 @@ export const ESTADOS_RESPUESTA_FICHA: EstadoRespuestaFicha[] = [
   "observaciones",
   "esperando-evaluacion",
   "completa",
+  "finalizada",
 ];
 
 export type EstadoRespuestaFicha =
@@ -27,7 +28,8 @@ export type EstadoRespuestaFicha =
   | "borrador"
   | "observaciones"
   | "esperando-evaluacion"
-  | "completa";
+  | "completa"
+  | "finalizada";
 
 export type EstadoEvaluacionFicha =
   | "pendiente"
@@ -133,10 +135,11 @@ export function estadoRespuestaFicha(
   }
 
   if (
-    postulacion.asignaciones.length > 0 &&
-    postulacion.asignaciones.every((item) => item.estado === "FINALIZADA")
+    postulacion.estado === "FINALIZADA" ||
+    (postulacion.asignaciones.length > 0 &&
+      postulacion.asignaciones.every((item) => item.estado === "FINALIZADA"))
   ) {
-    return "completa";
+    return "finalizada";
   }
 
   if (postulacion.enviadaAt) return "esperando-evaluacion";
@@ -168,6 +171,7 @@ export function etiquetaEstadoRespuestaFicha(estado: EstadoRespuestaFicha) {
   if (estado === "observaciones") return "Respondiendo observaciones";
   if (estado === "esperando-evaluacion") return "Esperando evaluación";
   if (estado === "completa") return "Completa";
+  if (estado === "finalizada") return "Finalizada";
   return "Pendiente";
 }
 
@@ -187,6 +191,7 @@ export function resumenNumerosAsesoria(
     observaciones: 0,
     "esperando-evaluacion": 0,
     completa: 0,
+    finalizada: 0,
   };
   let conEvaluador = 0;
   let conSupervisor = 0;

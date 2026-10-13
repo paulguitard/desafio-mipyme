@@ -104,7 +104,7 @@ describe("estadoRespuestaFicha", () => {
     ).toBe("esperando-evaluacion");
   });
 
-  it("marks completa when every evaluation is finished", () => {
+  it("marks finalizada when every evaluation is finished", () => {
     expect(
       estadoRespuestaFicha(
         {
@@ -115,7 +115,7 @@ describe("estadoRespuestaFicha", () => {
         },
         [],
       ),
-    ).toBe("completa");
+    ).toBe("finalizada");
   });
 
   it("keeps an untouched first draft as pendiente", () => {
@@ -235,7 +235,8 @@ describe("resumenNumerosAsesoria", () => {
     expect(resumen.total).toBe(3);
     expect(resumen.porEstado.pendiente).toBe(1);
     expect(resumen.porEstado["esperando-evaluacion"]).toBe(1);
-    expect(resumen.porEstado.completa).toBe(1);
+    expect(resumen.porEstado.completa).toBe(0);
+    expect(resumen.porEstado.finalizada).toBe(1);
     expect(resumen.conEvaluador).toBe(2);
     expect(resumen.sinEvaluador).toBe(1);
     expect(resumen.conSupervisor).toBe(1);

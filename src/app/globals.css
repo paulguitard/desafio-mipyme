@@ -2900,6 +2900,10 @@ html:has(.ficha-publica-page) body {
   color: #0f7a45;
 }
 
+.eval-ficha-value.is-finalizada {
+  color: #0f7a45;
+}
+
 .eval-ficha-value.is-observaciones {
   color: #9a7b00;
 }

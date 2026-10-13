@@ -42,7 +42,7 @@ describe("filasExcelLinks", () => {
       "https://ejemplo.cl/ficha/abcdefghijklmnopqrstuvwx",
     ]);
     expect(filas[2]?.[0]).toBe("Sin nombre");
-    expect(filas[2]?.[3]).toBe("Completa");
+    expect(filas[2]?.[3]).toBe("Finalizada");
     expect(filas[2]?.[4]).toBe("");
   });
 });
