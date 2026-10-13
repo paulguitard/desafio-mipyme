@@ -135,8 +135,11 @@ async function persistirSupervisionPorPregunta(
   opciones?: OpcionesPersistir,
 ) {
   for (const pregunta of preguntas) {
-    const veredicto = String(formData.get(`veredicto-${pregunta.id}`) ?? "");
-    const comentario = leerComentario(formData, `comentario-${pregunta.id}`);
+    const veredictoRaw = String(formData.get(`veredicto-${pregunta.id}`) ?? "");
+    const veredicto = opciones?.forzarOkSinComentario ? "OK" : veredictoRaw;
+    const comentario = opciones?.forzarOkSinComentario
+      ? ""
+      : leerComentario(formData, `comentario-${pregunta.id}`);
     const tieneVeredicto = esVeredictoValido(veredicto);
     if (
       !debePersistirCampoRevision({
@@ -184,7 +187,9 @@ async function persistirSupervisionGeneral(
   ciclo: number,
   opciones?: OpcionesPersistir,
 ) {
-  const { veredicto, comentario } = leerVeredictoGeneral(formData);
+  const leido = leerVeredictoGeneral(formData);
+  const veredicto = opciones?.forzarOkSinComentario ? "OK" : leido.veredicto;
+  const comentario = opciones?.forzarOkSinComentario ? "" : leido.comentario;
   const tieneVeredicto = esVeredictoValido(veredicto);
   if (
     !debePersistirCampoRevision({
@@ -335,6 +340,7 @@ export async function persistirBorradorSupervision(args: {
   formData: FormData;
   expectedUpdatedAt?: string | null;
   permitirSinVeredicto?: boolean;
+  forzarOkSinComentario?: boolean;
 }): Promise<ResultadoBorrador> {
   const asignacionId = String(args.formData.get("asignacionId") ?? "");
   const asignacion = await cargaAsignacionSupervisor(asignacionId, args.userId);
@@ -356,6 +362,7 @@ export async function persistirBorradorSupervision(args: {
   const modo = parseModoEvaluacion(asignacion.postulacion.convocatoria.formulario.modoEvaluacion);
   const opciones: OpcionesPersistir = {
     permitirSinVeredicto: args.permitirSinVeredicto,
+    forzarOkSinComentario: args.forzarOkSinComentario,
   };
 
   if (modo === "GENERAL") {

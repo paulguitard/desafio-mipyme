@@ -53,6 +53,7 @@ describe("resolverTutorial", () => {
       "observacion-pregunta",
       "guardar-revision",
       "enviar-observaciones",
+      "enviar-evaluador",
       "proceder",
     ]);
     expect(resolverTutorial("ADMIN", "/admin/formularios/nuevo").map((p) => p.ancla)).toContain("formulario-agregar");

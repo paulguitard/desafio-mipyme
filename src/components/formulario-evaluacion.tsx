@@ -16,6 +16,11 @@ import {
   ModalProgreso,
   type EstadoModalProgreso,
 } from "@/components/modal-guardado";
+import { AccionesPanelRevision } from "@/components/acciones-revision-botones";
+import {
+  ProveedorAccionesRevision,
+  type AccionEnvioRevision,
+} from "@/components/acciones-revision-context";
 import { EvalDetalleColumnas } from "@/components/eval-detalle-head";
 import { ProveedorVeredictoSupervision } from "@/components/veredicto-supervision-context";
 import type { AvisoEntradaCaso as AvisoEntradaCasoDatos } from "@/lib/aviso-entrada-caso";
@@ -33,17 +38,14 @@ import {
   campoVeredictoIncompleto,
   mensajeVeredictosIncompletos,
   type CampoVeredicto,
+  type OpcionesVeredictoIncompleto,
 } from "@/lib/veredicto-seleccion";
 import { useAccionOptimista } from "@/lib/use-dato-optimista";
 import { useAutoguardado } from "@/lib/use-autoguardado";
 import type { IntencionSupervision } from "@/lib/estado";
 import type { ModoEvaluacion } from "@/lib/modo-evaluacion";
 
-type AccionEnvio =
-  | "enviar-observaciones-supervisor"
-  | "finalizar-evaluacion"
-  | "enviar-observaciones-evaluador"
-  | "proceder";
+type AccionEnvio = AccionEnvioRevision;
 
 type PendienteEnvio = {
   accion: AccionEnvio;
@@ -63,19 +65,21 @@ function leerCampoVeredicto(form: HTMLFormElement, grupo: HTMLElement): CampoVer
   return { veredicto, comentario };
 }
 
-function marcarVeredictosPendientes(form: HTMLFormElement) {
+function marcarVeredictosPendientes(form: HTMLFormElement, opciones?: OpcionesVeredictoIncompleto) {
   form.querySelectorAll(".is-seleccion-pendiente, .is-comentario-pendiente").forEach((nodo) => {
     nodo.classList.remove("is-seleccion-pendiente", "is-comentario-pendiente");
   });
 
-  const grupos = [...form.querySelectorAll<HTMLElement>("[data-veredicto-opciones]")];
+  const grupos = [...form.querySelectorAll<HTMLElement>("[data-veredicto-opciones]")].filter(
+    (grupo) => grupo.dataset.veredictoOpciones,
+  );
   const campos = grupos.map((grupo) => ({ grupo, ...leerCampoVeredicto(form, grupo) }));
-  const mensaje = mensajeVeredictosIncompletos(campos);
+  const mensaje = mensajeVeredictosIncompletos(campos, opciones);
   if (!mensaje) return null;
 
   let primero: HTMLElement | null = null;
   for (const campo of campos) {
-    const falta = campoVeredictoIncompleto(campo);
+    const falta = campoVeredictoIncompleto(campo, opciones);
     if (falta === "seleccion") {
       campo.grupo.classList.add("is-seleccion-pendiente");
       primero ??= campo.grupo;
@@ -174,16 +178,7 @@ export function FormularioEvaluacion({
   const accion = useAccionOptimista();
   const esGeneral = modoEvaluacion === "GENERAL";
   const esSupervisor = rolAccion === "supervisor";
-  const [veredictos, setVeredictos] = useState<Record<string, string>>(() =>
-    Object.keys(veredictosIniciales).length > 0
-      ? veredictosIniciales
-      : { general: veredictoSupervisionInicial },
-  );
-  const reportarVeredicto = useCallback((clave: string, veredicto: string) => {
-    setVeredictos((actual) =>
-      actual[clave] === veredicto ? actual : { ...actual, [clave]: veredicto },
-    );
-  }, []);
+  const reportarVeredicto = useCallback((_clave: string, _veredicto: string) => {}, []);
   const mostrarAcciones = canEdit && rolAccion !== "lectura" && !bloqueado;
   const autoguardado = useAutoguardado({
     enabled: mostrarAcciones,
@@ -191,23 +186,14 @@ export function FormularioEvaluacion({
     formRef,
     versionInicial,
   });
-  const veredictoGeneral = veredictos.general ?? "";
-  const valoresVeredicto = esGeneral
-    ? [veredictoGeneral]
-    : Object.entries(veredictos)
-        .filter(([clave]) => clave !== "general")
-        .map(([, valor]) => valor);
-  const todosElegidos =
-    valoresVeredicto.length > 0 &&
-    valoresVeredicto.every((valor) => valor === "OK" || valor === "OBSERVACION");
-  const hayObservacion = valoresVeredicto.some((valor) => valor === "OBSERVACION");
-  const todosSinObservaciones =
-    valoresVeredicto.length > 0 && valoresVeredicto.every((valor) => valor === "OK");
-  const puedeEnviarObservaciones = esGeneral ? veredictoGeneral === "OBSERVACION" : todosElegidos && hayObservacion;
-  const ocultarDevolverEvaluador = esSupervisor && !puedeEnviarObservaciones;
-  const ocultarProceder = esSupervisor && !todosSinObservaciones;
-  const ocultarEnviarSupervisor = !esSupervisor && !puedeEnviarObservaciones;
-  const ocultarFinalizar = !esSupervisor && !todosSinObservaciones;
+  const veredictoInicialPanel = (() => {
+    if (!esSupervisor || esGeneral) return "";
+    const valores = Object.values(veredictosIniciales);
+    if (valores.some((valor) => valor === "OBSERVACION")) return "OBSERVACION";
+    if (valores.length > 0 && valores.every((valor) => valor === "OK")) return "OK";
+    return "";
+  })();
+  const [veredictoPanel, setVeredictoPanel] = useState(veredictoInicialPanel);
   const finalizaAlProceder = intencionPendiente === "FINALIZAR";
   const conservarCampos = bloqueado || envioModal !== null;
   const camposVisibles = useRef({ caso, evaluacion });
@@ -245,10 +231,15 @@ export function FormularioEvaluacion({
   function abrirConfirmacion(tipo: AccionEnvio) {
     const form = formRef.current;
     if (!form) return;
-    const mensaje = marcarVeredictosPendientes(form);
-    if (mensaje) {
-      setError(mensaje);
-      return;
+    if (tipo !== "proceder") {
+      const mensaje = marcarVeredictosPendientes(form, {
+        exigirSeleccion: esSupervisor,
+        exigirComentarioSiempre: !esSupervisor || tipo === "enviar-observaciones-evaluador",
+      });
+      if (mensaje) {
+        setError(mensaje);
+        return;
+      }
     }
     setError(null);
     setPendienteEnvio({ accion: tipo });
@@ -280,19 +271,19 @@ export function FormularioEvaluacion({
     let detalleExito: string;
     if (tipo === "enviar-observaciones-supervisor") {
       persistir = enviarObservaciones;
-      detalleExito = "Las observaciones se enviaron al supervisor.";
+      detalleExito = "El pedido de cambios se envió al supervisor.";
     } else if (tipo === "finalizar-evaluacion") {
       persistir = finalizarEvaluacion;
       detalleExito = "La finalización se envió al supervisor.";
     } else if (tipo === "enviar-observaciones-evaluador") {
       persistir = enviarObservacionesSupervision;
-      detalleExito = "Las observaciones se enviaron al evaluador.";
+      detalleExito = "El pedido de cambios se envió al evaluador.";
     } else if (finalizaAlProceder) {
       persistir = procederSupervision;
-      detalleExito = "La evaluación quedó cerrada.";
+      detalleExito = "La evaluación quedó finalizada y aprobada.";
     } else {
       persistir = procederSupervision;
-      detalleExito = "Las observaciones se enviaron al participante.";
+      detalleExito = "El participante ya puede editar su caso.";
     }
     setDetalleEnvio(detalleExito);
     setEnvioModal("enCurso");
@@ -317,6 +308,7 @@ export function FormularioEvaluacion({
       }
 
       const updatedAtBorrador = borrador.updatedAt;
+      autoguardado.pausarFlush(true);
       setBloqueado(true);
       const paraEnviar = datosDelFormulario() ?? formData;
       paraEnviar.set("expectedUpdatedAt", updatedAtBorrador);
@@ -329,6 +321,7 @@ export function FormularioEvaluacion({
           setEnvioModal("exito");
         },
         onError: (mensajeError) => {
+          autoguardado.pausarFlush(false);
           setEnvioModal("error");
           const yaDiceBorrador =
             mensajeError.includes("borrador") || mensajeError.includes("Se guardó");
@@ -389,12 +382,13 @@ export function FormularioEvaluacion({
 
     if (accion === "enviar-observaciones-supervisor") {
       return {
-        title: "¿Enviar a supervisor?",
-        confirmLabel: "Enviar a supervisor",
+        title: "¿Pedir cambios al participante?",
+        confirmLabel: "Pedir cambios al participante",
         body: (
           <>
-            <p>Las observaciones se enviarán al supervisor.</p>
-            <p>No podrás editar hasta que el supervisor las devuelva.</p>
+            <p>Tu comentario se enviará al supervisor.</p>
+            <p>Si el supervisor aprueba, el participante podrá editar su caso.</p>
+            <p>No podrás editar hasta que el supervisor responda.</p>
           </>
         ),
       };
@@ -406,15 +400,15 @@ export function FormularioEvaluacion({
         confirmLabel: "Finalizar evaluación",
         body: (
           <>
-            <p>La finalización se enviará al supervisor.</p>
+            <p>La finalización se enviará al supervisor junto con tu comentario.</p>
             <p>
               {esGeneral
-                ? "La observación general debe quedar sin observaciones y con nota si corresponde."
-                : "Todas las preguntas deben quedar sin observaciones y con nota si corresponde."}
+                ? "Debes dejar un comentario y una nota si corresponde."
+                : "Cada pregunta debe tener un comentario y una nota si corresponde."}
             </p>
             <p>
-              No podrás editar mientras esté en supervisión. Si el supervisor procede, la evaluación
-              quedará cerrada.
+              Si el supervisor aprueba, el caso de esta evaluación quedará finalizado y aprobado. El
+              participante verá tu comentario y no podrá editar.
             </p>
           </>
         ),
@@ -423,11 +417,11 @@ export function FormularioEvaluacion({
 
     if (accion === "enviar-observaciones-evaluador") {
       return {
-        title: "¿Enviar observaciones?",
-        confirmLabel: "Enviar observaciones",
+        title: "¿Enviar al evaluador?",
+        confirmLabel: "Enviar al evaluador",
         body: (
           <>
-            <p>Las observaciones se enviarán al evaluador.</p>
+            <p>Le pides correcciones al evaluador con el comentario que dejaste.</p>
             <p>No podrás seguir editando hasta que el evaluador vuelva a enviar.</p>
           </>
         ),
@@ -436,23 +430,23 @@ export function FormularioEvaluacion({
 
     if (finalizaAlProceder) {
       return {
-        title: "¿Proceder con la finalización?",
-        confirmLabel: "Proceder",
+        title: "¿Aprobar la finalización?",
+        confirmLabel: "Aprobar",
         body: (
           <>
-            <p>Se cerrará la evaluación.</p>
-            <p>El participante y el evaluador no podrán seguir editando.</p>
+            <p>Se dará por finalizada y aprobada esta evaluación.</p>
+            <p>El participante verá el último comentario del evaluador y no podrá editar.</p>
           </>
         ),
       };
     }
 
     return {
-      title: "¿Proceder con las observaciones?",
-      confirmLabel: "Proceder",
+      title: "¿Aprobar los cambios al participante?",
+      confirmLabel: "Aprobar",
       body: (
         <>
-          <p>Las observaciones se enviarán al participante, que podrá corregir lo observado.</p>
+          <p>El participante recibirá el comentario del evaluador y podrá editar su caso.</p>
           <p>Esta supervisión quedará cerrada.</p>
         </>
       ),
@@ -477,75 +471,15 @@ export function FormularioEvaluacion({
           </div>
           {mostrarAcciones ? (
             <div className="formulario-caso-acciones flex shrink-0 flex-nowrap justify-end gap-2">
-              {esSupervisor ? (
-                <>
-                  <button
-                    className="btn btn-sm btn-secondary"
-                    data-tour="guardar-revision"
-                    type="button"
-                    disabled={Boolean(guardadoModal) || Boolean(envioModal) || accion.guardando}
-                    onClick={guardarRevisionActual(guardarSupervision)}
-                  >
-                    Guardar revisión
-                  </button>
-                  {ocultarDevolverEvaluador ? null : (
-                    <button
-                      className="btn btn-sm btn-gold"
-                      data-tour="enviar-observaciones"
-                      type="button"
-                      disabled={Boolean(guardadoModal) || Boolean(envioModal) || accion.guardando}
-                      onClick={() => abrirConfirmacion("enviar-observaciones-evaluador")}
-                    >
-                      Enviar observaciones
-                    </button>
-                  )}
-                  {ocultarProceder ? null : (
-                    <button
-                      className="btn btn-sm btn-primary"
-                      data-tour="proceder"
-                      type="button"
-                      disabled={Boolean(guardadoModal) || Boolean(envioModal) || accion.guardando}
-                      onClick={() => abrirConfirmacion("proceder")}
-                    >
-                      Proceder
-                    </button>
-                  )}
-                </>
-              ) : (
-                <>
-                  <button
-                    className="btn btn-sm btn-secondary"
-                    data-tour="guardar-revision"
-                    type="button"
-                    disabled={Boolean(guardadoModal) || Boolean(envioModal) || accion.guardando}
-                    onClick={guardarRevisionActual(guardarRevision)}
-                  >
-                    Guardar revisión
-                  </button>
-                  {ocultarEnviarSupervisor ? null : (
-                    <button
-                      className="btn btn-sm btn-gold"
-                      data-tour="enviar-supervisor"
-                      type="button"
-                      disabled={Boolean(guardadoModal) || Boolean(envioModal) || accion.guardando}
-                      onClick={() => abrirConfirmacion("enviar-observaciones-supervisor")}
-                    >
-                      Enviar a supervisor
-                    </button>
-                  )}
-                  {ocultarFinalizar ? null : (
-                    <button
-                      className="btn btn-sm btn-primary"
-                      data-tour="finalizar-evaluacion"
-                      type="button"
-                      disabled={Boolean(guardadoModal) || Boolean(envioModal) || accion.guardando}
-                      onClick={() => abrirConfirmacion("finalizar-evaluacion")}
-                    >
-                      Finalizar evaluación
-                    </button>
-                  )}
-                </>
-              )}
+              <button
+                className="btn btn-sm btn-secondary"
+                data-tour="guardar-revision"
+                type="button"
+                disabled={Boolean(guardadoModal) || Boolean(envioModal) || accion.guardando}
+                onClick={guardarRevisionActual(esSupervisor ? guardarSupervision : guardarRevision)}
+              >
+                Guardar borrador
+              </button>
             </div>
           ) : null}
         </div>
@@ -560,21 +494,34 @@ export function FormularioEvaluacion({
 
       <section className="eval-detalle-shell h-full min-h-0" aria-label="Caso, evaluación y supervisión">
         <input type="hidden" name="asignacionId" value={asignacionId} />
-        <ProveedorVeredictoSupervision onChange={reportarVeredicto}>
-          <EvalDetalleColumnas
-            sinSupervision
-            bloqueado={bloqueado && envioModal !== "exito"}
-            casoTitle="Caso"
-            casoSubtitle="Respuestas del participante"
-            caso={conservarCampos ? camposVisibles.current.caso : caso}
-            evalTitle="Evaluación y Supervisión"
-            evalSubtitle={
-              headerEvaluacion ??
-              (esGeneral ? "Comentario del caso" : "Comentarios por pregunta")
-            }
-            evaluacion={conservarCampos ? camposVisibles.current.evaluacion : evaluacion}
-          />
-        </ProveedorVeredictoSupervision>
+        <ProveedorAccionesRevision
+          value={{
+            disabled: Boolean(guardadoModal) || Boolean(envioModal) || accion.guardando,
+            esSupervisor,
+            esGeneral,
+            intencionPendiente: intencionPendiente ?? null,
+            veredictoPanel,
+            setVeredictoPanel,
+            abrirConfirmacion,
+          }}
+        >
+          <ProveedorVeredictoSupervision onChange={reportarVeredicto}>
+            <EvalDetalleColumnas
+              sinSupervision
+              bloqueado={bloqueado && envioModal !== "exito"}
+              casoTitle="Caso"
+              casoSubtitle="Respuestas del participante"
+              caso={conservarCampos ? camposVisibles.current.caso : caso}
+              evalTitle="Evaluación y Supervisión"
+              evalSubtitle={
+                headerEvaluacion ??
+                (esGeneral ? "Comentario del caso" : "Comentarios por pregunta")
+              }
+              evaluacion={conservarCampos ? camposVisibles.current.evaluacion : evaluacion}
+              evalAcciones={mostrarAcciones && !esGeneral ? <AccionesPanelRevision /> : null}
+            />
+          </ProveedorVeredictoSupervision>
+        </ProveedorAccionesRevision>
       </section>
 
       <AvisoEntradaCaso aviso={avisoEntrada} />
@@ -606,7 +553,7 @@ export function FormularioEvaluacion({
         onAceptar={() => {
           if (envioModal === "exito") {
             setEnvioModal(null);
-            router.push(esSupervisor ? "/supervisor" : "/evaluador");
+            router.push("/evaluador");
             return;
           }
           const eraError = envioModal === "error";

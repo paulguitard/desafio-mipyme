@@ -227,6 +227,7 @@ export function FormularioPostulante({
       }
 
       const updatedAtBorrador = borrador.updatedAt;
+      autoguardado.pausarFlush(true);
       setBloqueado(true);
       const paraEnviar = datosDelFormulario() ?? data;
       paraEnviar.set("expectedUpdatedAt", updatedAtBorrador);
@@ -241,6 +242,7 @@ export function FormularioPostulante({
         },
         onError: (mensajeError) => {
           savingRef.current = false;
+          autoguardado.pausarFlush(false);
           setEnvioModal("error");
           const yaDiceBorrador =
             mensajeError.includes("borrador") || mensajeError.includes("Se guardó");

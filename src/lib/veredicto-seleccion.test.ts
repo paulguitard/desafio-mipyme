@@ -12,7 +12,7 @@ describe("mensajeVeredictosIncompletos", () => {
     );
   });
 
-  it("pide el comentario si se eligió comentar observaciones sin texto", () => {
+  it("pide el comentario si se eligió pedir cambios sin texto", () => {
     expect(
       mensajeVeredictosIncompletos([{ veredicto: "OBSERVACION", comentario: "   " }]),
     ).toBe(MENSAJE_COMENTARIO_VEREDICTO);
@@ -37,12 +37,21 @@ describe("mensajeVeredictosIncompletos", () => {
     ).toBe(`${MENSAJE_SELECCION_VEREDICTO} ${MENSAJE_COMENTARIO_VEREDICTO}`);
   });
 
-  it("acepta sin observaciones o un comentario escrito", () => {
+  it("acepta aprobar sin comentario o un comentario escrito", () => {
     expect(
       mensajeVeredictosIncompletos([
         { veredicto: "OK", comentario: "" },
         { veredicto: "OBSERVACION", comentario: "<p>Falta el monto</p>" },
       ]),
     ).toBeNull();
+  });
+
+  it("exige comentario en todos los campos del evaluador", () => {
+    expect(
+      mensajeVeredictosIncompletos([{ veredicto: "OBSERVACION", comentario: "" }], {
+        exigirSeleccion: false,
+        exigirComentarioSiempre: true,
+      }),
+    ).toBe(MENSAJE_COMENTARIO_VEREDICTO);
   });
 });

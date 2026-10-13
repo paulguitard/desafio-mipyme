@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import {
-  esVeredictoValido,
   leerComentario,
   leerVeredictoGeneral,
   persistirBorradorSupervision,
@@ -84,10 +83,10 @@ export async function enviarObservacionesSupervision(formData: FormData) {
   if (modo === "GENERAL") {
     const general = leerVeredictoGeneral(formData);
     if (general.veredicto !== "OBSERVACION") {
-      return { error: "Para enviar observaciones, marca la observación general." };
+      return { error: "Para pedir cambios al evaluador, elige esa opción." };
     }
     if (!general.comentario) {
-      return { error: "La observación general debe incluir un comentario." };
+      return { error: "Debes incluir un comentario para el evaluador." };
     }
   } else {
     const preguntas = asignacion.postulacion.convocatoria.formulario.preguntas;
@@ -95,15 +94,11 @@ export async function enviarObservacionesSupervision(formData: FormData) {
       veredicto: String(formData.get(`veredicto-${pregunta.id}`) ?? ""),
       comentario: leerComentario(formData, `comentario-${pregunta.id}`),
     }));
-    if (items.some((item) => !esVeredictoValido(item.veredicto))) {
-      return { error: "Marca todas las preguntas como Sin observaciones o Comentar observaciones." };
+    if (items.some((item) => item.veredicto !== "OBSERVACION")) {
+      return { error: "Elige Pedir cambios al evaluador para enviar el comentario." };
     }
-    const observadas = items.filter((item) => item.veredicto === "OBSERVACION");
-    if (observadas.length === 0) {
-      return { error: "Para enviar observaciones, al menos una pregunta debe tener observación." };
-    }
-    if (observadas.some((item) => !item.comentario)) {
-      return { error: "Cada observación debe incluir un comentario." };
+    if (items.some((item) => !item.comentario)) {
+      return { error: "Cada pregunta debe incluir un comentario para el evaluador." };
     }
   }
 
@@ -138,22 +133,17 @@ export async function procederSupervision(formData: FormData) {
     return { error: "Esta evaluación no tiene una intención pendiente del evaluador." };
   }
 
-  const guardado = await guardarSupervision(formData);
-  if (guardado?.error) return guardado;
-
-  const modo = parseModoEvaluacion(asignacion.postulacion.convocatoria.formulario.modoEvaluacion);
-  const preguntas = asignacion.postulacion.convocatoria.formulario.preguntas;
-
-  if (modo === "GENERAL") {
-    const general = leerVeredictoGeneral(formData);
-    if (general.veredicto !== "OK") {
-      return { error: "Para proceder, la supervisión general debe quedar sin observaciones." };
-    }
-  } else {
-    const items = preguntas.map((pregunta) => String(formData.get(`veredicto-${pregunta.id}`) ?? ""));
-    if (items.some((veredicto) => veredicto !== "OK")) {
-      return { error: "Para proceder, todas las preguntas deben quedar sin observaciones." };
-    }
+  const expectedUpdatedAt = String(formData.get("expectedUpdatedAt") ?? "").trim() || null;
+  const resultado = await persistirBorradorSupervision({
+    userId: user.id,
+    formData,
+    expectedUpdatedAt,
+    permitirSinVeredicto: false,
+    forzarOkSinComentario: true,
+  });
+  if ("error" in resultado) return { error: resultado.error };
+  if ("conflict" in resultado) {
+    return { error: "No se pudo guardar.", conflict: true as const, updatedAt: resultado.updatedAt };
   }
 
   const siguienteEstado =

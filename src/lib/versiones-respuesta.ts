@@ -42,6 +42,44 @@ export function respuestasEquivalentes(args: {
   return valoresRespuestaEquivalentes(args.tipo, args.valorA, args.valorB);
 }
 
+/**
+ * Si el envío no llegó a snapshotear (p. ej. el borrador ya había escrito
+ * `respuesta.valor`), el historial debe incluir esa vigencia para no perder el cambio.
+ */
+export function versionesConVigente<T extends { valor: string; archivos: string; createdAt: string }>(
+  tipo: string,
+  vigente: { id?: string; valor: string; archivos: string; createdAt: string } | null | undefined,
+  versiones: T[],
+): Array<T & { id?: string }> {
+  const ordenadas = [...versiones].sort(
+    (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+  );
+  if (!vigente) return ordenadas;
+  const ultima = ordenadas[0];
+  if (
+    ultima &&
+    respuestasEquivalentes({
+      tipo,
+      valorA: ultima.valor,
+      archivosA: ultima.archivos,
+      valorB: vigente.valor,
+      archivosB: vigente.archivos,
+    })
+  ) {
+    return ordenadas;
+  }
+  return [
+    {
+      ...(ordenadas[0] ?? ({} as T)),
+      id: vigente.id ? `vigente:${vigente.id}` : "vigente",
+      valor: vigente.valor,
+      archivos: vigente.archivos,
+      createdAt: vigente.createdAt,
+    },
+    ...ordenadas,
+  ];
+}
+
 export function versionesDistintas<T extends { valor: string; archivos: string }>(
   versiones: T[],
   tipo: string,

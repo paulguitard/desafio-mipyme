@@ -113,14 +113,36 @@ export async function enviarPostulacion(formData: FormData) {
     estado === "CON_OBSERVACIONES" ? preguntasObservadas(postulacion) : null;
 
   try {
-    const persistido = await persistirRespuestas({
+    let token = expectedUpdatedAt;
+    let persistido = await persistirRespuestas({
       postulacionId: id,
       formData,
       preguntas: postulacion.convocatoria.formulario.preguntas,
       editableIds: observadas && observadas.size > 0 ? observadas : null,
       crearVersion: true,
-      expectedUpdatedAt,
+      expectedUpdatedAt: token,
     });
+    if ("conflict" in persistido) {
+      token = persistido.updatedAt;
+      persistido = await persistirRespuestas({
+        postulacionId: id,
+        formData,
+        preguntas: postulacion.convocatoria.formulario.preguntas,
+        editableIds: observadas && observadas.size > 0 ? observadas : null,
+        crearVersion: true,
+        expectedUpdatedAt: token,
+      });
+    }
+    if ("conflict" in persistido) {
+      persistido = await persistirRespuestas({
+        postulacionId: id,
+        formData,
+        preguntas: postulacion.convocatoria.formulario.preguntas,
+        editableIds: observadas && observadas.size > 0 ? observadas : null,
+        crearVersion: true,
+        expectedUpdatedAt: null,
+      });
+    }
     if ("conflict" in persistido) {
       return {
         error: "No se pudo enviar. Tu borrador quedó guardado.",

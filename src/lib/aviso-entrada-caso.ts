@@ -1,3 +1,5 @@
+import { textoIntencionEvaluador } from "@/lib/intencion-evaluador";
+
 export type AvisoEntradaCaso = {
   title: string;
   parrafos: string[];
@@ -41,7 +43,7 @@ export function avisoEntradaEvaluador(estado: string): AvisoEntradaCaso {
       ],
       pasos: [
         "Léelas en Evaluación y Supervisión.",
-        "Ajusta tu evaluación y pulsa Enviar a supervisor, o Finalizar evaluación si ya no hay nada que corregir.",
+        "Ajusta tu comentario y pulsa Pedir cambios al participante, o Finalizar evaluación si corresponde cerrar el caso.",
         EXTRA_HISTORIAL,
       ],
     };
@@ -64,7 +66,7 @@ export function avisoEntradaEvaluador(estado: string): AvisoEntradaCaso {
       parrafos: ["Revisa qué cambió y actualiza tu evaluación."],
       pasos: [
         "En Caso, abre Modificada en las preguntas que cambiaron.",
-        "Luego pulsa Enviar a supervisor o Finalizar evaluación.",
+        "Luego pulsa Pedir cambios al participante o Finalizar evaluación.",
       ],
     };
   }
@@ -80,7 +82,7 @@ export function avisoEntradaEvaluador(estado: string): AvisoEntradaCaso {
     parrafos: ["Lee las respuestas y escribe tu evaluación."],
     pasos: [
       "En Caso lees las respuestas. En Evaluación y Supervisión escribes tu comentario.",
-      "Puedes usar Guardar revisión, Enviar a supervisor y Finalizar evaluación.",
+      "Puedes usar Guardar borrador, Pedir cambios al participante y Finalizar evaluación.",
       EXTRA_HISTORIAL,
     ],
   };
@@ -95,15 +97,14 @@ export function avisoEntradaSupervisor(
     return {
       title: "Toca revisar esta evaluación",
       parrafos: [
+        textoIntencionEvaluador(intencionPendiente),
         pidioFinalizar
-          ? "El evaluador pidió cerrar el caso. Revisa y decide si cierra o si hay que corregir."
-          : "El evaluador envió observaciones para el participante. Revisa y decide si proceden.",
+          ? "Revisa el comentario y decide si apruebas el cierre o le pides cambios al evaluador."
+          : "Revisa el comentario y decide si apruebas los cambios al participante o le pides correcciones al evaluador.",
       ],
       pasos: [
         PANELES_EVALUACION,
-        pidioFinalizar
-          ? "Proceder cierra la evaluación. Enviar observaciones la devuelve al evaluador."
-          : "Proceder las aprueba y llegan al participante. Enviar observaciones las devuelve al evaluador.",
+        "Aprobar aplica lo que eligió el evaluador. Pedir cambios al evaluador abre el campo para devolverle la evaluación.",
         EXTRA_HISTORIAL,
       ],
     };

@@ -164,6 +164,9 @@ export default async function PostulacionPage({
           postulacion.convocatoria.formulario.preguntas.find(
             (pregunta) => pregunta.id === respuesta.preguntaId,
           )?.tipo ?? "texto_corto",
+        valor: respuesta.valor,
+        archivos: respuesta.archivos,
+        updatedAt: respuesta.updatedAt.toISOString(),
         versiones: respuesta.versiones.map((version) => ({
           valor: version.valor,
           archivos: version.archivos,
@@ -216,8 +219,10 @@ export default async function PostulacionPage({
           preguntas={postulacion.convocatoria.formulario.preguntas}
           respuestas={postulacion.respuestas.map((respuesta) => ({
             preguntaId: respuesta.preguntaId,
+            id: respuesta.id,
             valor: respuesta.valor,
             archivos: respuesta.archivos,
+            updatedAt: respuesta.updatedAt.toISOString(),
             versiones: respuesta.versiones.map((version) => ({
               id: version.id,
               valor: version.valor,

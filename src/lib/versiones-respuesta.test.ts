@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   respuestasEquivalentes,
   valoresRespuestaEquivalentes,
+  versionesConVigente,
   versionesDistintas,
 } from "@/lib/versiones-respuesta";
 
@@ -64,6 +65,28 @@ describe("versiones de respuesta", () => {
     expect(versionesDistintas([ruido, vieja], "texto_largo").map((item) => item.id)).toEqual(["v1"]);
     expect(versionesDistintas([editada, vieja], "texto_largo").map((item) => item.id)).toEqual([
       "v3",
+      "v1",
+    ]);
+  });
+
+  it("suma la respuesta vigente si el envío no creó una versión nueva", () => {
+    const vieja = {
+      id: "v1",
+      valor: JSON.stringify(`<p>${lorem}</p>`),
+      archivos: "[]",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+    const vigente = {
+      id: "r1",
+      valor: JSON.stringify(`<p><mark>${lorem}</mark></p>`),
+      archivos: "[]",
+      createdAt: "2026-01-03T00:00:00.000Z",
+    };
+    expect(versionesConVigente("texto_largo", vigente, [vieja]).map((item) => item.id)).toEqual([
+      "vigente:r1",
+      "v1",
+    ]);
+    expect(versionesConVigente("texto_largo", { ...vieja, id: "r1" }, [vieja]).map((item) => item.id)).toEqual([
       "v1",
     ]);
   });

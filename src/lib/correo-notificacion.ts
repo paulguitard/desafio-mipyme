@@ -9,8 +9,10 @@ import {
 } from "@/lib/correo-recuperacion";
 import { isMailConfigured, sendMail } from "@/lib/mail";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
+import { textoResultadoCorreo, textoResultadoParaSupervisor } from "@/lib/intencion-evaluador";
 import {
   DEFAULT_CORREO_NOTIFICACION,
+  DEFAULT_CORREO_NOTIFICACION_ANTERIOR,
   TIPOS_CORREO_NOTIFICACION,
   type TipoCorreoNotificacion,
   type TextosCorreoNotificacion,
@@ -53,8 +55,52 @@ async function asegurarTablaCorreoNotificacion() {
   `);
 }
 
+function textosCorreoIguales(a: TextosCorreoNotificacion, b: TextosCorreoNotificacion) {
+  return (
+    a.asunto === b.asunto &&
+    a.titulo === b.titulo &&
+    a.cuerpo === b.cuerpo &&
+    a.textoBoton === b.textoBoton &&
+    a.pie === b.pie
+  );
+}
+
+let correosMigrados = false;
+
+async function migrarTextosCorreoSiDefaultAnterior() {
+  if (correosMigrados) return;
+  correosMigrados = true;
+  const ids = Prisma.join(TIPOS_CORREO_NOTIFICACION.map((id) => Prisma.sql`${id}`));
+  const rows = await prisma.$queryRaw<FilaCorreoNotificacion[]>`
+    SELECT id, asunto, titulo, cuerpo, "textoBoton", pie
+    FROM "ConfigCorreoNotificacion"
+    WHERE id IN (${ids})
+  `;
+  for (const tipo of TIPOS_CORREO_NOTIFICACION) {
+    const anterior = DEFAULT_CORREO_NOTIFICACION_ANTERIOR[tipo];
+    const actual = DEFAULT_CORREO_NOTIFICACION[tipo];
+    const row = rows.find((item) => item.id === tipo);
+    if (!anterior || !row) continue;
+    if (
+      textosCorreoIguales(
+        {
+          asunto: row.asunto,
+          titulo: row.titulo,
+          cuerpo: row.cuerpo,
+          textoBoton: row.textoBoton,
+          pie: row.pie,
+        },
+        anterior,
+      )
+    ) {
+      await guardarFilaCorreoNotificacion(tipo, actual);
+    }
+  }
+}
+
 export async function listarConfigCorreoNotificacion(): Promise<FilaCorreoNotificacion[]> {
   await asegurarTablaCorreoNotificacion();
+  await migrarTextosCorreoSiDefaultAnterior();
   const ids = Prisma.join(TIPOS_CORREO_NOTIFICACION.map((id) => Prisma.sql`${id}`));
   return prisma.$queryRaw<FilaCorreoNotificacion[]>`
     SELECT id, asunto, titulo, cuerpo, "textoBoton", pie
@@ -209,6 +255,7 @@ const casoSelect = {
 export async function avisarSupervisorNuevaRevision(input: {
   postulacionId: string;
   actorNombre: string;
+  intencion?: string | null;
 }) {
   const postulacion = await prisma.postulacion.findUnique({
     where: { id: input.postulacionId },
@@ -226,6 +273,7 @@ export async function avisarSupervisorNuevaRevision(input: {
       nombre: supervisor.name,
       enlace: urlSupervision(input.postulacionId),
       actor: input.actorNombre,
+      resultado: textoResultadoParaSupervisor(input.intencion),
       ...contextoCaso(postulacion),
     },
   });
@@ -276,10 +324,7 @@ export async function avisarTrasAprobacionSupervisor(input: {
   });
   if (!asignacion) return;
   const caso = contextoCaso(asignacion.postulacion);
-  const resultadoTexto =
-    input.resultado === "finalizacion"
-      ? "evaluación finalizada"
-      : "observaciones aprobadas";
+  const resultadoTexto = textoResultadoCorreo(input.resultado);
 
   if (asignacion.evaluador.email) {
     await notifyNovedadCaso({

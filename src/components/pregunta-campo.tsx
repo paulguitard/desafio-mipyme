@@ -475,7 +475,7 @@ export function PreguntaCampo({
   ) : null;
   const encabezado = (
     <div className="pregunta-encabezado">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         {titulo}
         {acciones ? <div className="flex shrink-0 items-center gap-1">{acciones}</div> : null}
       </div>

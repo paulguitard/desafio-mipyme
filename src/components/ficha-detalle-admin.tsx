@@ -131,6 +131,12 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
                       <HistorialVersionesRespuesta
                         tipo={pregunta.tipo}
                         opciones={pregunta.opciones}
+                        vigente={{
+                          id: respuesta.id,
+                          valor: respuesta.valor,
+                          archivos: respuesta.archivos,
+                          createdAt: respuesta.updatedAt,
+                        }}
                         versiones={respuesta.versiones.map((version, index) => ({
                           id: version.id,
                           valor: version.valor,
@@ -153,7 +159,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
           )}
           evaluacion={
             esGeneral ? (
-              <EvalDetalleCelda panel="eval">
+              <EvalDetalleCelda key="eval-general" panel="eval">
                 {asignacion ? (
                   <PanelHiloRevision
                     audiencia="equipo"

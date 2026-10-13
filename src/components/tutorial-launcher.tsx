@@ -144,6 +144,7 @@ export function TutorialLauncher({ rol }: { rol: Role }) {
           paso.ancla === "guardar-revision" ||
           paso.ancla === "enviar-supervisor" ||
           paso.ancla === "enviar-observaciones" ||
+          paso.ancla === "enviar-evaluador" ||
           paso.ancla === "finalizar-evaluacion";
         return {
           element: () => nodoTourVisible(paso.ancla, raiz) as Element,

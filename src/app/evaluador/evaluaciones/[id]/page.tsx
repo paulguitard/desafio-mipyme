@@ -74,6 +74,9 @@ export default async function EvaluacionDetallePage({
       respuestas: asignacion.postulacion.respuestas.map((respuesta) => ({
         preguntaId: respuesta.preguntaId,
         tipo: preguntas.find((pregunta) => pregunta.id === respuesta.preguntaId)?.tipo ?? "texto_corto",
+        valor: respuesta.valor,
+        archivos: respuesta.archivos,
+        updatedAt: respuesta.updatedAt.toISOString(),
         versiones: respuesta.versiones.map((version) => ({
           valor: version.valor,
           archivos: version.archivos,
@@ -142,7 +145,7 @@ export default async function EvaluacionDetallePage({
       }
       caso={
         <>
-          <ResumenCambiosReenvio preguntas={preguntasModificadas} />
+          <ResumenCambiosReenvio key="cambios-reenvio" preguntas={preguntasModificadas} />
           {asignacion.postulacion.convocatoria.formulario.preguntas.map((pregunta) => {
         const respuesta = asignacion.postulacion.respuestas.find((r) => r.preguntaId === pregunta.id);
         const modificada = idsModificadas.has(pregunta.id);
@@ -158,6 +161,12 @@ export default async function EvaluacionDetallePage({
                   <HistorialVersionesRespuesta
                     tipo={pregunta.tipo}
                     opciones={pregunta.opciones}
+                    vigente={{
+                      id: respuesta.id,
+                      valor: respuesta.valor,
+                      archivos: respuesta.archivos,
+                      createdAt: respuesta.updatedAt.toISOString(),
+                    }}
                     versiones={respuesta.versiones.map((version, index) => ({
                       id: version.id,
                       valor: version.valor,
@@ -177,7 +186,7 @@ export default async function EvaluacionDetallePage({
       }
       evaluacion={
         esGeneral ? (
-          <EvalDetalleCelda panel="eval">
+          <EvalDetalleCelda key="eval-general" panel="eval">
             <PanelHiloRevision
               audiencia="equipo"
               asignacion={hiloAsignacion}

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { normalizarCorreo } from "@/lib/correo";
 import {
   convocatoriaAbiertaParaPostular,
@@ -34,6 +35,36 @@ import {
 import { respuestasEquivalentes } from "@/lib/versiones-respuesta";
 
 const MANTENER_VALOR = Symbol("mantener-valor");
+
+async function snapshotVersionSiCambio(
+  tx: Prisma.TransactionClient,
+  args: { respuestaId: string; tipo: string; valor: string; archivos: string },
+) {
+  const ultima = await tx.respuestaVersion.findFirst({
+    where: { respuestaId: args.respuestaId },
+    orderBy: { createdAt: "desc" },
+    select: { valor: true, archivos: true },
+  });
+  if (
+    ultima &&
+    respuestasEquivalentes({
+      tipo: args.tipo,
+      valorA: ultima.valor,
+      archivosA: ultima.archivos,
+      valorB: args.valor,
+      archivosB: args.archivos,
+    })
+  ) {
+    return;
+  }
+  await tx.respuestaVersion.create({
+    data: {
+      respuestaId: args.respuestaId,
+      valor: args.valor,
+      archivos: args.archivos,
+    },
+  });
+}
 
 export type ResultadoBorrador =
   | { ok: true; updatedAt: string; archivoError?: string }
@@ -375,13 +406,10 @@ export async function persistirRespuestas(args: {
           continue;
         }
 
-        if (igual && item.existing) {
-          if (!crearVersionEnTexto) continue;
-          const versions = await tx.respuestaVersion.count({
-            where: { respuestaId: item.existing.id },
-          });
-          if (versions > 0) continue;
-        }
+        // Un borrador ya puede haber escrito `respuesta.valor`. Al enviar hay que
+        // comparar contra la última versión, no contra esa fila, o el historial
+        // nunca recibe el cambio.
+        if (igual && item.existing && !args.crearVersion) continue;
 
         const respuesta = await tx.respuesta.upsert({
           where: {
@@ -400,12 +428,11 @@ export async function persistirRespuestas(args: {
         });
 
         if (crearVersionEnTexto) {
-          await tx.respuestaVersion.create({
-            data: {
-              respuestaId: respuesta.id,
-              valor: item.valorStr,
-              archivos: item.archivosStr,
-            },
+          await snapshotVersionSiCambio(tx, {
+            respuestaId: respuesta.id,
+            tipo: item.tipo,
+            valor: item.valorStr,
+            archivos: item.archivosStr,
           });
         }
       }
@@ -540,12 +567,12 @@ export async function persistirRespuestas(args: {
           },
         });
         if (!respuesta) continue;
-        await tx.respuestaVersion.create({
-          data: {
-            respuestaId: respuesta.id,
-            valor: respuesta.valor,
-            archivos: respuesta.archivos,
-          },
+        const pregunta = args.preguntas.find((item) => item.id === preguntaId);
+        await snapshotVersionSiCambio(tx, {
+          respuestaId: respuesta.id,
+          tipo: pregunta?.tipo ?? "texto_corto",
+          valor: respuesta.valor,
+          archivos: respuesta.archivos,
         });
       }
     });

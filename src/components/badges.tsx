@@ -69,7 +69,7 @@ export function BadgePostulacion({
   ) as EstadoPostulacion;
   const label =
     key === "FINALIZADA" && vistaParticipante
-      ? "Aprobado y finalizado"
+      ? "Finalizada y aprobada"
       : (ESTADO_POSTULACION_LABEL[key] ?? estado);
   const cls = POSTULACION_CLASS[key] ?? "bg-slate-100";
   if (!cortoMovil) {
@@ -77,7 +77,7 @@ export function BadgePostulacion({
   }
   const corto =
     key === "FINALIZADA" && vistaParticipante
-      ? "Aprobado"
+      ? "Finalizada"
       : (ESTADO_POSTULACION_LABEL_CORTO[key] ?? label);
   return (
     <span className={`badge ${cls}`}>

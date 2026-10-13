@@ -185,6 +185,39 @@ describe("hilo de revisión", () => {
     expect(tarjetas[1]?.mensajes.find((item) => item.id === "ev2")?.esVersionFinal).toBe(true);
   });
 
+  it("marca como versión final un comentario aunque el veredicto histórico sea OK", () => {
+    const tarjetas = armarHiloRevision({
+      revisiones: [
+        {
+          id: "ev-ok",
+          ronda: 1,
+          ciclo: 1,
+          veredicto: "OK",
+          comentario: "<p>Queda aprobado con este comentario</p>",
+          createdAt: "2026-09-03T00:00:00.000Z",
+        },
+      ],
+      supervisiones: [
+        {
+          id: "sup-ok",
+          ronda: 1,
+          ciclo: 1,
+          veredicto: "OK",
+          comentario: "",
+          createdAt: "2026-09-03T12:00:00.000Z",
+        },
+      ],
+      asignacion: { estado: "FINALIZADA", rondaActual: 1, cicloSupervision: 1 },
+      audiencia: "participante",
+    });
+    expect(tarjetas[0]?.mensajes[0]).toEqual(
+      expect.objectContaining({
+        id: "ev-ok",
+        comentario: "<p>Queda aprobado con este comentario</p>",
+      }),
+    );
+  });
+
   it("al participante le deja solo el globo final de cada ronda liberada, sin ticker", () => {
     const tarjetas = armarHiloRevision({
       revisiones: [

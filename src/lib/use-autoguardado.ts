@@ -103,6 +103,7 @@ export function useAutoguardado(args: {
   const colaManualRef = useRef<Promise<void>>(Promise.resolve());
   const enabledRef = useRef(args.enabled);
   const kindRef = useRef(args.kind);
+  const pausarFlushRef = useRef(false);
   enabledRef.current = args.enabled;
   kindRef.current = args.kind;
 
@@ -124,6 +125,7 @@ export function useAutoguardado(args: {
       soloTexto?: boolean;
       reintentoConflicto?: boolean;
     }): Promise<RespuestaBorrador | { skipped: true }> => {
+      if (pausarFlushRef.current && opciones?.keepalive) return { skipped: true };
       if (!opciones?.forzar && !enabledRef.current) return { skipped: true };
       if (enVueloRef.current) return { skipped: true };
       if (!sucioRef.current && !opciones?.forzar) {
@@ -253,7 +255,7 @@ export function useAutoguardado(args: {
       form.removeEventListener("change", onCambio);
       window.removeEventListener("pagehide", onSalir);
       window.removeEventListener("beforeunload", onSalir);
-      if (sucioRef.current) {
+      if (sucioRef.current && !pausarFlushRef.current) {
         void flush({ keepalive: true, forzar: true, soloTexto: true });
       }
       detenerTimer();
@@ -310,12 +312,16 @@ export function useAutoguardado(args: {
   );
 
   const versionActual = useCallback(() => versionRef.current, []);
+  const pausarFlush = useCallback((pausar: boolean) => {
+    pausarFlushRef.current = pausar;
+  }, []);
 
   return {
     esperarAutoguardado,
     marcarLimpio,
     marcarSucio,
     versionActual,
+    pausarFlush,
     flush,
   };
 }

@@ -233,23 +233,24 @@ export function resolverTutorial(
           ancla: "observacion-pregunta",
           titulo: "Tu revisión",
           descripcion:
-            "Escribe tu evaluación en la tarjeta de la ronda. Al enviarla, queda como comentario. Si el supervisor observa, respondes en la misma tarjeta.",
+            "Escribe tu comentario en la tarjeta de la ronda. Debajo eliges si pides cambios al participante o finalizas. Si el supervisor te pide cambios, respondes en la misma tarjeta.",
         },
         {
           ancla: "guardar-revision",
-          titulo: "Guardar revisión",
+          titulo: "Guardar borrador",
           descripcion: "Guarda tu avance sin enviarlo al supervisor.",
         },
         {
           ancla: "enviar-supervisor",
-          titulo: "Enviar a supervisor",
-          descripcion: "Cuando las observaciones estén listas, envíalas para que el supervisor las revise.",
+          titulo: "Pedir cambios al participante",
+          descripcion:
+            "Envía tu comentario al supervisor. Si lo aprueba, el participante podrá editar su caso.",
         },
         {
           ancla: "finalizar-evaluacion",
           titulo: "Finalizar evaluación",
           descripcion:
-            "Cierra el caso sin devolver observaciones. El supervisor debe confirmar si corresponde finalizar.",
+            "Envía tu comentario al supervisor para cerrar el caso. Si lo aprueba, el participante lo verá y no podrá editar.",
         },
       ];
     }
@@ -311,23 +312,28 @@ export function resolverTutorial(
           ancla: "observacion-pregunta",
           titulo: "Tu supervisión",
           descripcion:
-            "Tu comentario queda encima del evaluador, en la misma ronda. Si no hay observaciones, procede para liberar esa versión.",
+            "Arriba ves qué eligió el evaluador. Puedes pedirle cambios o aprobar para que proceda esa decisión.",
         },
         {
           ancla: "guardar-revision",
-          titulo: "Guardar revisión",
+          titulo: "Guardar borrador",
           descripcion: "Guarda tus comentarios de supervisión sin enviarlos todavía.",
         },
         {
           ancla: "enviar-observaciones",
-          titulo: "Devolver observaciones",
-          descripcion: "Devuelve el caso al evaluador para que corrija según tu supervisión.",
+          titulo: "Pedir cambios al evaluador",
+          descripcion: "Abre el campo para escribirle al evaluador. Luego envía el pedido.",
+        },
+        {
+          ancla: "enviar-evaluador",
+          titulo: "Enviar al evaluador",
+          descripcion: "Manda tu comentario al evaluador para que corrija y vuelva a enviar.",
         },
         {
           ancla: "proceder",
-          titulo: "Proceder",
+          titulo: "Aprobar",
           descripcion:
-            "Confirma la evaluación: las observaciones llegan al participante o, si pidió finalizar, el caso se cierra.",
+            "Aprueba lo que eligió el evaluador: el participante podrá editar el caso, o el caso quedará finalizado y aprobado.",
         },
       ];
     }

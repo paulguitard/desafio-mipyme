@@ -52,16 +52,16 @@ describe("avisoEntradaEvaluador", () => {
 describe("avisoEntradaSupervisor", () => {
   it("distingue finalizar de observaciones", () => {
     expect(avisoEntradaSupervisor("EN_SUPERVISION", "FINALIZAR").parrafos[0]).toContain(
-      "pidió cerrar",
+      "pidió finalizar",
     );
     expect(avisoEntradaSupervisor("EN_SUPERVISION", "OBSERVACIONES").parrafos[0]).toContain(
-      "envió observaciones",
+      "pidió cambios al participante",
     );
     expect(avisoEntradaSupervisor("EN_SUPERVISION", "FINALIZAR").pasos?.join(" ")).toContain(
-      "Proceder cierra",
+      "Aprobar aplica",
     );
     expect(avisoEntradaSupervisor("EN_SUPERVISION", "OBSERVACIONES").pasos?.join(" ")).toContain(
-      "llegan al participante",
+      "Pedir cambios al evaluador",
     );
   });
 

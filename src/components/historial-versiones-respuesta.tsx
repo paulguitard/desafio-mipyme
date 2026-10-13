@@ -5,7 +5,7 @@ import { Modal } from "@/components/modal";
 import { AdjuntosRespuesta, formatValorRespuesta } from "@/components/pregunta-campo";
 import { TextoLargoVista } from "@/components/texto-largo-vista";
 import { parseArchivos, parseValor } from "@/lib/preguntas";
-import { versionesDistintas } from "@/lib/versiones-respuesta";
+import { versionesConVigente, versionesDistintas } from "@/lib/versiones-respuesta";
 
 function IconoHistorial() {
   return (
@@ -53,18 +53,23 @@ export function HistorialVersionesRespuesta({
   tipo,
   opciones,
   modificada = false,
+  vigente,
 }: {
   versiones: VersionHistorial[];
   tipo: string;
   opciones: string;
   modificada?: boolean;
+  vigente?: { id: string; valor: string; archivos: string; createdAt: string } | null;
 }) {
   const [open, setOpen] = useState(false);
 
-  const visibles = versionesDistintas(versiones, tipo).map((version, index, lista) => ({
-    ...version,
-    numero: lista.length - index,
-  }));
+  const visibles = versionesDistintas(versionesConVigente(tipo, vigente, versiones), tipo).map(
+    (version, index, lista) => ({
+      ...version,
+      id: version.id ?? `version-${index}`,
+      numero: lista.length - index,
+    }),
+  );
   const cantidad = visibles.length;
   if (cantidad < 2) return null;
 

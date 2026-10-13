@@ -1,4 +1,4 @@
-import { versionesDistintas } from "@/lib/versiones-respuesta";
+import { versionesConVigente, versionesDistintas } from "@/lib/versiones-respuesta";
 
 type VersionCambio = {
   valor: string;
@@ -9,6 +9,9 @@ type VersionCambio = {
 type RespuestaCambio = {
   preguntaId: string;
   tipo: string;
+  valor?: string;
+  archivos?: string;
+  updatedAt?: string;
   versiones: VersionCambio[];
 };
 
@@ -49,7 +52,20 @@ export function preguntasModificadasEnUltimoEnvio(args: {
     const versiones = [...respuesta.versiones].sort(
       (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
     );
-    const distintas = versionesDistintas(versiones, respuesta.tipo);
+    const distintas = versionesDistintas(
+      versionesConVigente(
+        respuesta.tipo,
+        respuesta.valor != null && respuesta.archivos != null && respuesta.updatedAt
+          ? {
+              valor: respuesta.valor,
+              archivos: respuesta.archivos,
+              createdAt: respuesta.updatedAt,
+            }
+          : null,
+        versiones,
+      ),
+      respuesta.tipo,
+    );
     if (distintas.length < 2) continue;
     const reciente = Date.parse(distintas[0]?.createdAt ?? "");
     if (Number.isNaN(reciente) || reciente <= corte) continue;

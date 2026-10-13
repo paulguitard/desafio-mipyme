@@ -386,9 +386,11 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
         .filter((item): item is NonNullable<typeof item> => Boolean(item)),
     })),
     respuestas: postulacion.respuestas.map((respuesta) => ({
+      id: respuesta.id,
       preguntaId: respuesta.preguntaId,
       valor: respuesta.valor,
       archivos: respuesta.archivos,
+      updatedAt: respuesta.updatedAt.toISOString(),
       versiones: respuesta.versiones.map((version) => ({
         id: version.id,
         valor: version.valor,

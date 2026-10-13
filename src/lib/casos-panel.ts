@@ -105,7 +105,7 @@ export const FILTROS_SUPERVISOR: FiltroCaso[] = [
     labelCorto: "Observaciones",
     banda: "tu-turno",
     descripcion:
-      "El evaluador te envió observaciones para que las revises: puedes proceder o devolverlas.",
+      "El evaluador pidió cambios al participante. Revisa y decide si apruebas o le pides correcciones al evaluador.",
   },
   {
     id: "finalizar",
@@ -113,7 +113,7 @@ export const FILTROS_SUPERVISOR: FiltroCaso[] = [
     labelCorto: "Aprobaciones",
     banda: "tu-turno",
     descripcion:
-      "El evaluador pidió finalizar el caso. Revisa y confirma el cierre o devuelve observaciones.",
+      "El evaluador pidió finalizar la evaluación. Revisa y decide si apruebas el cierre o le pides correcciones al evaluador.",
   },
   {
     id: "esperando-evaluacion",

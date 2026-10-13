@@ -2,11 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import {
-  esVeredictoValido,
   leerComentario,
   leerVeredictoGeneral,
   persistirBorradorEvaluacion,
 } from "@/lib/borrador-revision";
+import type { ModoEvaluacion } from "@/lib/modo-evaluacion";
 import { prisma } from "@/lib/db";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { parseEscalaNotas } from "@/lib/preguntas";
@@ -51,6 +51,28 @@ export async function guardarRevision(formData: FormData) {
   return { ok: true as const, updatedAt: resultado.updatedAt };
 }
 
+async function validarComentarioEvaluacion(
+  formData: FormData,
+  modo: ModoEvaluacion,
+  asignacion: { postulacion: { convocatoria: { formulario: { preguntas: { id: string }[] } } } },
+) {
+  if (modo === "GENERAL") {
+    const general = leerVeredictoGeneral(formData);
+    if (!general.comentario) {
+      return { error: "La evaluación debe incluir un comentario." };
+    }
+    return null;
+  }
+  const items = await leerVeredictos(
+    formData,
+    asignacion.postulacion.convocatoria.formulario.preguntas.map((pregunta) => pregunta.id),
+  );
+  if (items.some((item) => !item.comentario)) {
+    return { error: "Cada pregunta debe incluir un comentario." };
+  }
+  return null;
+}
+
 async function leerVeredictos(formData: FormData, preguntaIds: string[]) {
   return preguntaIds.map((preguntaId) => ({
     preguntaId,
@@ -73,33 +95,8 @@ export async function enviarObservaciones(formData: FormData) {
   if (guardado && "error" in guardado && guardado.error) return guardado;
 
   const modo = parseModoEvaluacion(asignacion.postulacion.convocatoria.formulario.modoEvaluacion);
-
-  if (modo === "GENERAL") {
-    const general = leerVeredictoGeneral(formData);
-    if (general.veredicto !== "OBSERVACION") {
-      return { error: "Para enviar observaciones, marca la observación general." };
-    }
-    if (!general.comentario) {
-      return { error: "La observación general debe incluir un comentario." };
-    }
-  } else {
-    const preguntas = asignacion.postulacion.convocatoria.formulario.preguntas;
-    const items = await leerVeredictos(
-      formData,
-      preguntas.map((p) => p.id),
-    );
-
-    if (items.some((item) => !esVeredictoValido(item.veredicto))) {
-      return { error: "Marca todas las preguntas como Sin observaciones o Comentar observaciones." };
-    }
-    const observadas = items.filter((item) => item.veredicto === "OBSERVACION");
-    if (observadas.length === 0) {
-      return { error: "Para enviar observaciones, al menos una pregunta debe tener observación." };
-    }
-    if (observadas.some((item) => !item.comentario)) {
-      return { error: "Cada observación debe incluir un comentario." };
-    }
-  }
+  const errorComentario = await validarComentarioEvaluacion(formData, modo, asignacion);
+  if (errorComentario) return errorComentario;
 
   await prisma.asignacionEvaluador.update({
     where: { id: asignacionId },
@@ -109,6 +106,7 @@ export async function enviarObservaciones(formData: FormData) {
   await avisarSupervisorNuevaRevision({
     postulacionId: asignacion.postulacionId,
     actorNombre: user.name ?? "Un evaluador",
+    intencion: "OBSERVACIONES",
   });
   revalidatePath(`/evaluador/evaluaciones/${asignacionId}`);
   revalidatePath("/evaluador");
@@ -130,19 +128,12 @@ export async function finalizarEvaluacion(formData: FormData) {
 
   const preguntas = asignacion.postulacion.convocatoria.formulario.preguntas;
   const modo = parseModoEvaluacion(asignacion.postulacion.convocatoria.formulario.modoEvaluacion);
+  const errorComentario = await validarComentarioEvaluacion(formData, modo, asignacion);
+  if (errorComentario) return errorComentario;
   const items = await leerVeredictos(
     formData,
     preguntas.map((p) => p.id),
   );
-
-  if (modo === "GENERAL") {
-    const general = leerVeredictoGeneral(formData);
-    if (general.veredicto !== "OK") {
-      return { error: "Para finalizar, la observación general debe quedar sin observaciones." };
-    }
-  } else if (items.some((item) => item.veredicto !== "OK")) {
-    return { error: "Para finalizar, todas las preguntas deben quedar sin observaciones." };
-  }
 
   const sinNota = preguntas.filter((pregunta) => {
     if (!pregunta.conNotas) return false;
@@ -164,6 +155,7 @@ export async function finalizarEvaluacion(formData: FormData) {
   await avisarSupervisorNuevaRevision({
     postulacionId: asignacion.postulacionId,
     actorNombre: user.name ?? "Un evaluador",
+    intencion: "FINALIZAR",
   });
   revalidatePath(`/evaluador/evaluaciones/${asignacionId}`);
   revalidatePath("/evaluador");

@@ -18,6 +18,9 @@ import type { NotaPreguntaGeneral, PeldanoEscala } from "@/lib/preguntas";
 import { esHtmlVacio, parseEscalaNotas } from "@/lib/preguntas";
 import { revisionParaEditar, revisionVigente } from "@/lib/revision-ciclo";
 import { irAPreguntaCaso } from "@/components/resumen-cambios-reenvio";
+import { useAccionesRevision } from "@/components/acciones-revision-context";
+import { BotonEnviarAlEvaluador, BotonesEvaluadorRevision } from "@/components/acciones-revision-botones";
+import { textoIntencionEvaluador } from "@/lib/intencion-evaluador";
 
 const EditorTextoLargo = dynamic(
   () => import("@/components/editor-texto-largo").then((mod) => mod.EditorTextoLargo),
@@ -47,17 +50,18 @@ function etiquetaNota(nota: number | null, escala: PeldanoEscala[]) {
 }
 
 function cuerpoMensaje(mensaje: MensajeHilo, className: string): ReactNode {
+  const html = htmlParaVistaComentario(mensaje.comentario);
+  if (!esHtmlVacio(html)) {
+    return (
+      <div className={className}>
+        <TextoLargoVista html={html} />
+      </div>
+    );
+  }
   if (mensaje.veredicto === "OK") {
     return <p className={className}>Sin observaciones</p>;
   }
-  if (mensaje.veredicto !== "OBSERVACION") return null;
-  const html = htmlParaVistaComentario(mensaje.comentario);
-  if (esHtmlVacio(html)) return null;
-  return (
-    <div className={className}>
-      <TextoLargoVista html={html} />
-    </div>
-  );
+  return null;
 }
 
 function notasGeneralesDelCiclo(
@@ -171,7 +175,17 @@ function EditorHilo({
   escala: PeldanoEscala[];
   notasPreguntas: NotaPreguntaGeneral[];
 }) {
-  const [veredicto, setVeredicto] = useState(veredictoInicial);
+  const acciones = useAccionesRevision();
+  const esSupervision = rol === "supervisor";
+  const controlesEnTarjeta = Boolean(acciones?.esGeneral && esSupervision);
+  const veredictoForzado =
+    acciones && esSupervision && !acciones.esGeneral ? acciones.veredictoPanel : undefined;
+  const intencionPendiente = acciones?.intencionPendiente ?? null;
+  const accionesEnTarjeta = Boolean(acciones?.esGeneral && !esSupervision);
+  const enviarAlEvaluador = Boolean(acciones?.esGeneral && esSupervision);
+  const [veredicto, setVeredicto] = useState(() =>
+    esSupervision ? veredictoInicial : "OBSERVACION",
+  );
   const [comentario, setComentario] = useState(() => htmlParaVistaComentario(comentarioInicial));
   const [nota, setNota] = useState<number | null>(notaInicial);
   const anclaRef = useRef<HTMLInputElement>(null);
@@ -181,10 +195,23 @@ function EditorHilo({
   const campoVeredicto = `${namePrefix}veredicto-${sufijo}`;
   const campoComentario = `${namePrefix}comentario-${sufijo}`;
   const campoNota = preguntaId ? `${namePrefix}nota-${preguntaId}` : "";
-  const esSupervision = rol === "supervisor";
   const muestraNotasGenerales = !esSupervision && !preguntaId && notasPreguntas.length > 0;
   const muestraNota = escala.length > 0 && !esSupervision && Boolean(preguntaId);
-  const muestraComentario = veredicto === "OBSERVACION";
+  const muestraComentario = !esSupervision || veredicto === "OBSERVACION";
+  const muestraSelector = esSupervision && controlesEnTarjeta;
+  const accionesTarjeta =
+    accionesEnTarjeta ? (
+      <BotonesEvaluadorRevision disabled={Boolean(acciones?.disabled)} />
+    ) : enviarAlEvaluador && veredicto === "OBSERVACION" ? (
+      <BotonEnviarAlEvaluador disabled={Boolean(acciones?.disabled)} />
+    ) : null;
+  const cuerpoVisible =
+    muestraNotasGenerales || muestraNota || muestraComentario || Boolean(accionesTarjeta);
+
+  useEffect(() => {
+    if (veredictoForzado === undefined) return;
+    setVeredicto(veredictoForzado === "" ? "" : veredictoForzado);
+  }, [veredictoForzado]);
 
   useEffect(() => {
     reportar(preguntaId ?? "general", veredicto);
@@ -195,7 +222,6 @@ function EditorHilo({
       primerRender.current = false;
       return;
     }
-    // El comentario lo avisa EditorTextoLargo al escribir.
     avisarCambioFormulario(anclaRef.current);
   }, [veredicto, nota]);
 
@@ -203,21 +229,34 @@ function EditorHilo({
     <div className="hilo-editor-halo">
       <span className="hilo-editor-halo__glow" aria-hidden="true" />
       <span className="hilo-editor-halo__ring" aria-hidden="true" />
-      <div className={`hilo-editor pregunta-edicion${muestraNotasGenerales || muestraNota || muestraComentario ? "" : " is-solo-cabeza"}`}>
+      <div
+        className={`hilo-editor pregunta-edicion${cuerpoVisible ? "" : " is-solo-cabeza"}`}
+        data-veredicto-opciones={muestraSelector ? undefined : campoVeredicto}
+      >
       <div className="pregunta-edicion-enunciado hilo-editor-cabeza">
-        <strong>
-          {esSupervision
-            ? "Tu supervisión, elige una de las opciones:"
-            : "Tu evaluación, elige una de las opciones:"}
-        </strong>
-        <SelectorVeredicto campo={campoVeredicto} veredicto={veredicto} onChange={setVeredicto} />
+        <div className="hilo-editor-cabeza-copy">
+          {muestraSelector ? (
+            <p className="hilo-editor-intencion">
+              {textoIntencionEvaluador(intencionPendiente)}
+            </p>
+          ) : null}
+          <strong>{esSupervision ? "Tu supervisión" : "Tu evaluación"}</strong>
+        </div>
+        {muestraSelector ? (
+          <SelectorVeredicto
+            campo={campoVeredicto}
+            veredicto={veredicto}
+            onChange={(valor) => {
+              setVeredicto(valor);
+              if (valor === "OK") acciones?.abrirConfirmacion("proceder");
+            }}
+          />
+        ) : null}
       </div>
       <div className="pregunta-edicion-cuerpo space-y-3">
         <input ref={anclaRef} type="hidden" name={campoVeredicto} value={veredicto} />
         {muestraNota ? <input type="hidden" name={campoNota} value={nota ?? ""} /> : null}
-        {veredicto !== "OBSERVACION" ? (
-          <input type="hidden" name={campoComentario} value={comentario} />
-        ) : null}
+        {muestraComentario ? null : <input type="hidden" name={campoComentario} value={comentario} />}
         {muestraNotasGenerales ? (
           <SelectoresNotasGenerales notas={notasPreguntas} canEdit namePrefix={namePrefix} />
         ) : null}
@@ -258,6 +297,7 @@ function EditorHilo({
             </p>
           </div>
         ) : null}
+        {accionesTarjeta}
       </div>
     </div>
     </div>

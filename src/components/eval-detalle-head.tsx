@@ -93,6 +93,7 @@ export function EvalDetalleColumnas({
   sinSupervision = false,
   bloqueado = false,
   className,
+  evalAcciones,
 }: {
   casoTitle: string;
   casoSubtitle?: ReactNode;
@@ -106,6 +107,7 @@ export function EvalDetalleColumnas({
   sinSupervision?: boolean;
   bloqueado?: boolean;
   className?: string;
+  evalAcciones?: ReactNode;
 }) {
   const paneles = useEvalPanelesColapsables();
   const [tab, setTab] = useState<"caso" | "eval" | "sup">("caso");
@@ -170,7 +172,10 @@ export function EvalDetalleColumnas({
           collapsed={paneles.evalColapsado}
           onToggle={paneles.toggleEval}
         />
-        <div className="eval-detalle-col-scroll">{evaluacion}</div>
+        <div className="eval-detalle-col-scroll">
+          <div className="eval-detalle-eval-cuerpo">{evaluacion}</div>
+          {evalAcciones ? <div className="eval-detalle-eval-acciones">{evalAcciones}</div> : null}
+        </div>
       </div>
       {sinSupervision ? null : (
         <div className={`eval-detalle-col is-sup${paneles.supColapsado ? " is-collapsed" : ""}`}>

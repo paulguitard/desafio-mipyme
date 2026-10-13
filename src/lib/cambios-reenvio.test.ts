@@ -103,6 +103,24 @@ describe("preguntas modificadas en el último envío", () => {
     ).toEqual(["p2"]);
   });
 
+  it("marca el cambio aunque solo esté en la respuesta vigente y no en versiones", () => {
+    expect(
+      preguntasModificadasEnUltimoEnvio({
+        respuestas: [
+          {
+            preguntaId: "p1",
+            tipo: "texto_corto",
+            valor: JSON.stringify("nuevo"),
+            archivos: "[]",
+            updatedAt: tReenvio,
+            versiones: [version("v1", tEnvio, JSON.stringify("origen"))],
+          },
+        ],
+        asignaciones: [{ rondaActual: 2, revisiones: [{ ronda: 1, createdAt: tObservacion }] }],
+      }),
+    ).toEqual(["p1"]);
+  });
+
   it("toma el corte de la observación respondida más reciente entre evaluadores", () => {
     expect(
       preguntasModificadasEnUltimoEnvio({

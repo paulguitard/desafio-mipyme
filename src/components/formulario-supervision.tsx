@@ -15,7 +15,7 @@ import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { avisoEntradaSupervisor } from "@/lib/aviso-entrada-caso";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
 import { parseEscalaNotas } from "@/lib/preguntas";
-import { revisionParaEditar } from "@/lib/revision-ciclo";
+import { revisionVigente } from "@/lib/revision-ciclo";
 import type { DetalleFichaAdmin } from "@/lib/convocatoria-admin-data";
 
 export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
@@ -39,6 +39,9 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
         respuestas: data.respuestas.map((respuesta) => ({
           preguntaId: respuesta.preguntaId,
           tipo: data.preguntas.find((pregunta) => pregunta.id === respuesta.preguntaId)?.tipo ?? "texto_corto",
+          valor: respuesta.valor,
+          archivos: respuesta.archivos,
+          updatedAt: respuesta.updatedAt,
           versiones: respuesta.versiones,
         })),
         asignaciones: data.asignaciones.map((item) => ({
@@ -72,12 +75,12 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
 
   const veredictosIniciales = esGeneral
     ? {
-        general: revisionParaEditar(asignacion.supervisionesGenerales, ronda, ciclo)?.veredicto ?? "",
+        general: revisionVigente(asignacion.supervisionesGenerales, ronda, ciclo)?.veredicto ?? "",
       }
     : Object.fromEntries(
         data.preguntas.map((pregunta) => [
           pregunta.id,
-          revisionParaEditar(
+          revisionVigente(
             asignacion.supervisionesPregunta.filter((item) => item.preguntaId === pregunta.id),
             ronda,
             ciclo,
@@ -132,7 +135,7 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
                     {item.estado === "EN_SUPERVISION"
                       ? item.intencionPendiente === "FINALIZAR"
                         ? " · Por finalizar"
-                        : " · Observaciones por revisar"
+                        : " · Pedir cambios"
                       : item.estado === "FINALIZADA"
                         ? " · Finalizada"
                         : item.estado === "DEVUELTA_SUPERVISOR"
@@ -147,7 +150,7 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
       }
       caso={
         <>
-          <ResumenCambiosReenvio preguntas={preguntasModificadas} />
+          <ResumenCambiosReenvio key="cambios-reenvio" preguntas={preguntasModificadas} />
           {data.preguntas.map((pregunta) => {
         const respuesta = data.respuestas.find((item) => item.preguntaId === pregunta.id);
         const modificada = idsModificadas.has(pregunta.id);
@@ -163,6 +166,12 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
                   <HistorialVersionesRespuesta
                     tipo={pregunta.tipo}
                     opciones={pregunta.opciones}
+                    vigente={{
+                      id: respuesta.id,
+                      valor: respuesta.valor,
+                      archivos: respuesta.archivos,
+                      createdAt: respuesta.updatedAt,
+                    }}
                     versiones={respuesta.versiones.map((version, index) => ({
                       id: version.id,
                       valor: version.valor,
@@ -182,7 +191,7 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
       }
       evaluacion={
         esGeneral ? (
-          <EvalDetalleCelda panel="eval">
+          <EvalDetalleCelda key="eval-general" panel="eval">
             <PanelHiloRevision
               audiencia="equipo"
               asignacion={{

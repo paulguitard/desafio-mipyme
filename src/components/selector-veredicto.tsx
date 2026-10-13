@@ -4,22 +4,27 @@ export function SelectorVeredicto({
   campo,
   veredicto,
   onChange,
+  etiquetaObservacion = "Pedir cambios al evaluador",
+  etiquetaOk = "Aprobar",
 }: {
-  campo: string;
+  campo?: string;
   veredicto: string;
   onChange: (valor: "OK" | "OBSERVACION") => void;
+  etiquetaObservacion?: string;
+  etiquetaOk?: string;
 }) {
   return (
     <div>
       <div
         className="veredicto-opciones flex flex-wrap gap-2"
-        data-veredicto-opciones={campo}
+        data-veredicto-opciones={campo || undefined}
         role="group"
-        aria-label="Observaciones"
+        aria-label="Decisión de supervisión"
       >
         <button
           className={`btn btn-sm ${veredicto === "OBSERVACION" ? "btn-primary" : "btn-secondary"}`}
           type="button"
+          data-tour="enviar-observaciones"
           onClick={(event) => {
             event.currentTarget
               .closest("[data-veredicto-opciones]")
@@ -27,11 +32,12 @@ export function SelectorVeredicto({
             onChange("OBSERVACION");
           }}
         >
-          Comentar observaciones
+          {etiquetaObservacion}
         </button>
         <button
           className={`btn btn-sm ${veredicto === "OK" ? "btn-primary" : "btn-secondary"}`}
           type="button"
+          data-tour="proceder"
           onClick={(event) => {
             event.currentTarget
               .closest("[data-veredicto-opciones]")
@@ -39,7 +45,7 @@ export function SelectorVeredicto({
             onChange("OK");
           }}
         >
-          Sin observaciones
+          {etiquetaOk}
         </button>
       </div>
       <p className="veredicto-opciones-aviso text-danger" role="alert">
