@@ -43,7 +43,7 @@ export function CasoPdfDocumento({
                 pregunta={pregunta}
                 respuesta={respuesta ?? null}
                 disabled
-                ocultarAdjuntos
+                adjuntosModoPdf
               />
             </div>
           );

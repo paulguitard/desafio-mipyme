@@ -33,7 +33,7 @@ export function parseUploadWidth(raw: string | null | undefined): number | undef
   return n;
 }
 
-export function appUploadUrl(file: StoredFileRef, options?: { width?: number }): string {
+export function appUploadUrl(file: StoredFileRef, options?: { width?: number; embed?: boolean }): string {
   const publicId = storedFilePublicId(file);
   if (publicId) {
     const path = `/api/archivos/${publicId
@@ -41,11 +41,14 @@ export function appUploadUrl(file: StoredFileRef, options?: { width?: number }):
       .filter(Boolean)
       .map((segment) => encodeURIComponent(segment))
       .join("/")}`;
+    const params = new URLSearchParams();
     const width = options?.width;
     if (width && Number.isInteger(width) && width >= 32 && width <= 2000) {
-      return `${path}?w=${width}`;
+      params.set("w", String(width));
     }
-    return path;
+    if (options?.embed) params.set("embed", "1");
+    const qs = params.toString();
+    return qs ? `${path}?${qs}` : path;
   }
   const fallback = file.url?.trim() ?? "";
   return /^https?:\/\//i.test(fallback) ? fallback : "";

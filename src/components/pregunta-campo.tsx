@@ -264,10 +264,19 @@ function etiquetaArchivo(file: StoredFile) {
   return ext && ext.length <= 5 ? ext : "DOC";
 }
 
-function AdjuntoArchivo({ file }: { file: StoredFile }) {
+function AdjuntoArchivo({ file, marcarPdf }: { file: StoredFile; marcarPdf?: boolean }) {
   const fichaToken = useFichaPublicaToken();
   const href = withFichaToken(publicUploadUrl(file), fichaToken);
-  const src = withFichaToken(publicUploadUrl(file, { width: 1200 }), fichaToken);
+  const src = withFichaToken(
+    publicUploadUrl(file, {
+      width: 1200,
+      embed: Boolean(marcarPdf && file.kind === "image"),
+    }),
+    fichaToken,
+  );
+  const pdfAttrs = marcarPdf
+    ? ({ "data-pdf-link": href, "data-pdf-bloque": "" } as const)
+    : undefined;
   if (file.kind === "image") {
     return (
       <a
@@ -276,6 +285,7 @@ function AdjuntoArchivo({ file }: { file: StoredFile }) {
         rel="noreferrer"
         className="pregunta-adjuntos-link"
         title={`Abrir ${file.originalName}`}
+        {...pdfAttrs}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt={file.originalName} className="pregunta-adjuntos-media" />
@@ -293,6 +303,7 @@ function AdjuntoArchivo({ file }: { file: StoredFile }) {
       rel="noreferrer"
       title={`Abrir ${file.originalName}`}
       aria-label={`Abrir ${file.originalName}`}
+      {...pdfAttrs}
     >
       <span className="pregunta-adjuntos-doc-sheet" aria-hidden="true">
         <span className="pregunta-adjuntos-doc-fold" />
@@ -341,7 +352,14 @@ export function ArchivosLista({ archivos }: { archivos: StoredAttachment[] }) {
   );
 }
 
-export function AdjuntosRespuesta({ archivos }: { archivos: StoredAttachment[] }) {
+export function AdjuntosRespuesta({
+  archivos,
+  modoPdf = false,
+}: {
+  archivos: StoredAttachment[];
+  /** Marca miniaturas para hotspots del PDF y abre videos como enlace externo. */
+  modoPdf?: boolean;
+}) {
   const { imagenes, documentos, videos } = agruparAdjuntos(archivos);
   if (imagenes.length === 0 && documentos.length === 0 && videos.length === 0) return null;
 
@@ -355,7 +373,7 @@ export function AdjuntosRespuesta({ archivos }: { archivos: StoredAttachment[] }
             <ul className="pregunta-adjuntos-lista is-imagenes">
               {imagenes.map((file) => (
                 <li key={file.id}>
-                  <AdjuntoArchivo file={file} />
+                  <AdjuntoArchivo file={file} marcarPdf={modoPdf} />
                 </li>
               ))}
             </ul>
@@ -367,7 +385,7 @@ export function AdjuntosRespuesta({ archivos }: { archivos: StoredAttachment[] }
             <ul className="pregunta-adjuntos-lista is-archivos">
               {documentos.map((file) => (
                 <li key={file.id}>
-                  <AdjuntoArchivo file={file} />
+                  <AdjuntoArchivo file={file} marcarPdf={modoPdf} />
                 </li>
               ))}
             </ul>
@@ -379,7 +397,7 @@ export function AdjuntosRespuesta({ archivos }: { archivos: StoredAttachment[] }
             <ul className="pregunta-adjuntos-lista is-videos">
               {videos.map((video) => (
                 <li key={video.id}>
-                  <VideoMiniatura url={video.url} />
+                  <VideoMiniatura url={video.url} enlaceExterno={modoPdf} />
                 </li>
               ))}
             </ul>
@@ -431,6 +449,7 @@ export function PreguntaCampo({
   acciones,
   modificada = false,
   ocultarAdjuntos = false,
+  adjuntosModoPdf = false,
 }: {
   pregunta: {
     id: string;
@@ -450,6 +469,8 @@ export function PreguntaCampo({
   acciones?: ReactNode;
   modificada?: boolean;
   ocultarAdjuntos?: boolean;
+  /** Marca miniaturas para hotspots del PDF y abre videos como enlace. */
+  adjuntosModoPdf?: boolean;
 }) {
   const opciones = parseOpciones(pregunta.opciones);
   const valor = parseValor(respuesta?.valor ?? "");
@@ -517,7 +538,9 @@ export function PreguntaCampo({
         <div className="pregunta-lectura-cuerpo">
           <div className={hayAdjuntos ? "pregunta-con-adjuntos" : undefined}>
             <div className="pregunta-valor min-w-0">{valorNodo}</div>
-            {ocultarAdjuntos ? null : <AdjuntosRespuesta archivos={archivos} />}
+            {ocultarAdjuntos ? null : (
+              <AdjuntosRespuesta archivos={archivos} modoPdf={adjuntosModoPdf} />
+            )}
           </div>
         </div>
       </MarcoPregunta>

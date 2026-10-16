@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { ajustarCorteSinPartirTexto, nombreArchivoCasoPdf, slugArchivoPdf } from "@/lib/caso-pdf";
+import {
+  absolutizarUrlPdf,
+  ajustarCorteSinPartirTexto,
+  CASO_PDF_DOC_WIDTH,
+  LETTER_H_MM,
+  LETTER_W_MM,
+  nombreArchivoCasoPdf,
+  rectHotspotEnPaginaMm,
+  slugArchivoPdf,
+  type PdfLinkHotspot,
+} from "@/lib/caso-pdf";
 
 describe("slugArchivoPdf", () => {
   it("normaliza acentos y espacios", () => {
@@ -19,6 +29,20 @@ describe("nombreArchivoCasoPdf", () => {
         emprendedorNombre: "Marjorie Ulloa",
       }),
     ).toBe("Mi-caso-demo-Marjorie-Ulloa.pdf");
+  });
+});
+
+describe("absolutizarUrlPdf", () => {
+  it("deja intactas las URLs absolutas", () => {
+    expect(absolutizarUrlPdf("https://youtu.be/abc", "https://app.example")).toBe(
+      "https://youtu.be/abc",
+    );
+  });
+
+  it("antepone el origen a rutas relativas", () => {
+    expect(absolutizarUrlPdf("/api/archivos/foo/bar.png", "https://app.example/")).toBe(
+      "https://app.example/api/archivos/foo/bar.png",
+    );
   });
 });
 
@@ -50,5 +74,64 @@ describe("ajustarCorteSinPartirTexto", () => {
     ];
     // target parte la 2ª fila (28-52), que está anclada cerca del inicio → corte al fin de la 1ª.
     expect(ajustarCorteSinPartirTexto(0, 40, 2000, lineas)).toBe(24);
+  });
+
+  it("mueve una miniatura completa a la página siguiente si el corte la atraviesa", () => {
+    const miniaturas = [
+      { top: 900, bottom: 1020 },
+      { top: 1040, bottom: 1160 },
+    ];
+    // target 1000 parte la primera miniatura (900-1020) → corte al inicio de esa miniatura.
+    expect(ajustarCorteSinPartirTexto(0, 1000, 2000, miniaturas)).toBe(900);
+  });
+});
+
+describe("rectHotspotEnPaginaMm", () => {
+  const pageHeightDom = (LETTER_H_MM / LETTER_W_MM) * CASO_PDF_DOC_WIDTH;
+
+  it("mapea el rectángulo visible de la miniatura a milímetros de la página", () => {
+    const hotspot: PdfLinkHotspot = {
+      url: "https://app.example/api/archivos/x.png",
+      top: 100,
+      bottom: 220,
+      left: 40,
+      right: 160,
+    };
+    const corte = { y: 0, height: pageHeightDom };
+    const rect = rectHotspotEnPaginaMm(hotspot, corte);
+
+    expect(rect).not.toBeNull();
+    expect(rect!.x).toBeCloseTo((40 / CASO_PDF_DOC_WIDTH) * LETTER_W_MM, 5);
+    expect(rect!.w).toBeCloseTo((120 / CASO_PDF_DOC_WIDTH) * LETTER_W_MM, 5);
+    expect(rect!.y).toBeCloseTo((100 / pageHeightDom) * LETTER_H_MM, 5);
+    expect(rect!.h).toBeCloseTo((120 / pageHeightDom) * LETTER_H_MM, 5);
+  });
+
+  it("devuelve null si la miniatura queda fuera de la página", () => {
+    const hotspot: PdfLinkHotspot = {
+      url: "https://youtu.be/abc",
+      top: 1200,
+      bottom: 1320,
+      left: 10,
+      right: 100,
+    };
+    const corte = { y: 0, height: 800 };
+    expect(rectHotspotEnPaginaMm(hotspot, corte)).toBeNull();
+  });
+
+  it("recorta al tramo visible cuando la miniatura cruza el borde de la página", () => {
+    const hotspot: PdfLinkHotspot = {
+      url: "https://app.example/api/archivos/doc.xlsx",
+      top: 750,
+      bottom: 900,
+      left: 0,
+      right: 100,
+    };
+    const corte = { y: 0, height: 800 };
+    const rect = rectHotspotEnPaginaMm(hotspot, corte);
+    expect(rect).not.toBeNull();
+    // Solo los 50px visibles (750-800) se mapean.
+    expect(rect!.y).toBeCloseTo((750 / pageHeightDom) * LETTER_H_MM, 5);
+    expect(rect!.h).toBeCloseTo((50 / pageHeightDom) * LETTER_H_MM, 5);
   });
 });

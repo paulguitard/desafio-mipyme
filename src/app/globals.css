@@ -1527,6 +1527,11 @@ h1.formulario-caso-titulo {
   width: 100%;
 }
 
+a.pregunta-adjuntos-video {
+  text-decoration: none;
+  color: inherit;
+}
+
 .pregunta-adjuntos-video-fallback {
   background: #0f172a;
 }

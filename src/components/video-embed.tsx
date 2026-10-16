@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Modal } from "@/components/modal";
 import { resolveVideoEmbed } from "@/lib/preguntas";
+import { youtubeThumbAppUrl, youtubeThumbCdnUrl, youtubeVideoIdDesdeEmbed } from "@/lib/youtube-thumb";
 
 const PROVIDER_LABEL = {
   youtube: "YouTube",
@@ -11,9 +12,10 @@ const PROVIDER_LABEL = {
   sharepoint: "SharePoint",
 } as const;
 
-function youtubeThumb(embedUrl: string) {
-  const id = embedUrl.split("/embed/")[1]?.split(/[/?#]/)[0];
-  return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
+function youtubeThumb(embedUrl: string, sameOrigin: boolean) {
+  const id = youtubeVideoIdDesdeEmbed(embedUrl);
+  if (!id) return null;
+  return sameOrigin ? youtubeThumbAppUrl(id) : youtubeThumbCdnUrl(id);
 }
 
 function embedSrc(embedUrl: string, autoPlay?: boolean) {
@@ -52,15 +54,63 @@ export function VideoEmbed({ url, autoPlay }: { url: string; autoPlay?: boolean 
   );
 }
 
-export function VideoMiniatura({ url, onAbrir }: { url: string; onAbrir?: () => void }) {
+function VideoMiniaturaContenido({ thumb }: { thumb: string | null }) {
+  const [roto, setRoto] = useState(false);
+  const mostrarImg = Boolean(thumb) && !roto;
+  return (
+    <>
+      {mostrarImg ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={thumb ?? ""}
+          alt=""
+          className="pregunta-adjuntos-media"
+          onError={() => setRoto(true)}
+        />
+      ) : (
+        <span className="pregunta-adjuntos-media pregunta-adjuntos-video-fallback" />
+      )}
+      <span className="pregunta-adjuntos-play" aria-hidden="true" />
+    </>
+  );
+}
+
+export function VideoMiniatura({
+  url,
+  onAbrir,
+  enlaceExterno = false,
+}: {
+  url: string;
+  onAbrir?: () => void;
+  /** En PDF: abre el link del video en pestaña nueva (sin modal). */
+  enlaceExterno?: boolean;
+}) {
   const [abierto, setAbierto] = useState(false);
   const resolved = resolveVideoEmbed(url);
   if (!resolved) {
     return <span className="text-muted">Video no válido</span>;
   }
 
-  const thumb = resolved.provider === "youtube" ? youtubeThumb(resolved.embedUrl) : null;
+  const thumb =
+    resolved.provider === "youtube" ? youtubeThumb(resolved.embedUrl, enlaceExterno) : null;
   const label = `Reproducir video de ${PROVIDER_LABEL[resolved.provider]}`;
+
+  if (enlaceExterno) {
+    return (
+      <a
+        href={resolved.url}
+        target="_blank"
+        rel="noreferrer"
+        className="pregunta-adjuntos-video"
+        title={label}
+        aria-label={label}
+        data-pdf-link={resolved.url}
+        data-pdf-bloque=""
+      >
+        <VideoMiniaturaContenido thumb={thumb} />
+      </a>
+    );
+  }
 
   return (
     <>
@@ -74,13 +124,7 @@ export function VideoMiniatura({ url, onAbrir }: { url: string; onAbrir?: () => 
           setAbierto(true);
         }}
       >
-        {thumb ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={thumb} alt="" className="pregunta-adjuntos-media" />
-        ) : (
-          <span className="pregunta-adjuntos-media pregunta-adjuntos-video-fallback" />
-        )}
-        <span className="pregunta-adjuntos-play" aria-hidden="true" />
+        <VideoMiniaturaContenido thumb={thumb} />
       </button>
       <Modal
         open={abierto}

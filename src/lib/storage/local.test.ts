@@ -20,6 +20,21 @@ describe("upload paths", () => {
         relativePath: "desafio-aiep/abc",
         url: "https://res.cloudinary.com/x/raw/upload/secret.pdf",
       }),
-    ).toBe("/api/archivos/desafio-aiep/abc");
+      ).toBe("/api/archivos/desafio-aiep/abc");
+  });
+
+  it("agrega embed=1 para capturar la miniatura en el mismo origen", () => {
+    expect(
+      publicUploadUrl(
+        {
+          id: "1",
+          originalName: "foto.webp",
+          mimeType: "image/webp",
+          kind: "image",
+          relativePath: "desafio-aiep/abc",
+        },
+        { width: 1200, embed: true },
+      ),
+    ).toBe("/api/archivos/desafio-aiep/abc?w=1200&embed=1");
   });
 });

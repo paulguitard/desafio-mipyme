@@ -16,6 +16,7 @@ export async function GET(
   const relativePath = segments.map((segment) => decodeURIComponent(segment)).join("/");
   const requestUrl = new URL(request.url);
   const width = parseUploadWidth(requestUrl.searchParams.get("w"));
+  const embed = requestUrl.searchParams.get("embed") === "1";
   const fichaToken = requestUrl.searchParams.get("ficha");
 
   let allowed = false;
@@ -71,6 +72,32 @@ export async function GET(
     resourceType,
     width: resourceType === "image" ? (width ?? 1200) : undefined,
   });
+  if (embed) {
+    try {
+      const remote = await fetch(url);
+      if (!remote.ok) {
+        return new Response("No encontrado", { status: 404 });
+      }
+      const contentType = remote.headers.get("content-type") || mime || "application/octet-stream";
+      if (fileLooksLikeSvg(relativePath, contentType)) {
+        return new Response("No encontrado", { status: 404 });
+      }
+      const buffer = Buffer.from(await remote.arrayBuffer());
+      if (buffer.byteLength > 8 * 1024 * 1024) {
+        return new Response("Archivo demasiado grande", { status: 413 });
+      }
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": contentType,
+          "Content-Length": String(buffer.byteLength),
+          "Cache-Control": "private, max-age=300",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    } catch {
+      return new Response("No encontrado", { status: 404 });
+    }
+  }
   return new Response(null, {
     status: 302,
     headers: {

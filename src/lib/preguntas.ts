@@ -381,7 +381,7 @@ export function serializeValor(value: unknown): string {
   return JSON.stringify(value ?? "");
 }
 
-export function publicUploadUrl(file: StoredFile, options?: { width?: number }) {
+export function publicUploadUrl(file: StoredFile, options?: { width?: number; embed?: boolean }) {
   return appUploadUrl(file, options);
 }
 

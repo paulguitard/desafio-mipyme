@@ -60,6 +60,21 @@ describe("publicUploadUrl", () => {
       }),
     ).toBe("/api/archivos/desafio-mipyme/foto");
   });
+
+  it("puede pedir el archivo embebido para captura PDF", () => {
+    expect(
+      publicUploadUrl(
+        {
+          id: "1",
+          originalName: "x.webp",
+          mimeType: "image/webp",
+          kind: "image",
+          relativePath: "desafio-aiep/foto",
+        },
+        { width: 1200, embed: true },
+      ),
+    ).toBe("/api/archivos/desafio-aiep/foto?w=1200&embed=1");
+  });
 });
 
 describe("resolveVideoEmbed", () => {
