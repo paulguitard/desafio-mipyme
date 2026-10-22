@@ -8,6 +8,11 @@ import {
 } from "@/lib/borrador-revision";
 import { prisma } from "@/lib/db";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
+import {
+  modoRevisionDeConvocatoria,
+  publicaDirectoAlParticipante,
+  usaSupervisores,
+} from "@/lib/modo-revision";
 import { requireUser } from "@/lib/session";
 import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
 import {
@@ -25,12 +30,28 @@ async function cargaAsignacionParaSupervisor(asignacionId: string, supervisorId:
     include: {
       postulacion: {
         include: {
-          convocatoria: { include: { formulario: { include: { preguntas: true } } } },
+          convocatoria: {
+            include: { formulario: { include: { preguntas: true } } },
+          },
           supervision: true,
         },
       },
     },
   });
+}
+
+function errorSiSinSupervision(convocatoria: {
+  tipo?: string | null;
+  evaluadoresHabilitados?: boolean | null;
+  supervisoresHabilitados?: boolean | null;
+}) {
+  const modo = modoRevisionDeConvocatoria(convocatoria);
+  if (!usaSupervisores(modo) || publicaDirectoAlParticipante(modo)) {
+    return {
+      error: "Esta asesoría no usa supervisión. Las evaluaciones se publican directo al participante.",
+    };
+  }
+  return null;
 }
 
 function revalidateSupervision(asignacionId: string, postulacionId: string) {
@@ -70,6 +91,8 @@ export async function enviarObservacionesSupervision(formData: FormData) {
   const asignacionId = String(formData.get("asignacionId") ?? "");
   const asignacion = await cargaAsignacionParaSupervisor(asignacionId, user.id);
   if (!asignacion) return { error: "Evaluación no encontrada." };
+  const sinSupervision = errorSiSinSupervision(asignacion.postulacion.convocatoria);
+  if (sinSupervision) return sinSupervision;
   if (asignacion.estado !== "EN_SUPERVISION") {
     return { error: "Solo puedes devolver evaluaciones que están en supervisión." };
   }
@@ -123,6 +146,8 @@ export async function procederSupervision(formData: FormData) {
   const asignacionId = String(formData.get("asignacionId") ?? "");
   const asignacion = await cargaAsignacionParaSupervisor(asignacionId, user.id);
   if (!asignacion) return { error: "Evaluación no encontrada." };
+  const sinSupervision = errorSiSinSupervision(asignacion.postulacion.convocatoria);
+  if (sinSupervision) return sinSupervision;
   if (asignacion.estado !== "EN_SUPERVISION") {
     return { error: "Solo puedes proceder evaluaciones que están en supervisión." };
   }

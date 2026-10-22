@@ -187,6 +187,10 @@ model Convocatoria {
   fechaInicio                DateTime?
   fechaCierre                DateTime?
   evaluacionesPorPostulacion Int       @default(1)
+  /// En FEEDBACK: si es false, no hay pool/asignación de evaluadores (el supervisor evalúa).
+  evaluadoresHabilitados     Boolean   @default(true)
+  /// En FEEDBACK: si es false, el evaluador publica directo al participante.
+  supervisoresHabilitados    Boolean   @default(true)
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
 

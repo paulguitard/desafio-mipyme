@@ -212,6 +212,8 @@ export async function getPanelEvaluacion(id: string) {
     titulo: convocatoria.titulo,
     estado: convocatoria.estado,
     tipo: parseTipoFormulario(convocatoria.tipo),
+    evaluadoresHabilitados: convocatoria.evaluadoresHabilitados !== false,
+    supervisoresHabilitados: convocatoria.supervisoresHabilitados !== false,
     evaluacionesPorPostulacion: convocatoria.evaluacionesPorPostulacion,
     totalPostulaciones: convocatoria.postulaciones.length,
     preguntas: convocatoria.formulario.preguntas.map((pregunta) => ({

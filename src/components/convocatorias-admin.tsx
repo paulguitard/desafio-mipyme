@@ -43,6 +43,8 @@ export type ConvocatoriaListaItem = {
   formularioId: string;
   formularioTitulo: string;
   postulaciones: number;
+  evaluadoresHabilitados: boolean;
+  supervisoresHabilitados: boolean;
   fechaInicio: string | null;
   fechaCierre: string | null;
   imagenUrl: string | null;
@@ -85,6 +87,8 @@ export function ConvocatoriasAdmin({
   const [vistaPanel, setVistaPanel] = useState<"lista" | "numeros" | "links">("lista");
   const panelEsContenido = esMentoriaContenido(evaluacion?.tipo ?? evaluacionTipo);
   const [tipoMentoria, setTipoMentoria] = useState<TipoFormulario>("FEEDBACK");
+  const [evaluadoresHabilitados, setEvaluadoresHabilitados] = useState(true);
+  const [supervisoresHabilitados, setSupervisoresHabilitados] = useState(true);
   const tituloModal = editing ? "Editar asesoría" : "Crear asesoría";
   const tipoBloqueado = Boolean(editing && editing.postulaciones > 0);
   const formulariosDelTipo = formularios.filter((form) => form.tipo === tipoMentoria);
@@ -109,6 +113,8 @@ export function ConvocatoriasAdmin({
     setEditing(null);
     setError(null);
     setTipoMentoria("FEEDBACK");
+    setEvaluadoresHabilitados(true);
+    setSupervisoresHabilitados(true);
     setImagenPreview(null);
     setImagenPos({ x: 50, y: 50 });
     setVistaEmprendedor(false);
@@ -120,6 +126,8 @@ export function ConvocatoriasAdmin({
     setEditing(item);
     setError(null);
     setTipoMentoria(parseTipoFormulario(item.tipo));
+    setEvaluadoresHabilitados(item.evaluadoresHabilitados !== false);
+    setSupervisoresHabilitados(item.supervisoresHabilitados !== false);
     setImagenPreview(null);
     setImagenPos(item.imagenPos);
     setVistaEmprendedor(false);
@@ -216,6 +224,8 @@ export function ConvocatoriasAdmin({
       formularioTitulo:
         formularios.find((form) => form.id === formularioId)?.titulo ?? actual?.formularioTitulo ?? "",
       postulaciones: actual?.postulaciones ?? 0,
+      evaluadoresHabilitados: formData.has("evaluadoresHabilitados"),
+      supervisoresHabilitados: formData.has("supervisoresHabilitados"),
       fechaInicio: inicio ? inicio.toISOString() : null,
       fechaCierre: cierre ? cierre.toISOString() : null,
       imagenUrl: imagenPreview ?? actual?.imagenUrl ?? null,
@@ -427,6 +437,8 @@ export function ConvocatoriasAdmin({
             tipo={evaluacion.tipo}
             piezas={evaluacion.piezas}
             evaluacionesPorPostulacion={evaluacion.evaluacionesPorPostulacion}
+            evaluadoresHabilitados={evaluacion.evaluadoresHabilitados}
+            supervisoresHabilitados={evaluacion.supervisoresHabilitados}
             preguntas={evaluacion.preguntas}
             pool={evaluacion.pool}
             evaluadoresDisponibles={evaluacion.evaluadoresDisponibles}
@@ -553,6 +565,63 @@ export function ConvocatoriasAdmin({
               </>
             ) : null}
           </div>
+          {tipoMentoria === "FEEDBACK" ? (
+            <div className="field space-y-3">
+              <span className="block text-sm font-semibold text-navy">Roles de revisión</span>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  className="mt-1"
+                  type="checkbox"
+                  name="evaluadoresHabilitados"
+                  value="true"
+                  checked={evaluadoresHabilitados}
+                  onChange={(event) => {
+                    const next = event.target.checked;
+                    if (!next && !supervisoresHabilitados) {
+                      setError("Debes habilitar al menos evaluadores o supervisores.");
+                      return;
+                    }
+                    setError(null);
+                    setEvaluadoresHabilitados(next);
+                  }}
+                />
+                <span>
+                  <span className="font-semibold">Evaluadores</span>
+                  <span className="mt-0.5 block text-muted">
+                    Si los deshabilitas, un supervisor por caso escribe la respuesta y el participante lo
+                    ve como evaluador.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  className="mt-1"
+                  type="checkbox"
+                  name="supervisoresHabilitados"
+                  value="true"
+                  checked={supervisoresHabilitados}
+                  onChange={(event) => {
+                    const next = event.target.checked;
+                    if (!next && !evaluadoresHabilitados) {
+                      setError("Debes habilitar al menos evaluadores o supervisores.");
+                      return;
+                    }
+                    setError(null);
+                    setSupervisoresHabilitados(next);
+                  }}
+                />
+                <span>
+                  <span className="font-semibold">Supervisores</span>
+                  <span className="mt-0.5 block text-muted">
+                    Si los deshabilitas, el evaluador envía comentarios y finaliza sin supervisión.
+                  </span>
+                </span>
+              </label>
+              <p className="text-muted text-sm">
+                Para cambiar estos roles no debe haber evaluadores ni supervisores asignados a casos.
+              </p>
+            </div>
+          ) : null}
           <div className="field">
             <label htmlFor="formularioId">Formulario</label>
             <select

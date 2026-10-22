@@ -4,6 +4,11 @@ import type { ResultadoBorrador } from "@/lib/borrador-caso";
 import { prisma } from "@/lib/db";
 import { evaluadorPuedeEditar } from "@/lib/estado";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
+import {
+  modoRevisionDeConvocatoria,
+  puedeGuardarBorradorEvaluacion,
+} from "@/lib/modo-revision";
+import type { Role } from "@/lib/roles";
 import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
 
 function leerComentario(formData: FormData, name: string) {
@@ -256,6 +261,7 @@ async function cargaAsignacionSupervisor(asignacionId: string, supervisorId: str
 /** Guarda el borrador de evaluación. No cambia estado salvo `cambiarEstado`. */
 export async function persistirBorradorEvaluacion(args: {
   userId: string;
+  rol: Role;
   formData: FormData;
   expectedUpdatedAt?: string | null;
   cambiarEstado?: boolean;
@@ -264,6 +270,14 @@ export async function persistirBorradorEvaluacion(args: {
   const asignacionId = String(args.formData.get("asignacionId") ?? "");
   const asignacion = await cargaAsignacionEvaluador(asignacionId, args.userId);
   if (!asignacion) return { error: "Evaluación no encontrada." };
+  if (
+    !puedeGuardarBorradorEvaluacion(
+      args.rol,
+      modoRevisionDeConvocatoria(asignacion.postulacion.convocatoria),
+    )
+  ) {
+    return { error: "No tienes permiso para editar esta evaluación." };
+  }
   if (asignacion.estado === "FINALIZADA") {
     return { error: "Esta evaluación ya está finalizada." };
   }

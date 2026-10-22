@@ -140,6 +140,7 @@ export function FormularioEvaluacion({
   modoEvaluacion = "POR_PREGUNTA",
   rolAccion = "evaluador",
   intencionPendiente = null,
+  publicaDirecto = false,
   versionInicial,
   back,
   title,
@@ -156,6 +157,8 @@ export function FormularioEvaluacion({
   modoEvaluacion?: ModoEvaluacion;
   rolAccion?: "evaluador" | "supervisor" | "lectura";
   intencionPendiente?: IntencionSupervision | string | null;
+  /** Si true, Pedir cambios / Finalizar llegan al participante sin pasar por supervisor. */
+  publicaDirecto?: boolean;
   versionInicial: string;
   back: React.ReactNode;
   title: React.ReactNode;
@@ -271,10 +274,14 @@ export function FormularioEvaluacion({
     let detalleExito: string;
     if (tipo === "enviar-observaciones-supervisor") {
       persistir = enviarObservaciones;
-      detalleExito = "El pedido de cambios se envió al supervisor.";
+      detalleExito = publicaDirecto
+        ? "El pedido de cambios se envió al participante."
+        : "El pedido de cambios se envió al supervisor.";
     } else if (tipo === "finalizar-evaluacion") {
       persistir = finalizarEvaluacion;
-      detalleExito = "La finalización se envió al supervisor.";
+      detalleExito = publicaDirecto
+        ? "La evaluación quedó finalizada."
+        : "La finalización se envió al supervisor.";
     } else if (tipo === "enviar-observaciones-evaluador") {
       persistir = enviarObservacionesSupervision;
       detalleExito = "El pedido de cambios se envió al evaluador.";
@@ -384,7 +391,12 @@ export function FormularioEvaluacion({
       return {
         title: "¿Pedir cambios al participante?",
         confirmLabel: "Pedir cambios al participante",
-        body: (
+        body: publicaDirecto ? (
+          <>
+            <p>Tu comentario se enviará directo al participante.</p>
+            <p>El participante podrá editar su caso. No podrás editar hasta que reenvíe.</p>
+          </>
+        ) : (
           <>
             <p>Tu comentario se enviará al supervisor.</p>
             <p>Si el supervisor aprueba, el participante podrá editar su caso.</p>
@@ -398,7 +410,19 @@ export function FormularioEvaluacion({
       return {
         title: "¿Finalizar evaluación?",
         confirmLabel: "Finalizar evaluación",
-        body: (
+        body: publicaDirecto ? (
+          <>
+            <p>
+              {esGeneral
+                ? "Debes dejar un comentario y una nota si corresponde."
+                : "Cada pregunta debe tener un comentario y una nota si corresponde."}
+            </p>
+            <p>
+              Al confirmar, esta evaluación quedará finalizada. El participante verá tu comentario y
+              no podrá editar.
+            </p>
+          </>
+        ) : (
           <>
             <p>La finalización se enviará al supervisor junto con tu comentario.</p>
             <p>
@@ -512,7 +536,7 @@ export function FormularioEvaluacion({
               casoTitle="Caso"
               casoSubtitle="Respuestas del participante"
               caso={conservarCampos ? camposVisibles.current.caso : caso}
-              evalTitle="Evaluación y Supervisión"
+              evalTitle={publicaDirecto ? "Evaluación" : "Evaluación y Supervisión"}
               evalSubtitle={
                 headerEvaluacion ??
                 (esGeneral ? "Comentario del caso" : "Comentarios por pregunta")

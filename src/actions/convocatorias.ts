@@ -18,10 +18,42 @@ import { asignarSupervisoresAutomaticoEnConvocatoria } from "@/lib/asignacion-su
 import { cupoAlcanzado, mensajeCupoPersona } from "@/lib/cupo-asignacion";
 import { generarTokenPublico } from "@/lib/ficha-publica";
 import {
+  flagsRevisionDesdeCheckboxes,
+  modoRevisionDeConvocatoria,
+  supervisorActuaComoEvaluador,
+  usaEvaluadores,
+  usaSupervisores,
+  validarCambioRoles,
+  type FlagsRevision,
+} from "@/lib/modo-revision";
+import {
   getDetalleFichaAdmin,
   getPanelEvaluacion,
   getRespuestasConvocatoria,
 } from "@/lib/convocatoria-admin-data";
+
+async function conteosAsignacionesRevision(convocatoriaId: string) {
+  const [asignacionesEvaluador, asignacionesSupervisor] = await Promise.all([
+    prisma.asignacionEvaluador.count({ where: { postulacion: { convocatoriaId } } }),
+    prisma.asignacionSupervisor.count({ where: { postulacion: { convocatoriaId } } }),
+  ]);
+  return { asignacionesEvaluador, asignacionesSupervisor };
+}
+
+function flagsRevisionParaTipo(
+  tipo: TipoFormulario,
+  formData: FormData,
+  fallback: FlagsRevision,
+): FlagsRevision | { error: string } {
+  if (tipo !== "FEEDBACK") {
+    return fallback;
+  }
+  const flags = flagsRevisionDesdeCheckboxes(formData);
+  if (!flags) {
+    return { error: "Debes habilitar al menos evaluadores o supervisores." };
+  }
+  return flags;
+}
 
 async function validarFormulario(formularioId: string, tipoMentoria: TipoFormulario) {
   const form = await prisma.formulario.findUnique({
@@ -52,13 +84,18 @@ async function validarFormulario(formularioId: string, tipoMentoria: TipoFormula
 async function exigirMentoriaFeedback(convocatoriaId: string) {
   const convocatoria = await prisma.convocatoria.findUnique({
     where: { id: convocatoriaId },
-    select: { tipo: true },
+    select: {
+      id: true,
+      tipo: true,
+      evaluadoresHabilitados: true,
+      supervisoresHabilitados: true,
+    },
   });
   if (!convocatoria) return { error: "Asesoría no encontrada." };
   if (esMentoriaContenido(convocatoria.tipo)) {
     return { error: "Las asesorías de contenido no tienen evaluación ni supervisión." };
   }
-  return { ok: true as const };
+  return { ok: true as const, convocatoria };
 }
 
 function leerFechas(formData: FormData) {
@@ -135,6 +172,19 @@ export async function crearConvocatoria(formData: FormData) {
   const imagen = await leerImagen(formData, "");
   if (typeof imagen !== "string") return imagen;
 
+  const flagsFallback: FlagsRevision = {
+    evaluadoresHabilitados: true,
+    supervisoresHabilitados: true,
+  };
+  const flags = flagsRevisionParaTipo(tipo, formData, flagsFallback);
+  if ("error" in flags) return flags;
+  const validacionFlags = validarCambioRoles({
+    actual: flagsFallback,
+    siguiente: flags,
+    conteos: { asignacionesEvaluador: 0, asignacionesSupervisor: 0 },
+  });
+  if (!validacionFlags.ok) return { error: validacionFlags.error };
+
   const convocatoria = await prisma.convocatoria.create({
     data: {
       titulo,
@@ -145,6 +195,8 @@ export async function crearConvocatoria(formData: FormData) {
       imagen,
       fechaInicio: fechas.fechaInicio,
       fechaCierre: fechas.fechaCierre,
+      evaluadoresHabilitados: flags.evaluadoresHabilitados,
+      supervisoresHabilitados: flags.supervisoresHabilitados,
     },
   });
   revalidateConvocatorias(convocatoria.id);
@@ -187,6 +239,20 @@ export async function actualizarConvocatoria(formData: FormData) {
   const imagen = await leerImagen(formData, convocatoria.imagen);
   if (typeof imagen !== "string") return imagen;
 
+  const flagsActuales: FlagsRevision = {
+    evaluadoresHabilitados: convocatoria.evaluadoresHabilitados,
+    supervisoresHabilitados: convocatoria.supervisoresHabilitados,
+  };
+  const flags = flagsRevisionParaTipo(tipoFinal, formData, flagsActuales);
+  if ("error" in flags) return flags;
+  const conteos = await conteosAsignacionesRevision(id);
+  const validacionFlags = validarCambioRoles({
+    actual: flagsActuales,
+    siguiente: flags,
+    conteos,
+  });
+  if (!validacionFlags.ok) return { error: validacionFlags.error };
+
   await prisma.convocatoria.update({
     where: { id },
     data: {
@@ -197,6 +263,8 @@ export async function actualizarConvocatoria(formData: FormData) {
       imagen,
       fechaInicio: fechas.fechaInicio,
       fechaCierre: fechas.fechaCierre,
+      evaluadoresHabilitados: flags.evaluadoresHabilitados,
+      supervisoresHabilitados: flags.supervisoresHabilitados,
     },
   });
   revalidateConvocatorias(id);
@@ -314,6 +382,9 @@ export async function agregarEvaluadorAlPool(formData: FormData) {
   if (!convocatoriaId || !evaluadorId) return { error: "Datos incompletos." };
   const feedback = await exigirMentoriaFeedback(convocatoriaId);
   if ("error" in feedback) return feedback;
+  if (!usaEvaluadores(modoRevisionDeConvocatoria(feedback.convocatoria))) {
+    return { error: "Los evaluadores están deshabilitados en esta asesoría." };
+  }
 
   const user = await prisma.user.findUnique({ where: { id: evaluadorId } });
   if (!user || user.role !== "EVALUADOR") return { error: "Evaluador no válido." };
@@ -334,6 +405,9 @@ export async function agregarEvaluadoresAlPool(formData: FormData) {
   if (!convocatoriaId) return { error: "Datos incompletos." };
   const feedback = await exigirMentoriaFeedback(convocatoriaId);
   if ("error" in feedback) return feedback;
+  if (!usaEvaluadores(modoRevisionDeConvocatoria(feedback.convocatoria))) {
+    return { error: "Los evaluadores están deshabilitados en esta asesoría." };
+  }
   if (evaluadorIds.length === 0) return { error: "Selecciona al menos un evaluador." };
 
   const usuarios = await prisma.user.findMany({
@@ -389,6 +463,10 @@ export async function asignarEvaluadorAPostulacion(formData: FormData) {
   if (!postulacion) return { error: "Caso no encontrado." };
   if (esMentoriaContenido(postulacion.convocatoria.tipo)) {
     return { error: "Las asesorías de contenido no tienen evaluación ni supervisión." };
+  }
+  const modo = modoRevisionDeConvocatoria(postulacion.convocatoria);
+  if (!usaEvaluadores(modo)) {
+    return { error: "Los evaluadores están deshabilitados en esta asesoría." };
   }
   if (postulacion.estado === "FINALIZADA" || !postulacion.enviadaAt) {
     return { error: "Solo se asignan respuestas enviadas y no finalizadas." };
@@ -607,6 +685,9 @@ export async function asignarEvaluadoresAutomatico(formData: FormData) {
   if (!convocatoriaId) return { error: "Asesoría no encontrada." };
   const feedback = await exigirMentoriaFeedback(convocatoriaId);
   if ("error" in feedback) return feedback;
+  if (!usaEvaluadores(modoRevisionDeConvocatoria(feedback.convocatoria))) {
+    return { error: "Los evaluadores están deshabilitados en esta asesoría." };
+  }
   const result = await asignarEvaluadoresAutomaticoEnConvocatoria(convocatoriaId);
   revalidateConvocatorias(convocatoriaId);
   revalidatePath("/evaluador");
@@ -620,6 +701,9 @@ export async function agregarSupervisorAlPool(formData: FormData) {
   if (!convocatoriaId || !supervisorId) return { error: "Datos incompletos." };
   const feedback = await exigirMentoriaFeedback(convocatoriaId);
   if ("error" in feedback) return feedback;
+  if (!usaSupervisores(modoRevisionDeConvocatoria(feedback.convocatoria))) {
+    return { error: "Los supervisores están deshabilitados en esta asesoría." };
+  }
 
   const user = await prisma.user.findUnique({ where: { id: supervisorId } });
   if (!user || user.role !== "SUPERVISOR") return { error: "Supervisor no válido." };
@@ -646,6 +730,9 @@ export async function agregarSupervisoresAlPool(formData: FormData) {
   if (!convocatoriaId) return { error: "Datos incompletos." };
   const feedback = await exigirMentoriaFeedback(convocatoriaId);
   if ("error" in feedback) return feedback;
+  if (!usaSupervisores(modoRevisionDeConvocatoria(feedback.convocatoria))) {
+    return { error: "Los supervisores están deshabilitados en esta asesoría." };
+  }
   if (supervisorIds.length === 0) return { error: "Selecciona al menos un supervisor." };
 
   const usuarios = await prisma.user.findMany({
@@ -696,11 +783,16 @@ export async function asignarSupervisorAPostulacion(formData: FormData) {
     include: {
       convocatoria: { include: { supervisores: true } },
       supervision: true,
+      asignaciones: true,
     },
   });
   if (!postulacion) return { error: "Caso no encontrado." };
   if (esMentoriaContenido(postulacion.convocatoria.tipo)) {
     return { error: "Las asesorías de contenido no tienen evaluación ni supervisión." };
+  }
+  const modo = modoRevisionDeConvocatoria(postulacion.convocatoria);
+  if (!usaSupervisores(modo)) {
+    return { error: "Los supervisores están deshabilitados en esta asesoría." };
   }
   if (postulacion.estado === "FINALIZADA" || !postulacion.enviadaAt) {
     return { error: "Solo se asignan respuestas enviadas y no finalizadas." };
@@ -727,13 +819,114 @@ export async function asignarSupervisorAPostulacion(formData: FormData) {
   const user = await prisma.user.findUnique({ where: { id: supervisorId } });
   if (!user || user.role !== "SUPERVISOR") return { error: "Supervisor no válido." };
 
-  await prisma.asignacionSupervisor.create({
-    data: { postulacionId, supervisorId },
+  const comoEvaluador = supervisorActuaComoEvaluador(modo);
+  if (comoEvaluador && postulacion.asignaciones.length > 0) {
+    return { error: "Este caso ya tiene una evaluación asignada." };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.asignacionSupervisor.create({
+      data: { postulacionId, supervisorId },
+    });
+    if (comoEvaluador) {
+      const orden =
+        postulacion.asignaciones.reduce((maxOrden, a) => Math.max(maxOrden, a.orden), 0) + 1;
+      await tx.asignacionEvaluador.create({
+        data: {
+          postulacionId,
+          evaluadorId: supervisorId,
+          orden,
+          estado: "PENDIENTE",
+          rondaActual: 1,
+        },
+      });
+    }
   });
+
+  if (comoEvaluador) {
+    await sincronizarEstadoPostulacion(postulacionId);
+  }
 
   revalidatePath(`/admin/mentorias/${postulacion.convocatoriaId}`);
   revalidatePath("/evaluador");
-  return { ok: true, mensaje: "Supervisor asignado." };
+  return {
+    ok: true,
+    mensaje: comoEvaluador
+      ? "Supervisor asignado como evaluador del caso."
+      : "Supervisor asignado.",
+  };
+}
+
+export async function quitarEvaluadorDePostulacion(formData: FormData) {
+  await requireUser("ADMIN");
+  const postulacionId = String(formData.get("postulacionId") ?? "");
+  const evaluadorId = String(formData.get("evaluadorId") ?? "");
+  if (!postulacionId || !evaluadorId) return { error: "Datos incompletos." };
+
+  const postulacion = await prisma.postulacion.findUnique({
+    where: { id: postulacionId },
+    include: {
+      convocatoria: true,
+      supervision: true,
+      asignaciones: { where: { evaluadorId } },
+    },
+  });
+  if (!postulacion) return { error: "Caso no encontrado." };
+  const asignacion = postulacion.asignaciones[0];
+  if (!asignacion) return { error: "Ese evaluador no está asignado a este caso." };
+
+  const modo = modoRevisionDeConvocatoria(postulacion.convocatoria);
+  const esSupervisorEvaluador =
+    supervisorActuaComoEvaluador(modo) && postulacion.supervision?.supervisorId === evaluadorId;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.asignacionEvaluador.delete({ where: { id: asignacion.id } });
+    if (esSupervisorEvaluador && postulacion.supervision) {
+      await tx.asignacionSupervisor.delete({ where: { id: postulacion.supervision.id } });
+    }
+  });
+
+  await sincronizarEstadoPostulacion(postulacionId);
+  revalidatePath(`/admin/mentorias/${postulacion.convocatoriaId}`);
+  revalidatePath("/evaluador");
+  return { ok: true, mensaje: "Evaluador quitado del caso." };
+}
+
+export async function quitarSupervisorDePostulacion(formData: FormData) {
+  await requireUser("ADMIN");
+  const postulacionId = String(formData.get("postulacionId") ?? "");
+  if (!postulacionId) return { error: "Datos incompletos." };
+
+  const postulacion = await prisma.postulacion.findUnique({
+    where: { id: postulacionId },
+    include: {
+      convocatoria: true,
+      supervision: true,
+      asignaciones: true,
+    },
+  });
+  if (!postulacion) return { error: "Caso no encontrado." };
+  if (!postulacion.supervision) return { error: "Este caso no tiene supervisor asignado." };
+
+  const modo = modoRevisionDeConvocatoria(postulacion.convocatoria);
+  const supervisorId = postulacion.supervision.supervisorId;
+  const evaluacionDelSupervisor = supervisorActuaComoEvaluador(modo)
+    ? postulacion.asignaciones.find((a) => a.evaluadorId === supervisorId)
+    : null;
+
+  await prisma.$transaction(async (tx) => {
+    if (evaluacionDelSupervisor) {
+      await tx.asignacionEvaluador.delete({ where: { id: evaluacionDelSupervisor.id } });
+    }
+    await tx.asignacionSupervisor.delete({ where: { id: postulacion.supervision!.id } });
+  });
+
+  if (evaluacionDelSupervisor) {
+    await sincronizarEstadoPostulacion(postulacionId);
+  }
+  revalidatePath(`/admin/mentorias/${postulacion.convocatoriaId}`);
+  revalidatePath("/evaluador");
+  return { ok: true, mensaje: "Supervisor quitado del caso." };
 }
 
 export async function asignarSupervisoresAutomatico(formData: FormData) {
@@ -742,6 +935,9 @@ export async function asignarSupervisoresAutomatico(formData: FormData) {
   if (!convocatoriaId) return { error: "Asesoría no encontrada." };
   const feedback = await exigirMentoriaFeedback(convocatoriaId);
   if ("error" in feedback) return feedback;
+  if (!usaSupervisores(modoRevisionDeConvocatoria(feedback.convocatoria))) {
+    return { error: "Los supervisores están deshabilitados en esta asesoría." };
+  }
   const result = await asignarSupervisoresAutomaticoEnConvocatoria(convocatoriaId);
   revalidateConvocatorias(convocatoriaId);
   revalidatePath("/evaluador");

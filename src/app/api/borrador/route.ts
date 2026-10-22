@@ -45,11 +45,12 @@ export async function POST(request: Request) {
       omitirArchivosNuevos,
     });
   } else if (kindRaw === "evaluacion") {
-    if (user.role !== "EVALUADOR") {
+    if (user.role !== "EVALUADOR" && user.role !== "SUPERVISOR") {
       return Response.json({ error: "No autorizado." }, { status: 403 });
     }
     resultado = await persistirBorradorEvaluacion({
       userId: user.id,
+      rol: user.role,
       formData,
       expectedUpdatedAt,
       cambiarEstado: false,

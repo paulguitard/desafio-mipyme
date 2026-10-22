@@ -303,6 +303,26 @@ export async function avisarEvaluadorDevolucionSupervisor(input: {
   });
 }
 
+export async function avisarParticipanteObservaciones(postulacionId: string) {
+  const postulacion = await prisma.postulacion.findUnique({
+    where: { id: postulacionId },
+    select: {
+      ...casoSelect,
+      postulante: { select: { name: true, email: true } },
+    },
+  });
+  if (!postulacion?.postulante.email) return;
+  await notifyNovedadCaso({
+    tipo: "PARTICIPANTE_OBSERVACIONES",
+    to: postulacion.postulante.email,
+    vars: {
+      nombre: postulacion.postulante.name,
+      enlace: urlCasoParticipante(postulacionId),
+      ...contextoCaso(postulacion),
+    },
+  });
+}
+
 export async function avisarTrasAprobacionSupervisor(input: {
   asignacionId: string;
   actorNombre: string;
@@ -340,16 +360,8 @@ export async function avisarTrasAprobacionSupervisor(input: {
     });
   }
 
-  if (input.resultado === "observaciones" && asignacion.postulacion.postulante.email) {
-    await notifyNovedadCaso({
-      tipo: "PARTICIPANTE_OBSERVACIONES",
-      to: asignacion.postulacion.postulante.email,
-      vars: {
-        nombre: asignacion.postulacion.postulante.name,
-        enlace: urlCasoParticipante(asignacion.postulacion.id),
-        ...caso,
-      },
-    });
+  if (input.resultado === "observaciones") {
+    await avisarParticipanteObservaciones(asignacion.postulacion.id);
   }
 }
 

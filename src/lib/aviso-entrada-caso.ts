@@ -25,8 +25,16 @@ const PANELES_EVALUACION =
 const PANELES_PARTICIPANTE =
   "En Evaluación ves los comentarios. En Tu caso ves tu respuesta.";
 
-export function avisoEntradaEvaluador(estado: string): AvisoEntradaCaso {
-  if (estado === "EN_SUPERVISION") {
+export function avisoEntradaEvaluador(
+  estado: string,
+  opciones?: { publicaDirecto?: boolean },
+): AvisoEntradaCaso {
+  const publicaDirecto = Boolean(opciones?.publicaDirecto);
+  const panelEval = publicaDirecto
+    ? "En Caso ves las respuestas. En Evaluación escribes tu comentario."
+    : PANELES_EVALUACION;
+
+  if (estado === "EN_SUPERVISION" && !publicaDirecto) {
     return {
       title: "Esperando al supervisor",
       parrafos: [
@@ -35,7 +43,7 @@ export function avisoEntradaEvaluador(estado: string): AvisoEntradaCaso {
       pasos: [PANELES_EVALUACION, EXTRA_HISTORIAL],
     };
   }
-  if (estado === "DEVUELTA_SUPERVISOR") {
+  if (estado === "DEVUELTA_SUPERVISOR" && !publicaDirecto) {
     return {
       title: "El supervisor devolvió la evaluación",
       parrafos: [
@@ -55,7 +63,7 @@ export function avisoEntradaEvaluador(estado: string): AvisoEntradaCaso {
         "El participante todavía no corrige. Puedes consultar el caso, pero no editar.",
       ],
       pasos: [
-        PANELES_EVALUACION,
+        panelEval,
         "Cuando reenvíe, lo que cambió dirá Modificada.",
       ],
     };
@@ -74,15 +82,17 @@ export function avisoEntradaEvaluador(estado: string): AvisoEntradaCaso {
     return {
       title: "Evaluación finalizada",
       parrafos: ["Este caso está cerrado. Puedes consultarlo, pero ya no se edita."],
-      pasos: [PANELES_EVALUACION, EXTRA_HISTORIAL],
+      pasos: [panelEval, EXTRA_HISTORIAL],
     };
   }
   return {
     title: "Revisar el caso",
     parrafos: ["Lee las respuestas y escribe tu evaluación."],
     pasos: [
-      "En Caso lees las respuestas. En Evaluación y Supervisión escribes tu comentario.",
-      "Puedes usar Guardar borrador, Pedir cambios al participante y Finalizar evaluación.",
+      panelEval,
+      publicaDirecto
+        ? "Puedes usar Guardar borrador, Pedir cambios al participante y Finalizar evaluación. Tus comentarios llegan directo al participante."
+        : "Puedes usar Guardar borrador, Pedir cambios al participante y Finalizar evaluación.",
       EXTRA_HISTORIAL,
     ],
   };

@@ -20,7 +20,9 @@ import {
   guardarConfigEvaluacion,
   guardarCupoPool,
   quitarEvaluadorDelPool,
+  quitarEvaluadorDePostulacion,
   quitarSupervisorDelPool,
+  quitarSupervisorDePostulacion,
 } from "@/actions/convocatorias";
 import { descargarCasoPdfDesdeDetalle } from "@/lib/descargar-caso-pdf";
 import {
@@ -42,6 +44,11 @@ import { ESCUELAS } from "@/lib/escuelas";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
 import { rutaFichaPublica } from "@/lib/ficha-publica";
 import { filasExcelLinks } from "@/lib/excel-links";
+import {
+  modoRevision,
+  usaEvaluadores,
+  usaSupervisores,
+} from "@/lib/modo-revision";
 import { esMentoriaContenido, parseTipoFormulario, type TipoFormulario } from "@/lib/tipo-formulario";
 import { workbookXlsx } from "@/lib/xlsx-workbook";
 import {
@@ -227,10 +234,16 @@ function conAsignacionEvaluador(panel: PanelEval, postulacionId: string, evaluad
   };
 }
 
-function conAsignacionSupervisor(panel: PanelEval, postulacionId: string, supervisorId: string): PanelEval {
+function conAsignacionSupervisor(
+  panel: PanelEval,
+  postulacionId: string,
+  supervisorId: string,
+  comoEvaluador = false,
+): PanelEval {
   const persona = panel.poolSupervisores.find((item) => item.evaluadorId === supervisorId);
   const postulacion = panel.postulaciones.find((item) => item.id === postulacionId);
   if (!persona || !postulacion || postulacion.supervision) return panel;
+  if (comoEvaluador && postulacion.asignaciones.length > 0) return panel;
   const caso = casoResumen(postulacion);
   return {
     ...panel,
@@ -240,6 +253,17 @@ function conAsignacionSupervisor(panel: PanelEval, postulacionId: string, superv
         : {
             ...item,
             supervision: { supervisorId, supervisorNombre: persona.evaluador.name },
+            asignaciones: comoEvaluador
+              ? [
+                  {
+                    evaluadorId: supervisorId,
+                    evaluadorNombre: persona.evaluador.name,
+                    orden: 1,
+                    estado: "PENDIENTE",
+                    rondaActual: 1,
+                  },
+                ]
+              : item.asignaciones,
           },
     ),
     poolSupervisores: panel.poolSupervisores.map((item) =>
@@ -250,6 +274,41 @@ function conAsignacionSupervisor(panel: PanelEval, postulacionId: string, superv
             carga: item.carga + 1,
             asignadas: item.asignadas + 1,
             casosAsignados: [...item.casosAsignados, caso],
+          },
+    ),
+  };
+}
+
+function sinAsignacionEvaluador(panel: PanelEval, postulacionId: string, evaluadorId: string): PanelEval {
+  return {
+    ...panel,
+    postulaciones: panel.postulaciones.map((item) =>
+      item.id !== postulacionId
+        ? item
+        : {
+            ...item,
+            asignaciones: item.asignaciones.filter((a) => a.evaluadorId !== evaluadorId),
+            supervision:
+              item.supervision?.supervisorId === evaluadorId ? null : item.supervision ?? null,
+          },
+    ),
+  };
+}
+
+function sinAsignacionSupervisor(panel: PanelEval, postulacionId: string): PanelEval {
+  const postulacion = panel.postulaciones.find((item) => item.id === postulacionId);
+  const supervisorId = postulacion?.supervision?.supervisorId;
+  return {
+    ...panel,
+    postulaciones: panel.postulaciones.map((item) =>
+      item.id !== postulacionId
+        ? item
+        : {
+            ...item,
+            supervision: null,
+            asignaciones: supervisorId
+              ? item.asignaciones.filter((a) => a.evaluadorId !== supervisorId)
+              : item.asignaciones,
           },
     ),
   };
@@ -534,6 +593,8 @@ export function ConvocatoriaEvaluacion({
   tipo = "FEEDBACK",
   piezas = [],
   vista = "lista",
+  evaluadoresHabilitados = true,
+  supervisoresHabilitados = true,
 }: {
   convocatoriaId: string;
   estadoConvocatoria: string;
@@ -548,8 +609,17 @@ export function ConvocatoriaEvaluacion({
   tipo?: TipoFormulario;
   piezas?: { id: string; titulo: string }[];
   vista?: "lista" | "numeros" | "links";
+  evaluadoresHabilitados?: boolean;
+  supervisoresHabilitados?: boolean;
 }) {
   const router = useRouter();
+  const modoRev = esMentoriaContenido(tipo)
+    ? "ninguno"
+    : modoRevision({ evaluadoresHabilitados, supervisoresHabilitados });
+  const mostrarEvaluadores = usaEvaluadores(modoRev);
+  const mostrarSupervisores = usaSupervisores(modoRev);
+  const mostrarColumnaEvaluacion = mostrarEvaluadores;
+  const mostrarColumnaSupervision = mostrarSupervisores;
   const servidor = useMemo(
     () => ({
       evaluacionesPorPostulacion,
@@ -590,8 +660,18 @@ export function ConvocatoriaEvaluacion({
   const [filtroPiezas, setFiltroPiezas] = useState<Record<string, string>>({});
   const esContenido = esMentoriaContenido(parseTipoFormulario(tipo));
   const columnasContenido = { "--casillas": String(piezas.length) } as CSSProperties;
-  const [panelLateral, setPanelLateral] = useState<"evaluadores" | "supervisores">("evaluadores");
+  const [panelLateral, setPanelLateral] = useState<"evaluadores" | "supervisores">(
+    mostrarEvaluadores ? "evaluadores" : "supervisores",
+  );
   const [portalListo, setPortalListo] = useState(false);
+
+  useEffect(() => {
+    if (panelLateral === "evaluadores" && !mostrarEvaluadores && mostrarSupervisores) {
+      setPanelLateral("supervisores");
+    } else if (panelLateral === "supervisores" && !mostrarSupervisores && mostrarEvaluadores) {
+      setPanelLateral("evaluadores");
+    }
+  }, [mostrarEvaluadores, mostrarSupervisores, panelLateral]);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [editandoCasos, setEditandoCasos] = useState(false);
   const [valorCasos, setValorCasos] = useState(String(evaluacionesPorPostulacion));
@@ -876,11 +956,61 @@ export function ConvocatoriaEvaluacion({
     const formData = new FormData();
     formData.set("postulacionId", postulacionId);
     formData.set("supervisorId", supervisorId);
+    const comoEvaluador = modoRev === "solo_supervisores";
     void panel
       .aplicar(
-        (actual) => conAsignacionSupervisor(actual, postulacionId, supervisorId),
+        (actual) => conAsignacionSupervisor(actual, postulacionId, supervisorId, comoEvaluador),
         () => asignarSupervisorAPostulacion(formData),
-        { mensajeOk: "Supervisor asignado." },
+        {
+          mensajeOk: comoEvaluador
+            ? "Supervisor asignado como evaluador del caso."
+            : "Supervisor asignado.",
+        },
+      )
+      .then((result) => {
+        if (!result || !("error" in result) || !result.error) void onMutated?.();
+      });
+  }
+
+  function quitarEvaluadorAsignado(postulacion: PostulacionItem, evaluadorId: string, estado: string) {
+    if (estado !== "PENDIENTE") {
+      const ok = window.confirm(
+        "¿Quitar a esta persona del caso?\n\nSe eliminarán también los comentarios de esa evaluación. La respuesta del participante se conserva.",
+      );
+      if (!ok) return;
+    }
+    const formData = new FormData();
+    formData.set("postulacionId", postulacion.id);
+    formData.set("evaluadorId", evaluadorId);
+    void panel
+      .aplicar(
+        (actual) => sinAsignacionEvaluador(actual, postulacion.id, evaluadorId),
+        () => quitarEvaluadorDePostulacion(formData),
+        { mensajeOk: "Evaluador quitado del caso." },
+      )
+      .then((result) => {
+        if (!result || !("error" in result) || !result.error) void onMutated?.();
+      });
+  }
+
+  function quitarSupervisorAsignado(postulacion: PostulacionItem) {
+    if (!postulacion.supervision) return;
+    const evaluacion = postulacion.asignaciones.find(
+      (a) => a.evaluadorId === postulacion.supervision?.supervisorId,
+    );
+    if (evaluacion && evaluacion.estado !== "PENDIENTE") {
+      const ok = window.confirm(
+        "¿Quitar al supervisor de este caso?\n\nSe eliminarán también los comentarios de esa evaluación. La respuesta del participante se conserva.",
+      );
+      if (!ok) return;
+    }
+    const formData = new FormData();
+    formData.set("postulacionId", postulacion.id);
+    void panel
+      .aplicar(
+        (actual) => sinAsignacionSupervisor(actual, postulacion.id),
+        () => quitarSupervisorDePostulacion(formData),
+        { mensajeOk: "Supervisor quitado del caso." },
       )
       .then((result) => {
         if (!result || !("error" in result) || !result.error) void onMutated?.();
@@ -1011,30 +1141,36 @@ export function ConvocatoriaEvaluacion({
             {esSupervisores ? `Supervisores (${poolActivo.length})` : `Evaluadores (${poolActivo.length})`}
           </h3>
         </div>
-        <div className="eval-side-tabs">
-          <button
-            type="button"
-            className={`eval-side-tab${esSupervisores ? "" : " is-active"}`}
-            data-tour="pool-evaluadores"
-            onClick={() => {
-              setPanelLateral("evaluadores");
-              setSeleccionados([]);
-            }}
-          >
-            Evaluadores
-          </button>
-          <button
-            type="button"
-            className={`eval-side-tab${esSupervisores ? " is-active" : ""}`}
-            data-tour="pool-supervisores"
-            onClick={() => {
-              setPanelLateral("supervisores");
-              setSeleccionados([]);
-            }}
-          >
-            Supervisores
-          </button>
-        </div>
+        {mostrarEvaluadores || mostrarSupervisores ? (
+          <div className="eval-side-tabs">
+            {mostrarEvaluadores ? (
+              <button
+                type="button"
+                className={`eval-side-tab${esSupervisores ? "" : " is-active"}`}
+                data-tour="pool-evaluadores"
+                onClick={() => {
+                  setPanelLateral("evaluadores");
+                  setSeleccionados([]);
+                }}
+              >
+                Evaluadores
+              </button>
+            ) : null}
+            {mostrarSupervisores ? (
+              <button
+                type="button"
+                className={`eval-side-tab${esSupervisores ? " is-active" : ""}`}
+                data-tour="pool-supervisores"
+                onClick={() => {
+                  setPanelLateral("supervisores");
+                  setSeleccionados([]);
+                }}
+              >
+                Supervisores
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="eval-side-body space-y-4">
           {poolError ? <p className="text-danger">{poolError}</p> : null}
@@ -1262,14 +1398,28 @@ export function ConvocatoriaEvaluacion({
             />
             {esContenido ? null : (
               <>
+                {mostrarEvaluadores || modoRev === "solo_supervisores" ? (
                 <TablaNumeros
-                  titulo="Evaluadores"
+                  titulo={modoRev === "solo_supervisores" ? "Evaluación" : "Evaluadores"}
                   variante="evaluadores"
                   filas={[
-                    { etiqueta: "Con evaluador asignado", valor: resumenNumeros.conEvaluador },
-                    { etiqueta: "Sin evaluador asignado", valor: resumenNumeros.sinEvaluador },
+                    {
+                      etiqueta:
+                        modoRev === "solo_supervisores"
+                          ? "Con supervisor-evaluador asignado"
+                          : "Con evaluador asignado",
+                      valor: resumenNumeros.conEvaluador,
+                    },
+                    {
+                      etiqueta:
+                        modoRev === "solo_supervisores"
+                          ? "Sin supervisor-evaluador asignado"
+                          : "Sin evaluador asignado",
+                      valor: resumenNumeros.sinEvaluador,
+                    },
                   ]}
                   accion={
+                    mostrarEvaluadores ? (
                     <div className="eval-numeros-accion">
                       <button
                         className="btn btn-sm btn-secondary"
@@ -1291,8 +1441,11 @@ export function ConvocatoriaEvaluacion({
                         <p className="eval-numeros-hint">Nadie tiene casos pendientes de evaluar.</p>
                       ) : null}
                     </div>
+                    ) : undefined
                   }
                 />
+                ) : null}
+                {mostrarSupervisores ? (
                 <TablaNumeros
                   titulo="Supervisores"
                   variante="supervisores"
@@ -1324,6 +1477,7 @@ export function ConvocatoriaEvaluacion({
                     </div>
                   }
                 />
+                ) : null}
                 {recordatorioError && esNumeros ? (
                   <p className="eval-numeros-aviso text-danger">{recordatorioError}</p>
                 ) : null}
@@ -1483,68 +1637,78 @@ export function ConvocatoriaEvaluacion({
                 ))}
               </select>
             </div>
-            <div className="field">
-              <label htmlFor="filtro-estado-evaluacion">Estado evaluación</label>
-              <select
-                className="input"
-                id="filtro-estado-evaluacion"
-                value={filtroEstadoEvaluacion}
-                onChange={(event) => setFiltroEstadoEvaluacion(event.target.value)}
-              >
-                <option value="">Todos</option>
-                <option value="pendiente">Pendiente</option>
-                <option value="esperando-respuesta">Esperando respuesta</option>
-                <option value="esperando-supervision">Esperando supervisión</option>
-                <option value="finalizada">Finalizada</option>
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="filtro-evaluador">Evaluador</label>
-              <select
-                className="input"
-                id="filtro-evaluador"
-                value={filtroEvaluadorId}
-                onChange={(event) => setFiltroEvaluadorId(event.target.value)}
-              >
-                <option value="">Todos</option>
-                {poolLocal.map((item) => (
-                  <option key={item.evaluadorId} value={item.evaluadorId}>
-                    {item.evaluador.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="filtro-estado-supervision">Estado supervisión</label>
-              <select
-                className="input"
-                id="filtro-estado-supervision"
-                value={filtroEstadoSupervision}
-                onChange={(event) => setFiltroEstadoSupervision(event.target.value)}
-              >
-                <option value="">Todos</option>
-                <option value="pendiente">Pendiente</option>
-                <option value="esperando-respuesta">Esperando respuesta</option>
-                <option value="esperando-evaluacion">Esperando evaluación</option>
-                <option value="finalizada">Finalizada</option>
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="filtro-supervisor">Supervisor</label>
-              <select
-                className="input"
-                id="filtro-supervisor"
-                value={filtroSupervisorId}
-                onChange={(event) => setFiltroSupervisorId(event.target.value)}
-              >
-                <option value="">Todos</option>
-                {poolSupLocal.map((item) => (
-                  <option key={item.evaluadorId} value={item.evaluadorId}>
-                    {item.evaluador.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {mostrarColumnaEvaluacion || modoRev === "solo_supervisores" ? (
+              <div className="field">
+                <label htmlFor="filtro-estado-evaluacion">Estado evaluación</label>
+                <select
+                  className="input"
+                  id="filtro-estado-evaluacion"
+                  value={filtroEstadoEvaluacion}
+                  onChange={(event) => setFiltroEstadoEvaluacion(event.target.value)}
+                >
+                  <option value="">Todos</option>
+                  <option value="pendiente">Pendiente</option>
+                  <option value="esperando-respuesta">Esperando respuesta</option>
+                  {modoRev === "ambos" ? (
+                    <option value="esperando-supervision">Esperando supervisión</option>
+                  ) : null}
+                  <option value="finalizada">Finalizada</option>
+                </select>
+              </div>
+            ) : null}
+            {mostrarEvaluadores ? (
+              <div className="field">
+                <label htmlFor="filtro-evaluador">Evaluador</label>
+                <select
+                  className="input"
+                  id="filtro-evaluador"
+                  value={filtroEvaluadorId}
+                  onChange={(event) => setFiltroEvaluadorId(event.target.value)}
+                >
+                  <option value="">Todos</option>
+                  {poolLocal.map((item) => (
+                    <option key={item.evaluadorId} value={item.evaluadorId}>
+                      {item.evaluador.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+            {mostrarSupervisores && modoRev === "ambos" ? (
+              <div className="field">
+                <label htmlFor="filtro-estado-supervision">Estado supervisión</label>
+                <select
+                  className="input"
+                  id="filtro-estado-supervision"
+                  value={filtroEstadoSupervision}
+                  onChange={(event) => setFiltroEstadoSupervision(event.target.value)}
+                >
+                  <option value="">Todos</option>
+                  <option value="pendiente">Pendiente</option>
+                  <option value="esperando-respuesta">Esperando respuesta</option>
+                  <option value="esperando-evaluacion">Esperando evaluación</option>
+                  <option value="finalizada">Finalizada</option>
+                </select>
+              </div>
+            ) : null}
+            {mostrarSupervisores ? (
+              <div className="field">
+                <label htmlFor="filtro-supervisor">Supervisor</label>
+                <select
+                  className="input"
+                  id="filtro-supervisor"
+                  value={filtroSupervisorId}
+                  onChange={(event) => setFiltroSupervisorId(event.target.value)}
+                >
+                  <option value="">Todos</option>
+                  {poolSupLocal.map((item) => (
+                    <option key={item.evaluadorId} value={item.evaluadorId}>
+                      {item.evaluador.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
               </>
               )}
           </div>
@@ -1568,10 +1732,19 @@ export function ConvocatoriaEvaluacion({
               </span>
             </div>
             ) : (
-            <div className="eval-lista-cabecera" aria-hidden="true">
+            <div
+              className={`eval-lista-cabecera${
+                modoRev === "solo_evaluadores"
+                  ? " is-solo-evaluadores"
+                  : modoRev === "solo_supervisores"
+                    ? " is-solo-supervisores"
+                    : ""
+              }`}
+              aria-hidden="true"
+            >
               <span>Estado respuestas</span>
-              <span>Estado evaluaciones</span>
-              <span>Estado supervisión</span>
+              {mostrarColumnaEvaluacion ? <span>Estado evaluaciones</span> : null}
+              {mostrarColumnaSupervision ? <span>Estado supervisión</span> : null}
               <span className="eval-lista-cabecera-accion">
                 <span className="sr-only">Acciones</span>
               </span>
@@ -1595,13 +1768,25 @@ export function ConvocatoriaEvaluacion({
             const estadoRespuesta = estadoRespuestaFicha(postulacion, preguntas);
             const respuestaAsignable =
               Boolean(postulacion.enviadaAt) && postulacion.estado !== "FINALIZADA";
-            const puedeAsignarEval = !esContenido && respuestaAsignable;
-            const puedeAsignarSup = !esContenido && respuestaAsignable && !postulacion.supervision;
+            const puedeAsignarEval =
+              !esContenido && mostrarEvaluadores && respuestaAsignable;
+            const puedeAsignarSup =
+              !esContenido &&
+              mostrarSupervisores &&
+              respuestaAsignable &&
+              !postulacion.supervision &&
+              (modoRev !== "solo_supervisores" || postulacion.asignaciones.length === 0);
             const esDestino = dropTargetId === postulacion.id;
             return (
               <article
                 key={postulacion.id}
-                className={`eval-ficha${esContenido ? " is-contenido" : ""}${esDestino ? " is-drop-target" : ""}${
+                className={`eval-ficha${esContenido ? " is-contenido" : ""}${
+                  modoRev === "solo_evaluadores"
+                    ? " is-solo-evaluadores"
+                    : modoRev === "solo_supervisores"
+                      ? " is-solo-supervisores"
+                      : ""
+                }${esDestino ? " is-drop-target" : ""}${
                   puedeAsignarEval || puedeAsignarSup || esContenido ? "" : " is-locked"
                 }`}
                 style={esContenido ? columnasContenido : undefined}
@@ -1730,69 +1915,128 @@ export function ConvocatoriaEvaluacion({
                     </div>
                   </div>
                 </div>
-                <div className="eval-ficha-evaluacion">
-                  {postulacion.asignaciones.length === 0 ? (
-                    <p className="eval-ficha-empty">
-                      {estadoRespuesta === "observaciones"
-                        ? "Esperando respuesta"
-                        : estadoRespuesta === "pendiente"
-                          ? "Respuesta pendiente"
-                          : estadoRespuesta === "borrador"
-                            ? "Respuesta en borrador"
-                            : puedeAsignarEval
-                              ? "Arrastra un evaluador aquí"
-                              : "Sin evaluadores asignados"}
-                    </p>
-                  ) : (
-                    <ul className="eval-ficha-avatars">
-                      {postulacion.asignaciones.map((asignacion) => {
-                        const estadoEval = estadoAsignacionFicha(asignacion.estado);
-                        return (
-                          <li
-                            key={`${postulacion.id}-${asignacion.evaluadorId}`}
-                            className={`eval-avatar ${claseAvatarEstado(estadoEval)}`}
-                            title={`${asignacion.evaluadorNombre} · ${etiquetaEstadoAsignacionFicha(
-                              estadoEval,
-                            )}`}
-                          >
-                            <span className={`eval-avatar-pill is-${estadoEval}`}>
-                              {etiquetaEstadoAsignacionFicha(estadoEval)}
-                            </span>
-                            <span className="eval-avatar-icon">{IconoEstadoFicha(estadoEval)}</span>
-                            <span className="eval-avatar-name">{asignacion.evaluadorNombre}</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-                <div className="eval-ficha-supervision">
-                  {!postulacion.supervision ? (
-                    <p className="eval-ficha-empty">
-                      {puedeAsignarSup ? "Arrastra un supervisor aquí" : "Sin supervisor"}
-                    </p>
-                  ) : (
-                    <ul className="eval-ficha-avatars">
-                      {(() => {
-                        const estadoSup = estadoSupervisionFicha(postulacion.asignaciones);
-                        return (
-                          <li
-                            className={`eval-avatar ${claseAvatarEstado(estadoSup)}`}
-                            title={`${postulacion.supervision.supervisorNombre} · ${etiquetaEstadoSupervisionFicha(estadoSup)}`}
-                          >
-                            <span className={`eval-avatar-pill is-${estadoSup}`}>
-                              {etiquetaEstadoSupervisionFicha(estadoSup)}
-                            </span>
-                            <span className="eval-avatar-icon">{IconoEstadoFicha(estadoSup)}</span>
-                            <span className="eval-avatar-name">
-                              {postulacion.supervision.supervisorNombre}
-                            </span>
-                          </li>
-                        );
-                      })()}
-                    </ul>
-                  )}
-                </div>
+                {mostrarColumnaEvaluacion ? (
+                  <div className="eval-ficha-evaluacion">
+                    {postulacion.asignaciones.length === 0 ? (
+                      <p className="eval-ficha-empty">
+                        {estadoRespuesta === "observaciones"
+                          ? "Esperando respuesta"
+                          : estadoRespuesta === "pendiente"
+                            ? "Respuesta pendiente"
+                            : estadoRespuesta === "borrador"
+                              ? "Respuesta en borrador"
+                              : puedeAsignarEval
+                                ? "Arrastra un evaluador aquí"
+                                : "Sin evaluadores asignados"}
+                      </p>
+                    ) : (
+                      <ul className="eval-ficha-avatars">
+                        {postulacion.asignaciones.map((asignacion) => {
+                          const estadoEval = estadoAsignacionFicha(asignacion.estado);
+                          return (
+                            <li
+                              key={`${postulacion.id}-${asignacion.evaluadorId}`}
+                              className={`eval-avatar ${claseAvatarEstado(estadoEval)}`}
+                              title={`${asignacion.evaluadorNombre} · ${etiquetaEstadoAsignacionFicha(
+                                estadoEval,
+                              )}`}
+                            >
+                              <span className={`eval-avatar-pill is-${estadoEval}`}>
+                                {etiquetaEstadoAsignacionFicha(estadoEval)}
+                              </span>
+                              <span className="eval-avatar-icon">{IconoEstadoFicha(estadoEval)}</span>
+                              <span className="eval-avatar-name">{asignacion.evaluadorNombre}</span>
+                              <button
+                                type="button"
+                                className="eval-avatar-quitar"
+                                aria-label={`Quitar a ${asignacion.evaluadorNombre} del caso`}
+                                title="Quitar del caso"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  if (
+                                    modoRev === "solo_supervisores" &&
+                                    postulacion.supervision?.supervisorId === asignacion.evaluadorId
+                                  ) {
+                                    void quitarSupervisorAsignado(postulacion);
+                                    return;
+                                  }
+                                  void quitarEvaluadorAsignado(
+                                    postulacion,
+                                    asignacion.evaluadorId,
+                                    asignacion.estado,
+                                  );
+                                }}
+                              >
+                                ×
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                ) : null}
+                {mostrarColumnaSupervision ? (
+                  <div className="eval-ficha-supervision">
+                    {!postulacion.supervision ? (
+                      <p className="eval-ficha-empty">
+                        {estadoRespuesta === "observaciones"
+                          ? "Esperando respuesta"
+                          : estadoRespuesta === "pendiente"
+                            ? "Respuesta pendiente"
+                            : estadoRespuesta === "borrador"
+                              ? "Respuesta en borrador"
+                              : puedeAsignarSup
+                                ? "Arrastra un supervisor aquí"
+                                : "Sin supervisor"}
+                      </p>
+                    ) : (
+                      <ul className="eval-ficha-avatars">
+                        {(() => {
+                          const asignacionPropia = postulacion.asignaciones.find(
+                            (item) => item.evaluadorId === postulacion.supervision?.supervisorId,
+                          );
+                          const estadoSup =
+                            modoRev === "solo_supervisores" && asignacionPropia
+                              ? estadoAsignacionFicha(asignacionPropia.estado)
+                              : estadoSupervisionFicha(postulacion.asignaciones);
+                          const etiquetaSup =
+                            modoRev === "solo_supervisores"
+                              ? etiquetaEstadoAsignacionFicha(estadoSup as EstadoEvaluacionFicha)
+                              : etiquetaEstadoSupervisionFicha(estadoSup as EstadoSupervisionFicha);
+                          return (
+                            <li
+                              className={`eval-avatar ${claseAvatarEstado(estadoSup)}`}
+                              title={`${postulacion.supervision.supervisorNombre} · ${etiquetaSup}`}
+                            >
+                              <span className={`eval-avatar-pill is-${estadoSup}`}>
+                                {etiquetaSup}
+                              </span>
+                              <span className="eval-avatar-icon">{IconoEstadoFicha(estadoSup)}</span>
+                              <span className="eval-avatar-name">
+                                {postulacion.supervision.supervisorNombre}
+                              </span>
+                              <button
+                                type="button"
+                                className="eval-avatar-quitar"
+                                aria-label={`Quitar a ${postulacion.supervision.supervisorNombre} del caso`}
+                                title="Quitar del caso"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  void quitarSupervisorAsignado(postulacion);
+                                }}
+                              >
+                                ×
+                              </button>
+                            </li>
+                          );
+                        })()}
+                      </ul>
+                    )}
+                  </div>
+                ) : null}
                 <div className="eval-ficha-acciones">
                   <button
                     className="eval-ficha-eliminar"

@@ -151,7 +151,15 @@ export async function enviarPostulacion(formData: FormData) {
       };
     }
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "No se pudo enviar." };
+    console.error("enviarPostulacion", error);
+    const mensaje = error instanceof Error ? error.message : "";
+    if (/Transaction not found|expired transaction|Transaction already closed/i.test(mensaje)) {
+      return {
+        error:
+          "No se pudo enviar. Tu borrador quedó guardado. El servidor tardó demasiado; intentá de nuevo.",
+      };
+    }
+    return { error: mensaje || "No se pudo enviar." };
   }
 
   const actualizada = await prisma.postulacion.findUnique({

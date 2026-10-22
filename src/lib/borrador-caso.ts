@@ -36,33 +36,44 @@ import { respuestasEquivalentes } from "@/lib/versiones-respuesta";
 
 const MANTENER_VALOR = Symbol("mantener-valor");
 
-async function snapshotVersionSiCambio(
+/**
+ * Supabase está en sa-east-1 (~400 ms por consulta). El tope de Prisma es 5 s
+ * y cierra la transacción a mitad del envío: el borrador queda y el caso no se envía.
+ */
+const TX_BORRADOR = { maxWait: 15_000, timeout: 30_000 } as const;
+
+async function snapshotsSiCambio(
   tx: Prisma.TransactionClient,
-  args: { respuestaId: string; tipo: string; valor: string; archivos: string },
+  items: { respuestaId: string; tipo: string; valor: string; archivos: string }[],
 ) {
-  const ultima = await tx.respuestaVersion.findFirst({
-    where: { respuestaId: args.respuestaId },
+  if (items.length === 0) return;
+  const versiones = await tx.respuestaVersion.findMany({
+    where: { respuestaId: { in: items.map((item) => item.respuestaId) } },
     orderBy: { createdAt: "desc" },
-    select: { valor: true, archivos: true },
+    select: { respuestaId: true, valor: true, archivos: true },
   });
-  if (
-    ultima &&
-    respuestasEquivalentes({
-      tipo: args.tipo,
-      valorA: ultima.valor,
-      archivosA: ultima.archivos,
-      valorB: args.valor,
-      archivosB: args.archivos,
-    })
-  ) {
-    return;
+  const ultima = new Map<string, { valor: string; archivos: string }>();
+  for (const version of versiones) {
+    if (!ultima.has(version.respuestaId)) ultima.set(version.respuestaId, version);
   }
-  await tx.respuestaVersion.create({
-    data: {
-      respuestaId: args.respuestaId,
-      valor: args.valor,
-      archivos: args.archivos,
-    },
+  const crear = items.filter((item) => {
+    const previa = ultima.get(item.respuestaId);
+    if (!previa) return true;
+    return !respuestasEquivalentes({
+      tipo: item.tipo,
+      valorA: previa.valor,
+      archivosA: previa.archivos,
+      valorB: item.valor,
+      archivosB: item.archivos,
+    });
+  });
+  if (crear.length === 0) return;
+  await tx.respuestaVersion.createMany({
+    data: crear.map((item) => ({
+      respuestaId: item.respuestaId,
+      valor: item.valor,
+      archivos: item.archivos,
+    })),
   });
 }
 
@@ -280,18 +291,16 @@ export async function persistirRespuestas(args: {
 > {
   const pendientes: PendienteRespuesta[] = [];
   const archivosNuevos: ArchivoPendiente[] = [];
+  const existentes = await prisma.respuesta.findMany({
+    where: { postulacionId: args.postulacionId },
+    select: { id: true, preguntaId: true, valor: true, archivos: true },
+  });
+  const porPregunta = new Map(existentes.map((respuesta) => [respuesta.preguntaId, respuesta]));
 
   for (const pregunta of args.preguntas) {
     if (args.editableIds && !args.editableIds.has(pregunta.id)) continue;
 
-    const existing = await prisma.respuesta.findUnique({
-      where: {
-        postulacionId_preguntaId: {
-          postulacionId: args.postulacionId,
-          preguntaId: pregunta.id,
-        },
-      },
-    });
+    const existing = porPregunta.get(pregunta.id) ?? null;
 
     const leido = leerValorDesdeFormulario(pregunta, args.formData, existing?.valor ?? null);
     const omitirValor = leido === MANTENER_VALOR && Boolean(existing);
@@ -339,6 +348,23 @@ export async function persistirRespuestas(args: {
 
   const hayArchivosPendientes = !args.omitirArchivosNuevos && archivosNuevos.length > 0;
   const crearVersionEnTexto = Boolean(args.crearVersion) && !hayArchivosPendientes;
+  const porPendiente = new Map(pendientes.map((item) => [item.preguntaId, item]));
+  const nombreCaso = extraerNombreCaso(
+    args.preguntas,
+    args.preguntas.map((pregunta) => {
+      const pendiente = porPendiente.get(pregunta.id);
+      if (pendiente) {
+        return {
+          preguntaId: pregunta.id,
+          valor:
+            pendiente.omitirValor && pendiente.existing
+              ? pendiente.existing.valor
+              : pendiente.valorStr,
+        };
+      }
+      return { preguntaId: pregunta.id, valor: porPregunta.get(pregunta.id)?.valor ?? "" };
+    }),
+  );
 
   let updatedAtIso: string;
   try {
@@ -353,6 +379,7 @@ export async function persistirRespuestas(args: {
         throw new ConflictoBorradorError(actualIso);
       }
 
+      const paraSnapshot: { respuestaId: string; tipo: string; valor: string; archivos: string }[] = [];
       for (const item of pendientes) {
         const igual =
           item.existing != null &&
@@ -428,7 +455,7 @@ export async function persistirRespuestas(args: {
         });
 
         if (crearVersionEnTexto) {
-          await snapshotVersionSiCambio(tx, {
+          paraSnapshot.push({
             respuestaId: respuesta.id,
             tipo: item.tipo,
             valor: item.valorStr,
@@ -437,33 +464,14 @@ export async function persistirRespuestas(args: {
         }
       }
 
-      const conNombre = await tx.postulacion.findUnique({
-        where: { id: args.postulacionId },
-        include: {
-          convocatoria: {
-            include: {
-              formulario: { include: { preguntas: { select: { id: true, opciones: true } } } },
-            },
-          },
-          respuestas: { select: { preguntaId: true, valor: true } },
-        },
-      });
-      const nombreCaso = conNombre
-        ? extraerNombreCaso(
-            conNombre.convocatoria.formulario.preguntas,
-            conNombre.respuestas,
-          )
-        : undefined;
+      await snapshotsSiCambio(tx, paraSnapshot);
       const tocada = await tx.postulacion.update({
         where: { id: args.postulacionId },
-        data: {
-          ...(nombreCaso !== undefined ? { nombreCaso } : {}),
-          updatedAt: new Date(),
-        },
+        data: { nombreCaso, updatedAt: new Date() },
         select: { updatedAt: true },
       });
       return tocada.updatedAt.toISOString();
-    });
+    }, TX_BORRADOR);
   } catch (error) {
     if (error instanceof ConflictoBorradorError) {
       return { conflict: true, updatedAt: error.updatedAt };
@@ -538,7 +546,7 @@ export async function persistirRespuestas(args: {
           select: { updatedAt: true },
         });
         return tocada.updatedAt.toISOString();
-      });
+      }, TX_BORRADOR);
     } catch (error) {
       if (error instanceof ConflictoBorradorError) {
         return { conflict: true, updatedAt: error.updatedAt };
@@ -557,25 +565,26 @@ export async function persistirRespuestas(args: {
       ...archivosNuevos.map((a) => a.preguntaId),
     ]);
     await prisma.$transaction(async (tx) => {
-      for (const preguntaId of preguntaIds) {
-        const respuesta = await tx.respuesta.findUnique({
-          where: {
-            postulacionId_preguntaId: {
-              postulacionId: args.postulacionId,
-              preguntaId,
-            },
-          },
-        });
-        if (!respuesta) continue;
-        const pregunta = args.preguntas.find((item) => item.id === preguntaId);
-        await snapshotVersionSiCambio(tx, {
-          respuestaId: respuesta.id,
-          tipo: pregunta?.tipo ?? "texto_corto",
-          valor: respuesta.valor,
-          archivos: respuesta.archivos,
-        });
-      }
-    });
+      const respuestas = await tx.respuesta.findMany({
+        where: {
+          postulacionId: args.postulacionId,
+          preguntaId: { in: [...preguntaIds] },
+        },
+        select: { id: true, preguntaId: true, valor: true, archivos: true },
+      });
+      await snapshotsSiCambio(
+        tx,
+        respuestas.map((respuesta) => {
+          const pregunta = args.preguntas.find((item) => item.id === respuesta.preguntaId);
+          return {
+            respuestaId: respuesta.id,
+            tipo: pregunta?.tipo ?? "texto_corto",
+            valor: respuesta.valor,
+            archivos: respuesta.archivos,
+          };
+        }),
+      );
+    }, TX_BORRADOR);
   }
 
   return { ok: true, updatedAt: versionActual, ...(archivoError ? { archivoError } : {}) };

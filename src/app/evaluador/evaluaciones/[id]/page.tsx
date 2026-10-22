@@ -11,6 +11,12 @@ import { prisma } from "@/lib/db";
 import { evaluadorPuedeEditar } from "@/lib/estado";
 import { avisoEntradaEvaluador } from "@/lib/aviso-entrada-caso";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
+import {
+  modoRevisionDeConvocatoria,
+  publicaDirectoAlParticipante,
+  supervisorActuaComoEvaluador,
+  usaEvaluadores,
+} from "@/lib/modo-revision";
 import { etiquetaNombreCaso, extraerNombreCaso } from "@/lib/nombre-caso";
 import { notasParaEvaluacionGeneral, parseEscalaNotas } from "@/lib/preguntas";
 import { revisionParaEditar } from "@/lib/revision-ciclo";
@@ -55,6 +61,13 @@ export default async function EvaluacionDetallePage({
   });
   if (!asignacion) notFound();
 
+  const modo = modoRevisionDeConvocatoria(asignacion.postulacion.convocatoria);
+  const puedeVer =
+    (user.role === "EVALUADOR" && usaEvaluadores(modo)) ||
+    (user.role === "SUPERVISOR" && supervisorActuaComoEvaluador(modo));
+  if (!puedeVer) notFound();
+
+  const publicaDirecto = publicaDirectoAlParticipante(modo);
   const canEdit = evaluadorPuedeEditar(asignacion.estado);
   const ronda = asignacion.rondaActual;
   const ciclo = asignacion.cicloSupervision;
@@ -127,6 +140,7 @@ export default async function EvaluacionDetallePage({
       asignacionId={asignacion.id}
       canEdit={canEdit}
       modoEvaluacion={modoEvaluacion}
+      publicaDirecto={publicaDirecto}
       versionInicial={asignacion.updatedAt.toISOString()}
       back={<BotonAtras href="/evaluador" />}
       title={
@@ -136,7 +150,7 @@ export default async function EvaluacionDetallePage({
       }
       headerEvaluacion={esGeneral ? "Comentario del caso" : "Comentarios por pregunta"}
       veredictosIniciales={veredictosIniciales}
-      avisoEntrada={avisoEntradaEvaluador(asignacion.estado)}
+      avisoEntrada={avisoEntradaEvaluador(asignacion.estado, { publicaDirecto })}
       meta={
         <FichaCasoMeta
           participante={asignacion.postulacion.postulante.name}

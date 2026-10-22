@@ -36,6 +36,8 @@ export default async function MentoriasPage({
           formularioId: item.formularioId,
           formularioTitulo: item.formulario.titulo,
           postulaciones: item._count.postulaciones,
+          evaluadoresHabilitados: item.evaluadoresHabilitados,
+          supervisoresHabilitados: item.supervisoresHabilitados,
           fechaInicio: item.fechaInicio?.toISOString() ?? null,
           fechaCierre: item.fechaCierre?.toISOString() ?? null,
           imagenUrl: imagen ? directStoredImageUrl(imagen) : null,

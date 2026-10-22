@@ -1,5 +1,6 @@
 import { cupoAlcanzado } from "@/lib/cupo-asignacion";
 import { prisma } from "@/lib/db";
+import { modoRevisionDeConvocatoria, usaEvaluadores } from "@/lib/modo-revision";
 import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
 
 export async function asignarEvaluadoresAutomaticoEnConvocatoria(convocatoriaId: string) {
@@ -13,6 +14,9 @@ export async function asignarEvaluadoresAutomaticoEnConvocatoria(convocatoriaId:
     },
   });
   if (!convocatoria) return { error: "Asesoría no encontrada." };
+  if (!usaEvaluadores(modoRevisionDeConvocatoria(convocatoria))) {
+    return { error: "Los evaluadores están deshabilitados en esta asesoría." };
+  }
   if (convocatoria.evaluadores.length === 0) {
     return { error: "Agrega evaluadores al pool de la asesoría primero." };
   }

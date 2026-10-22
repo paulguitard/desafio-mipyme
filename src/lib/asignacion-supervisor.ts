@@ -1,5 +1,11 @@
 import { cupoAlcanzado } from "@/lib/cupo-asignacion";
 import { prisma } from "@/lib/db";
+import {
+  modoRevisionDeConvocatoria,
+  supervisorActuaComoEvaluador,
+  usaSupervisores,
+} from "@/lib/modo-revision";
+import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
 
 export async function asignarSupervisoresAutomaticoEnConvocatoria(convocatoriaId: string) {
   const convocatoria = await prisma.convocatoria.findUnique({
@@ -7,14 +13,19 @@ export async function asignarSupervisoresAutomaticoEnConvocatoria(convocatoriaId
     include: {
       supervisores: { include: { supervisor: true } },
       postulaciones: {
-        include: { supervision: true },
+        include: { supervision: true, asignaciones: true },
       },
     },
   });
   if (!convocatoria) return { error: "Asesoría no encontrada." };
+  const modo = modoRevisionDeConvocatoria(convocatoria);
+  if (!usaSupervisores(modo)) {
+    return { error: "Los supervisores están deshabilitados en esta asesoría." };
+  }
   if (convocatoria.supervisores.length === 0) {
     return { error: "Agrega supervisores al pool de la asesoría primero." };
   }
+  const comoEvaluador = supervisorActuaComoEvaluador(modo);
 
   const cargas = new Map<string, number>();
   for (const post of convocatoria.postulaciones) {
@@ -30,7 +41,11 @@ export async function asignarSupervisoresAutomaticoEnConvocatoria(convocatoriaId
   let incompletas = 0;
 
   const elegibles = convocatoria.postulaciones.filter(
-    (post) => post.enviadaAt && post.estado !== "FINALIZADA" && !post.supervision,
+    (post) =>
+      post.enviadaAt &&
+      post.estado !== "FINALIZADA" &&
+      !post.supervision &&
+      (!comoEvaluador || post.asignaciones.length === 0),
   );
 
   for (const postulacion of elegibles) {
@@ -53,21 +68,46 @@ export async function asignarSupervisoresAutomaticoEnConvocatoria(convocatoriaId
       continue;
     }
 
-    await prisma.asignacionSupervisor.create({
-      data: {
-        postulacionId: postulacion.id,
-        supervisorId: tomar.supervisorId,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.asignacionSupervisor.create({
+        data: {
+          postulacionId: postulacion.id,
+          supervisorId: tomar.supervisorId,
+        },
+      });
+      if (comoEvaluador) {
+        await tx.asignacionEvaluador.create({
+          data: {
+            postulacionId: postulacion.id,
+            evaluadorId: tomar.supervisorId,
+            orden: 1,
+            estado: "PENDIENTE",
+            rondaActual: 1,
+          },
+        });
+      }
     });
+    if (comoEvaluador) {
+      await sincronizarEstadoPostulacion(postulacion.id);
+    }
     cargas.set(tomar.supervisorId, (cargas.get(tomar.supervisorId) ?? 0) + 1);
     asignadas += 1;
   }
 
   if (asignadas === 0 && incompletas === 0) {
-    return { ok: true, mensaje: "No había casos pendientes de supervisión." };
+    return {
+      ok: true,
+      mensaje: comoEvaluador
+        ? "No había casos pendientes de evaluación."
+        : "No había casos pendientes de supervisión.",
+    };
   }
 
-  const partes = [`Se crearon ${asignadas} asignación${asignadas === 1 ? "" : "es"} de supervisor.`];
+  const partes = [
+    comoEvaluador
+      ? `Se asignaron ${asignadas} supervisor${asignadas === 1 ? "" : "es"} como evaluador${asignadas === 1 ? "" : "es"}.`
+      : `Se crearon ${asignadas} asignación${asignadas === 1 ? "" : "es"} de supervisor.`,
+  ];
   if (incompletas > 0) {
     partes.push(
       `${incompletas} caso${incompletas === 1 ? "" : "s"} no alcanzó supervisor (pool o carga máxima insuficiente).`,
