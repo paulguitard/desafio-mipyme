@@ -44,6 +44,7 @@ import { ESCUELAS } from "@/lib/escuelas";
 import { etiquetaNombreCaso } from "@/lib/nombre-caso";
 import { rutaFichaPublica } from "@/lib/ficha-publica";
 import { filasExcelLinks } from "@/lib/excel-links";
+import { esModoRubrica } from "@/lib/modo-evaluacion";
 import {
   modoRevision,
   usaEvaluadores,
@@ -99,6 +100,8 @@ type Asignacion = {
   estado: string;
   rondaActual: number;
   intencionPendiente?: string | null;
+  notaRubrica?: number | null;
+  notaRubricaTexto?: string | null;
 };
 
 type SupervisionFicha = {
@@ -122,6 +125,7 @@ type PostulacionItem = {
   vistasPiezaIds?: string[];
   asignaciones: Asignacion[];
   supervision?: SupervisionFicha | null;
+  notaRubricaPromedio?: string | null;
 };
 
 type PanelEval = {
@@ -606,6 +610,7 @@ export function ConvocatoriaEvaluacion({
   vista = "lista",
   evaluadoresHabilitados = true,
   supervisoresHabilitados = true,
+  modoEvaluacion,
 }: {
   convocatoriaId: string;
   estadoConvocatoria: string;
@@ -622,10 +627,15 @@ export function ConvocatoriaEvaluacion({
   vista?: "lista" | "numeros" | "links";
   evaluadoresHabilitados?: boolean;
   supervisoresHabilitados?: boolean;
+  modoEvaluacion?: string;
 }) {
   const router = useRouter();
+  const esRubrica = esModoRubrica(modoEvaluacion);
   const modoRev = mentoriaTieneRevision(tipo)
-    ? modoRevision({ evaluadoresHabilitados, supervisoresHabilitados })
+    ? modoRevision({
+        evaluadoresHabilitados: esRubrica ? true : evaluadoresHabilitados,
+        supervisoresHabilitados: esRubrica ? false : supervisoresHabilitados,
+      })
     : "ninguno";
   const mostrarEvaluadores = usaEvaluadores(modoRev);
   const mostrarSupervisores = usaSupervisores(modoRev);
@@ -672,6 +682,10 @@ export function ConvocatoriaEvaluacion({
   const esContenido = esMentoriaContenido(parseTipoFormulario(tipo));
   const conRevision = mentoriaTieneRevision(tipo);
   const columnasContenido = { "--casillas": String(piezas.length) } as CSSProperties;
+  const slotsEval = Math.max(evalsPorCaso, 1);
+  const columnasEval = mostrarColumnaEvaluacion
+    ? ({ "--eval-slots": String(slotsEval) } as CSSProperties)
+    : undefined;
   const [panelLateral, setPanelLateral] = useState<"evaluadores" | "supervisores">(
     mostrarEvaluadores ? "evaluadores" : "supervisores",
   );
@@ -696,6 +710,7 @@ export function ConvocatoriaEvaluacion({
   const [recordatorioError, setRecordatorioError] = useState<string | null>(null);
   const [recordatorioMensaje, setRecordatorioMensaje] = useState<string | null>(null);
   const [poolModalId, setPoolModalId] = useState<string | null>(null);
+  const [editandoAsignacionesId, setEditandoAsignacionesId] = useState<string | null>(null);
   const inputCasosRef = useRef<HTMLInputElement>(null);
   const cancelandoCasosRef = useRef(false);
   const arrastrandoPoolRef = useRef(false);
@@ -1255,9 +1270,11 @@ export function ConvocatoriaEvaluacion({
                       </strong>{" "}
                       asignadas
                     </span>
+                    {esRubrica ? null : (
                     <span>
                       <strong>{item.revisadas}</strong> observadas
                     </span>
+                    )}
                     <span>
                       <strong>{item.finalizadas}</strong> finalizadas
                     </span>
@@ -1752,6 +1769,7 @@ export function ConvocatoriaEvaluacion({
                     ? " is-solo-supervisores"
                     : ""
               }`}
+              style={columnasEval}
               aria-hidden="true"
             >
               <span>Estado respuestas</span>
@@ -1799,9 +1817,11 @@ export function ConvocatoriaEvaluacion({
                       ? " is-solo-supervisores"
                       : ""
                 }${esDestino ? " is-drop-target" : ""}${
+                  editandoAsignacionesId === postulacion.id ? " is-editando-asignaciones" : ""
+                }${
                   puedeAsignarEval || puedeAsignarSup || esContenido ? "" : " is-locked"
                 }`}
-                style={esContenido ? columnasContenido : undefined}
+                style={esContenido ? columnasContenido : columnasEval}
                 onDragOver={(event) => {
                   const payload = dragPoolRef.current;
                   const esSup =
@@ -1888,9 +1908,11 @@ export function ConvocatoriaEvaluacion({
                 ) : (
                   <>
                 <div className="eval-ficha-respuesta">
+                  {esRubrica ? null : (
                   <span className="eval-ficha-ronda">
                     Ronda {rondaRespuestaEmprendedor(postulacion.asignaciones)}
                   </span>
+                  )}
                   <div className="eval-ficha-ver-col">
                     <button
                       className="btn btn-sm btn-secondary eval-ficha-ver eval-ficha-lupa"
@@ -1920,9 +1942,15 @@ export function ConvocatoriaEvaluacion({
                       </div>
                       <div className="eval-ficha-estado">
                         <span className="eval-ficha-label">Estado</span>
-                        <span className={`eval-ficha-value is-${estadoRespuesta}`}>
-                          {etiquetaEstadoRespuestaFicha(estadoRespuesta)}
-                        </span>
+                        {esRubrica && postulacion.notaRubricaPromedio ? (
+                          <span className="eval-ficha-value is-nota-rubrica">
+                            Nota: {postulacion.notaRubricaPromedio}
+                          </span>
+                        ) : (
+                          <span className={`eval-ficha-value is-${estadoRespuesta}`}>
+                            {etiquetaEstadoRespuestaFicha(estadoRespuesta)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1945,19 +1973,30 @@ export function ConvocatoriaEvaluacion({
                       <ul className="eval-ficha-avatars">
                         {postulacion.asignaciones.map((asignacion) => {
                           const estadoEval = estadoAsignacionFicha(asignacion.estado);
+                          const notaEnCirculo = Boolean(esRubrica && asignacion.notaRubricaTexto);
+                          const etiquetaEval = etiquetaEstadoAsignacionFicha(estadoEval);
                           return (
                             <li
                               key={`${postulacion.id}-${asignacion.evaluadorId}`}
                               className={`eval-avatar ${claseAvatarEstado(estadoEval)}`}
-                              title={`${asignacion.evaluadorNombre} · ${etiquetaEstadoAsignacionFicha(
-                                estadoEval,
-                              )}`}
+                              title={`${asignacion.evaluadorNombre} · ${etiquetaEval}${
+                                notaEnCirculo ? ` · ${asignacion.notaRubricaTexto}` : ""
+                              }`}
                             >
                               <span className={`eval-avatar-pill is-${estadoEval}`}>
-                                {etiquetaEstadoAsignacionFicha(estadoEval)}
+                                {etiquetaEval}
                               </span>
-                              <span className="eval-avatar-icon">{IconoEstadoFicha(estadoEval)}</span>
+                              <span
+                                className={`eval-avatar-icon${notaEnCirculo ? " has-nota" : ""}`}
+                              >
+                                {notaEnCirculo ? (
+                                  <span className="eval-avatar-nota">{asignacion.notaRubricaTexto}</span>
+                                ) : (
+                                  IconoEstadoFicha(estadoEval)
+                                )}
+                              </span>
                               <span className="eval-avatar-name">{asignacion.evaluadorNombre}</span>
+                              {editandoAsignacionesId === postulacion.id ? (
                               <button
                                 type="button"
                                 className="eval-avatar-quitar"
@@ -1982,6 +2021,7 @@ export function ConvocatoriaEvaluacion({
                               >
                                 ×
                               </button>
+                              ) : null}
                             </li>
                           );
                         })}
@@ -2029,6 +2069,7 @@ export function ConvocatoriaEvaluacion({
                               <span className="eval-avatar-name">
                                 {postulacion.supervision.supervisorNombre}
                               </span>
+                              {editandoAsignacionesId === postulacion.id ? (
                               <button
                                 type="button"
                                 className="eval-avatar-quitar"
@@ -2042,6 +2083,7 @@ export function ConvocatoriaEvaluacion({
                               >
                                 ×
                               </button>
+                              ) : null}
                             </li>
                           );
                         })()}
@@ -2050,6 +2092,34 @@ export function ConvocatoriaEvaluacion({
                   </div>
                 ) : null}
                 <div className="eval-ficha-acciones">
+                  {mostrarColumnaEvaluacion || mostrarColumnaSupervision ? (
+                    <button
+                      className={`eval-ficha-editar${
+                        editandoAsignacionesId === postulacion.id ? " is-active" : ""
+                      }`}
+                      type="button"
+                      aria-pressed={editandoAsignacionesId === postulacion.id}
+                      aria-label={
+                        editandoAsignacionesId === postulacion.id
+                          ? `Listo: dejar de editar evaluadores de ${postulacion.emprendedorNombre}`
+                          : `Editar evaluadores de ${postulacion.emprendedorNombre}`
+                      }
+                      title={
+                        editandoAsignacionesId === postulacion.id
+                          ? "Listo"
+                          : "Editar evaluadores del caso"
+                      }
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setEditandoAsignacionesId((id) =>
+                          id === postulacion.id ? null : postulacion.id,
+                        );
+                      }}
+                    >
+                      <IconoLapiz />
+                    </button>
+                  ) : null}
                   <button
                     className="eval-ficha-eliminar"
                     type="button"
@@ -2270,6 +2340,7 @@ export function ConvocatoriaEvaluacion({
               esSupervisor={
                 Boolean(poolModalId) && poolSupLocal.some((item) => item.evaluadorId === poolModalId)
               }
+              mostrarObservadas={!esRubrica}
               onClose={() => setPoolModalId(null)}
               onGuardarCupo={(cupo, esSupervisor) => {
                 if (!poolModalId) return;

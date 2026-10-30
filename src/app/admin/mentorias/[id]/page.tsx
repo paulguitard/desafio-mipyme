@@ -56,6 +56,7 @@ export default async function MentoriaDetallePage({
         tipo={panel.tipo}
         piezas={panel.piezas}
         evaluacionesPorPostulacion={panel.evaluacionesPorPostulacion}
+        modoEvaluacion={panel.modoEvaluacion}
         evaluadoresHabilitados={panel.evaluadoresHabilitados}
         supervisoresHabilitados={panel.supervisoresHabilitados}
         preguntas={panel.preguntas}

@@ -26,6 +26,7 @@ import {
   toDatetimeLocalValue,
   type PosicionImagen,
 } from "@/lib/convocatoria";
+import { esModoRubrica } from "@/lib/modo-evaluacion";
 import {
   TIPO_FORMULARIO_LABEL,
   esMentoriaContenido,
@@ -51,7 +52,12 @@ export type ConvocatoriaListaItem = {
   imagenPos: PosicionImagen;
 };
 
-export type FormularioOpcion = { id: string; titulo: string; tipo: TipoFormulario };
+export type FormularioOpcion = {
+  id: string;
+  titulo: string;
+  tipo: TipoFormulario;
+  modoEvaluacion?: string;
+};
 
 export function ConvocatoriasAdmin({
   convocatorias,
@@ -89,9 +95,14 @@ export function ConvocatoriasAdmin({
   const [tipoMentoria, setTipoMentoria] = useState<TipoFormulario>("FEEDBACK");
   const [evaluadoresHabilitados, setEvaluadoresHabilitados] = useState(true);
   const [supervisoresHabilitados, setSupervisoresHabilitados] = useState(true);
+  const [formularioSeleccionadoId, setFormularioSeleccionadoId] = useState("");
   const tituloModal = editing ? "Editar asesoría" : "Crear asesoría";
   const tipoBloqueado = Boolean(editing && editing.postulaciones > 0);
   const formulariosDelTipo = formularios.filter((form) => form.tipo === tipoMentoria);
+  const formularioSeleccionado =
+    formulariosDelTipo.find((form) => form.id === formularioSeleccionadoId) ??
+    formularios.find((form) => form.id === formularioSeleccionadoId);
+  const esFormularioRubrica = esModoRubrica(formularioSeleccionado?.modoEvaluacion);
   const panelAutoAbiertoRef = useRef(false);
 
   useEffect(() => {
@@ -115,6 +126,7 @@ export function ConvocatoriasAdmin({
     setTipoMentoria("FEEDBACK");
     setEvaluadoresHabilitados(true);
     setSupervisoresHabilitados(true);
+    setFormularioSeleccionadoId("");
     setImagenPreview(null);
     setImagenPos({ x: 50, y: 50 });
     setVistaEmprendedor(false);
@@ -128,6 +140,7 @@ export function ConvocatoriasAdmin({
     setTipoMentoria(parseTipoFormulario(item.tipo));
     setEvaluadoresHabilitados(item.evaluadoresHabilitados !== false);
     setSupervisoresHabilitados(item.supervisoresHabilitados !== false);
+    setFormularioSeleccionadoId(item.formularioId);
     setImagenPreview(null);
     setImagenPos(item.imagenPos);
     setVistaEmprendedor(false);
@@ -437,6 +450,7 @@ export function ConvocatoriasAdmin({
             tipo={evaluacion.tipo}
             piezas={evaluacion.piezas}
             evaluacionesPorPostulacion={evaluacion.evaluacionesPorPostulacion}
+            modoEvaluacion={evaluacion.modoEvaluacion}
             evaluadoresHabilitados={evaluacion.evaluadoresHabilitados}
             supervisoresHabilitados={evaluacion.supervisoresHabilitados}
             preguntas={evaluacion.preguntas}
@@ -566,9 +580,58 @@ export function ConvocatoriasAdmin({
               </>
             ) : null}
           </div>
+          <div className="field">
+            <label htmlFor="formularioId">Formulario</label>
+            <select
+              className="input"
+              id="formularioId"
+              name="formularioId"
+              required
+              value={
+                formularioSeleccionadoId &&
+                formulariosDelTipo.some((form) => form.id === formularioSeleccionadoId)
+                  ? formularioSeleccionadoId
+                  : ""
+              }
+              onChange={(event) => {
+                const id = event.target.value;
+                setFormularioSeleccionadoId(id);
+                const elegido = formularios.find((form) => form.id === id);
+                if (esModoRubrica(elegido?.modoEvaluacion)) {
+                  setEvaluadoresHabilitados(true);
+                  setSupervisoresHabilitados(false);
+                }
+              }}
+              key={`${tipoMentoria}-${editing?.id ?? "nuevo"}`}
+              disabled={Boolean(editing && editing.postulaciones > 0)}
+            >
+              <option value="">Selecciona un formulario</option>
+              {formulariosDelTipo.map((form) => (
+                <option key={form.id} value={form.id}>
+                  {form.titulo}
+                </option>
+              ))}
+            </select>
+            {editing && editing.postulaciones > 0 ? (
+              <>
+                <input type="hidden" name="formularioId" value={editing.formularioId} />
+                <p className="text-muted">No se puede cambiar el formulario porque ya hay casos.</p>
+              </>
+            ) : null}
+          </div>
           {tipoMentoria === "FEEDBACK" ? (
             <div className="field space-y-3">
               <span className="block text-sm font-semibold text-navy">Roles de revisión</span>
+              {esFormularioRubrica ? (
+                <>
+                  <input type="hidden" name="evaluadoresHabilitados" value="true" />
+                  <p className="text-sm text-muted">
+                    La evaluación por rúbrica solo usa evaluadores. Puedes asignar más de uno por caso
+                    en el panel de la asesoría. No hay supervisores.
+                  </p>
+                </>
+              ) : (
+                <>
               <label className="flex items-start gap-2 text-sm">
                 <input
                   className="mt-1"
@@ -621,37 +684,10 @@ export function ConvocatoriasAdmin({
               <p className="text-muted text-sm">
                 Para cambiar estos roles no debe haber evaluadores ni supervisores asignados a casos.
               </p>
+                </>
+              )}
             </div>
           ) : null}
-          <div className="field">
-            <label htmlFor="formularioId">Formulario</label>
-            <select
-              className="input"
-              id="formularioId"
-              name="formularioId"
-              required
-              defaultValue={
-                editing && formulariosDelTipo.some((form) => form.id === editing.formularioId)
-                  ? editing.formularioId
-                  : ""
-              }
-              key={`${tipoMentoria}-${editing?.id ?? "nuevo"}`}
-              disabled={Boolean(editing && editing.postulaciones > 0)}
-            >
-              <option value="">Selecciona un formulario</option>
-              {formulariosDelTipo.map((form) => (
-                <option key={form.id} value={form.id}>
-                  {form.titulo}
-                </option>
-              ))}
-            </select>
-            {editing && editing.postulaciones > 0 ? (
-              <>
-                <input type="hidden" name="formularioId" value={editing.formularioId} />
-                <p className="text-muted">No se puede cambiar el formulario porque ya hay casos.</p>
-              </>
-            ) : null}
-          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="field">
               <label htmlFor="fechaInicio">Fecha de inicio</label>

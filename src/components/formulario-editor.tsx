@@ -1,6 +1,7 @@
 "use client";
 
 import { FormularioBuilder } from "@/components/formulario-builder";
+import type { RubricaVista } from "@/lib/rubrica";
 import type { TipoFormulario } from "@/lib/tipo-formulario";
 
 export function FormularioEditor({
@@ -26,6 +27,7 @@ export function FormularioEditor({
       conNotas: boolean;
       escalaNotas: string;
     }[];
+    rubrica?: RubricaVista | null;
   };
   permitirEvaluacionPorPregunta: boolean;
 }) {

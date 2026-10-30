@@ -8,7 +8,8 @@ import {
 } from "@/lib/borrador-revision";
 import type { ModoEvaluacion } from "@/lib/modo-evaluacion";
 import { prisma } from "@/lib/db";
-import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
+import { esModoRubrica, parseModoEvaluacion } from "@/lib/modo-evaluacion";
+import { campoNotaCriterio, notaEnEscala, parseEscalaRubrica } from "@/lib/rubrica";
 import {
   estadoTrasPublicarEvaluacion,
   modoRevisionDeConvocatoria,
@@ -33,7 +34,16 @@ async function cargaAsignacion(id: string, evaluadorId: string) {
     include: {
       postulacion: {
         include: {
-          convocatoria: { include: { formulario: { include: { preguntas: true } } } },
+          convocatoria: {
+            include: {
+              formulario: {
+                include: {
+                  preguntas: true,
+                  rubrica: { include: { criterios: { orderBy: { orden: "asc" } } } },
+                },
+              },
+            },
+          },
         },
       },
       revisiones: true,
@@ -95,6 +105,7 @@ async function validarComentarioEvaluacion(
   modo: ModoEvaluacion,
   asignacion: { postulacion: { convocatoria: { formulario: { preguntas: { id: string }[] } } } },
 ) {
+  if (modo === "RUBRICA") return null;
   if (modo === "GENERAL") {
     const general = leerVeredictoGeneral(formData);
     if (!general.comentario) {
@@ -145,10 +156,28 @@ async function publicarOEnviarASupervision(args: {
   if (guardado && "error" in guardado && guardado.error) return guardado;
 
   const modoEval = parseModoEvaluacion(asignacion.postulacion.convocatoria.formulario.modoEvaluacion);
+  if (modoEval === "RUBRICA" && args.intencion === "OBSERVACIONES") {
+    return { error: "La evaluación por rúbrica no pide cambios al participante." };
+  }
   const errorComentario = await validarComentarioEvaluacion(args.formData, modoEval, asignacion);
   if (errorComentario) return errorComentario;
 
   if (args.intencion === "FINALIZAR") {
+    if (modoEval === "RUBRICA") {
+      const rubrica = asignacion.postulacion.convocatoria.formulario.rubrica;
+      if (!rubrica || rubrica.criterios.length === 0) {
+        return { error: "Este formulario no tiene una rúbrica lista." };
+      }
+      const escala = parseEscalaRubrica(rubrica.escala);
+      const sinNota = rubrica.criterios.filter((criterio) => {
+        const raw = String(args.formData.get(campoNotaCriterio(criterio.id)) ?? "").trim();
+        const nota = Number(raw);
+        return !Number.isInteger(nota) || !notaEnEscala(nota, escala);
+      });
+      if (sinNota.length > 0) {
+        return { error: "Para finalizar, debes asignar una nota a cada criterio." };
+      }
+    } else {
     const preguntas = asignacion.postulacion.convocatoria.formulario.preguntas;
     const items = await leerVeredictos(
       args.formData,
@@ -167,6 +196,7 @@ async function publicarOEnviarASupervision(args: {
         error: "Para finalizar, debes asignar una nota a todas las preguntas que se evalúan con notas.",
       };
     }
+    }
   }
 
   const modo = modoRevisionDeConvocatoria(asignacion.postulacion.convocatoria);
@@ -182,7 +212,8 @@ async function publicarOEnviarASupervision(args: {
   });
   await sincronizarEstadoPostulacion(asignacion.postulacionId);
 
-  if (directo) {
+  const esRubrica = esModoRubrica(asignacion.postulacion.convocatoria.formulario.modoEvaluacion);
+  if (directo && !esRubrica) {
     if (args.intencion === "OBSERVACIONES") {
       await avisarParticipanteObservaciones(asignacion.postulacionId);
     } else {
@@ -194,7 +225,7 @@ async function publicarOEnviarASupervision(args: {
         await avisarCasoAprobado(asignacion.postulacionId);
       }
     }
-  } else {
+  } else if (!directo && !esRubrica) {
     await avisarSupervisorNuevaRevision({
       postulacionId: asignacion.postulacionId,
       actorNombre: args.user.name ?? "Un evaluador",

@@ -12,14 +12,23 @@ import {
 import { leerConfigApp } from "@/lib/config-app";
 import {
   esModoEvaluacion,
+  esModoRubrica,
   modoEvaluacionAlCrear,
   puedeAsignarModoEvaluacion,
   type ModoEvaluacion,
 } from "@/lib/modo-evaluacion";
 import {
+  leerPayloadRubrica,
+  serializeEscalaRubrica,
+  serializeExplicacionesRubrica,
+  validarRubrica,
+  type PayloadRubrica,
+} from "@/lib/rubrica";
+import {
   esTipoFormato,
   parseEscalaNotas,
   campoLimiteCuenta,
+  conLimitesAdjuntos,
   conOcultarTextbox,
   serializeConfigCorreo,
   serializeConfigFecha,
@@ -54,8 +63,12 @@ function isTipo(value: string): value is TipoPregunta {
   return (TIPOS_PREGUNTA as readonly string[]).includes(value);
 }
 
-function leerEscala(formData: FormData, tipoFormulario?: string | null) {
-  if (esCargaInformacion(tipoFormulario)) {
+function leerEscala(
+  formData: FormData,
+  tipoFormulario?: string | null,
+  modoEvaluacion?: string | null,
+) {
+  if (esCargaInformacion(tipoFormulario) || esModoRubrica(modoEvaluacion)) {
     return { conNotas: false, escalaNotas: "[]" as const };
   }
   const conNotas = formData.get("conNotas") === "on";
@@ -142,7 +155,15 @@ function leerConfigObjetivos(formData: FormData): ConfigObjetivos {
 function leerOpcionesGuardadas(tipo: TipoPregunta, formData: FormData): { opciones: string; error?: string } {
   const limites = leerLimites(formData);
   const ocultarTextbox = formData.get("ocultarTextbox") === "on";
-  const conFlag = (opciones: string) => conOcultarTextbox(opciones, ocultarTextbox);
+  const permiteArchivo = formData.get("permiteArchivo") === "on";
+  const permiteImagen = formData.get("permiteImagen") === "on";
+  const permiteVideoLink = formData.get("permiteVideoLink") === "on";
+  const conFlag = (opciones: string) =>
+    conLimitesAdjuntos(conOcultarTextbox(opciones, ocultarTextbox), {
+      maxArchivos: permiteArchivo ? leerEntero(formData, "maxArchivos") : null,
+      maxImagenes: permiteImagen ? leerEntero(formData, "maxImagenes") : null,
+      maxVideos: permiteVideoLink ? leerEntero(formData, "maxVideos") : null,
+    });
   if (tipo === "fecha") {
     const modo = String(formData.get("fechaModo") ?? "unica") === "rango" ? "rango" : "unica";
     return { opciones: conFlag(serializeConfigFecha(modo, limites)) };
@@ -270,7 +291,7 @@ export async function agregarPregunta(formData: FormData) {
 
   const formulario = await prisma.formulario.findUnique({
     where: { id: formularioId },
-    select: { tipo: true },
+    select: { tipo: true, modoEvaluacion: true },
   });
   if (!formulario) return { error: "Formulario no encontrado." };
   if (esMentoriaContenido(formulario.tipo)) {
@@ -280,7 +301,7 @@ export async function agregarPregunta(formData: FormData) {
   const opcionesLeidas = leerOpcionesGuardadas(tipo, formData);
   if (opcionesLeidas.error) return { error: opcionesLeidas.error };
 
-  const escala = leerEscala(formData, formulario.tipo);
+  const escala = leerEscala(formData, formulario.tipo, formulario.modoEvaluacion);
   if ("error" in escala && escala.error) return { error: escala.error };
 
   const last = await prisma.pregunta.findFirst({
@@ -378,7 +399,7 @@ export async function actualizarPregunta(formData: FormData) {
 
   const actual = await prisma.pregunta.findUnique({
     where: { id },
-    include: { formulario: { select: { tipo: true } } },
+    include: { formulario: { select: { tipo: true, modoEvaluacion: true } } },
   });
   if (!actual) return { error: "Pregunta no encontrada." };
   if (esPreguntaNombreCaso(actual)) {
@@ -388,7 +409,7 @@ export async function actualizarPregunta(formData: FormData) {
   const opcionesLeidas = leerOpcionesGuardadas(tipo, formData);
   if (opcionesLeidas.error) return { error: opcionesLeidas.error };
 
-  const escala = leerEscala(formData, actual.formulario.tipo);
+  const escala = leerEscala(formData, actual.formulario.tipo, actual.formulario.modoEvaluacion);
   if ("error" in escala && escala.error) return { error: escala.error };
 
   await prisma.pregunta.update({
@@ -414,6 +435,7 @@ export async function crearFormularioCompleto(payload: {
   titulo: string;
   tipo?: TipoFormulario;
   modoEvaluacion?: string;
+  rubrica?: PayloadRubrica;
   preguntas: {
     enunciado: string;
     ayuda: string;
@@ -457,10 +479,17 @@ export async function crearFormularioCompleto(payload: {
         return { error: "Hay una pregunta de opciones inválida." };
       }
     }
-    if (!esCargaInformacion(tipo) && pregunta.conNotas) {
+    if (!esCargaInformacion(tipo) && !esModoRubrica(modoEvaluacion) && pregunta.conNotas) {
       const error = validarEscalaNotas(pregunta.escalaNotas);
       if (error) return { error };
     }
+  }
+
+  if (esModoRubrica(modoEvaluacion)) {
+    const payloadRubrica = payload.rubrica;
+    if (!payloadRubrica) return { error: "Completa la rúbrica antes de guardar el formulario." };
+    const errorRubrica = validarRubrica(payloadRubrica);
+    if (errorRubrica) return { error: errorRubrica };
   }
 
   const form = await prisma.formulario.create({
@@ -479,9 +508,9 @@ export async function crearFormularioCompleto(payload: {
           permiteImagen: pregunta.permiteImagen,
           permiteVideoLink: pregunta.permiteVideoLink,
           opciones: pregunta.opciones,
-          conNotas: esCargaInformacion(tipo) ? false : pregunta.conNotas,
+          conNotas: esCargaInformacion(tipo) || esModoRubrica(modoEvaluacion) ? false : pregunta.conNotas,
           escalaNotas:
-            esCargaInformacion(tipo) || !pregunta.conNotas
+            esCargaInformacion(tipo) || esModoRubrica(modoEvaluacion) || !pregunta.conNotas
               ? "[]"
               : serializeEscalaNotas(pregunta.escalaNotas),
           orden: index + 1,
@@ -490,7 +519,132 @@ export async function crearFormularioCompleto(payload: {
     },
   });
 
+  if (esModoRubrica(modoEvaluacion) && payload.rubrica) {
+    const guardada = await persistirRubrica(form.id, payload.rubrica);
+    if ("error" in guardada) return { error: guardada.error };
+  }
+
   redirect(`/admin/formularios/${form.id}`);
+}
+
+async function persistirRubrica(formularioId: string, payload: PayloadRubrica) {
+  const error = validarRubrica(payload);
+  if (error) return { error };
+
+  const existente = await prisma.rubrica.findUnique({
+    where: { formularioId },
+    include: {
+      criterios: { include: { _count: { select: { revisiones: true } } } },
+    },
+  });
+  const estructuraBloqueada = Boolean(
+    existente?.criterios.some((criterio) => criterio._count.revisiones > 0),
+  );
+
+  if (estructuraBloqueada && existente) {
+    const idsPermitidos = new Set(existente.criterios.map((item) => item.id));
+    const escalaActual = existente.escala;
+    const escalaNueva = serializeEscalaRubrica(payload.escala);
+    if (escalaNueva !== escalaActual) {
+      return { error: "Ya hay evaluaciones: no se puede cambiar la escala." };
+    }
+    if (payload.criterios.length !== existente.criterios.length) {
+      return { error: "Ya hay evaluaciones: no se pueden agregar ni quitar criterios." };
+    }
+    for (const criterio of payload.criterios) {
+      if (!criterio.id || !idsPermitidos.has(criterio.id)) {
+        return { error: "Ya hay evaluaciones: no se puede cambiar la estructura de la rúbrica." };
+      }
+    }
+    const pesoPorId = new Map(existente.criterios.map((item) => [item.id, item.peso]));
+    const ordenPorId = new Map(existente.criterios.map((item) => [item.id, item.orden]));
+    await prisma.$transaction(
+      payload.criterios.map((criterio) =>
+        prisma.criterioRubrica.update({
+          where: { id: criterio.id! },
+          data: {
+            nombre: criterio.nombre.trim(),
+            preguntaGuia: criterio.preguntaGuia.trim(),
+            detalle: criterio.detalle.trim(),
+            peso: pesoPorId.get(criterio.id!) ?? criterio.peso,
+            orden: ordenPorId.get(criterio.id!) ?? 0,
+            explicaciones: serializeExplicacionesRubrica(criterio.explicaciones),
+          },
+        }),
+      ),
+    );
+    return { ok: true as const };
+  }
+
+  const rubrica = await prisma.rubrica.upsert({
+    where: { formularioId },
+    update: { escala: serializeEscalaRubrica(payload.escala) },
+    create: {
+      formularioId,
+      escala: serializeEscalaRubrica(payload.escala),
+    },
+  });
+
+  const idsKeep = payload.criterios
+    .map((item) => item.id)
+    .filter((id): id is string => Boolean(id) && !id.startsWith("tmp-"));
+
+  if (idsKeep.length > 0) {
+    await prisma.criterioRubrica.deleteMany({
+      where: { rubricaId: rubrica.id, id: { notIn: idsKeep } },
+    });
+  } else {
+    await prisma.criterioRubrica.deleteMany({ where: { rubricaId: rubrica.id } });
+  }
+
+  for (const [index, criterio] of payload.criterios.entries()) {
+    const data = {
+      orden: index + 1,
+      nombre: criterio.nombre.trim(),
+      preguntaGuia: criterio.preguntaGuia.trim(),
+      detalle: criterio.detalle.trim(),
+      peso: criterio.peso,
+      explicaciones: serializeExplicacionesRubrica(criterio.explicaciones),
+    };
+    const idReal = criterio.id && !criterio.id.startsWith("tmp-") ? criterio.id : null;
+    if (idReal) {
+      await prisma.criterioRubrica.upsert({
+        where: { id: idReal },
+        update: data,
+        create: { id: idReal, rubricaId: rubrica.id, ...data },
+      });
+    } else {
+      await prisma.criterioRubrica.create({
+        data: { rubricaId: rubrica.id, ...data },
+      });
+    }
+  }
+
+  return { ok: true as const };
+}
+
+export async function guardarRubrica(formData: FormData) {
+  await requireUser("ADMIN");
+  const formularioId = String(formData.get("formularioId") ?? "");
+  if (!formularioId) return { error: "Formulario no encontrado." };
+  const formulario = await prisma.formulario.findUnique({
+    where: { id: formularioId },
+    select: { id: true, modoEvaluacion: true, tipo: true },
+  });
+  if (!formulario) return { error: "Formulario no encontrado." };
+  if (esCargaInformacion(formulario.tipo) || esMentoriaContenido(formulario.tipo)) {
+    return { error: "Este formulario no usa rúbrica." };
+  }
+  if (!esModoRubrica(formulario.modoEvaluacion)) {
+    return { error: "Este formulario no está en modo rúbrica." };
+  }
+  const payload = leerPayloadRubrica(String(formData.get("rubrica") ?? ""));
+  if ("error" in payload) return payload;
+  const result = await persistirRubrica(formularioId, payload);
+  if ("error" in result) return result;
+  revalidatePath(`/admin/formularios/${formularioId}`);
+  revalidatePath("/admin/formularios");
+  return { ok: true as const };
 }
 
 async function formularioContenido(formularioId: string) {

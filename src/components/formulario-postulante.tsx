@@ -63,6 +63,7 @@ export function FormularioPostulante({
   meta,
   avisoEntrada = null,
   esCargaInformacion = false,
+  esRubrica = false,
   children,
 }: {
   postulacionId: string;
@@ -75,6 +76,7 @@ export function FormularioPostulante({
   meta?: React.ReactNode;
   avisoEntrada?: AvisoEntradaCasoDatos | null;
   esCargaInformacion?: boolean;
+  esRubrica?: boolean;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -261,7 +263,9 @@ export function FormularioPostulante({
     <form
       ref={formRef}
       onSubmit={(event) => event.preventDefault()}
-      data-tour-contexto-pagina={esCargaInformacion ? "carga-informacion" : undefined}
+      data-tour-contexto-pagina={
+        esCargaInformacion ? "carga-informacion" : esRubrica ? "rubrica" : undefined
+      }
       className={
         [
           conPaneles
@@ -361,6 +365,11 @@ export function FormularioPostulante({
           </>
         ) : esCargaInformacion ? (
           <p>Tu información se enviará y ya no podrás editarla.</p>
+        ) : esRubrica ? (
+          <>
+            <p>El caso se enviará al evaluador.</p>
+            <p>Después no podrás editarlo.</p>
+          </>
         ) : (
           <>
             <p>El caso se enviará al evaluador.</p>

@@ -9,6 +9,7 @@ export function BotonesEvaluadorRevision({ disabled }: { disabled: boolean }) {
   if (!ctx) return null;
   return (
     <div className="hilo-editor-acciones">
+      {ctx.esRubrica ? null : (
       <button
         className="btn btn-sm btn-gold"
         data-tour="enviar-supervisor"
@@ -18,6 +19,7 @@ export function BotonesEvaluadorRevision({ disabled }: { disabled: boolean }) {
       >
         Pedir cambios al participante
       </button>
+      )}
       <button
         className="btn btn-sm btn-primary"
         data-tour="finalizar-evaluacion"

@@ -47,6 +47,26 @@ describe("avisoEntradaEvaluador", () => {
     expect(aviso.title.trim().length).toBeGreaterThan(0);
     expect(aviso.parrafos.every((parrafo) => parrafo.trim().length > 0)).toBe(true);
   });
+
+  it("en rúbrica no habla de observaciones ni de Modificada", () => {
+    const aviso = avisoEntradaEvaluador("PENDIENTE", { esRubrica: true, publicaDirecto: true });
+    const texto = [aviso.title, ...aviso.parrafos, ...(aviso.pasos ?? [])].join(" ");
+    expect(texto).toContain("rúbrica");
+    expect(texto).toContain("no verá estas notas");
+    expect(texto).toContain("no podrá modificar");
+    expect(texto).not.toMatch(/por ahora/i);
+    expect(texto).not.toMatch(/Modificada/);
+    expect(texto).not.toMatch(/observaciones/i);
+    expect(texto).not.toMatch(/Pedir cambios/i);
+  });
+
+  it("en rúbrica finalizada no pide abrir Modificada", () => {
+    const aviso = avisoEntradaEvaluador("FINALIZADA", { esRubrica: true });
+    const texto = [aviso.title, ...aviso.parrafos, ...(aviso.pasos ?? [])].join(" ");
+    expect(aviso.title).toBe("Evaluación finalizada");
+    expect(texto).not.toMatch(/Modificada/);
+    expect(texto).not.toMatch(/observaciones/i);
+  });
 });
 
 describe("avisoEntradaSupervisor", () => {
@@ -166,5 +186,39 @@ describe("avisoEntradaParticipante", () => {
     expect(aviso.title).toBe("Tu caso fue aprobado");
     expect(aviso.parrafos[0]).toContain("Felicidades");
     expect(aviso.parrafos[0]).toContain("siguientes pasos");
+  });
+
+  it("en rúbrica no promete observaciones ni Modificada", () => {
+    const enviado = avisoEntradaParticipante({
+      estado: "EN_EVALUACION",
+      esCorreccion: false,
+      canEdit: false,
+      mentoriaAbierta: true,
+      esRubrica: true,
+    });
+    expect(enviado.title).toBe("Caso enviado");
+    expect(enviado.parrafos[0]).toContain("No podrás modificarlo");
+    expect(enviado.parrafos.join(" ")).not.toMatch(/observaciones/i);
+    expect(enviado.pasos).toBeUndefined();
+
+    const finalizado = avisoEntradaParticipante({
+      estado: "FINALIZADA",
+      esCorreccion: false,
+      canEdit: false,
+      mentoriaAbierta: false,
+      esRubrica: true,
+    });
+    expect(finalizado.title).toBe("Tu caso fue aprobado");
+    expect([...(finalizado.pasos ?? [])].join(" ")).not.toMatch(/Modificada|Evaluación/);
+
+    const cerrada = avisoEntradaParticipante({
+      estado: "EN_EVALUACION",
+      esCorreccion: false,
+      canEdit: false,
+      mentoriaAbierta: false,
+      esRubrica: true,
+    });
+    expect(cerrada.title).toBe("Asesoría cerrada");
+    expect(cerrada.pasos).toBeUndefined();
   });
 });

@@ -68,6 +68,75 @@ function idBajo(pathname: string, prefijo: string) {
 
 export const CONTEXTO_PANEL_MENTORIA = "panel-mentoria";
 export const CONTEXTO_CARGA_INFORMACION = "carga-informacion";
+export const CONTEXTO_RUBRICA = "rubrica";
+
+export const PASOS_RUBRICA_PARTICIPANTE: PasoTutorial[] = [
+  {
+    ancla: "volver",
+    titulo: "Volver al panel",
+    descripcion: "Este control te lleva de vuelta a tus asesorías y casos.",
+  },
+  {
+    ancla: "formulario-caso",
+    titulo: "Formulario del caso",
+    descripcion: "Responde cada pregunta y adjunta lo que se pida.",
+  },
+  {
+    ancla: "guardar-borrador",
+    titulo: "Guardar borrador",
+    descripcion: "Guarda tu avance sin enviarlo. Puedes volver más tarde a seguir editando.",
+  },
+  {
+    ancla: "enviar-caso",
+    titulo: "Enviar",
+    descripcion: "Cuando el caso esté listo, envíalo a evaluación. Después ya no podrás editarlo.",
+  },
+];
+
+export const PASOS_RUBRICA_EVALUADOR: PasoTutorial[] = [
+  {
+    ancla: "volver",
+    titulo: "Volver al panel",
+    descripcion: "Este control te lleva de vuelta a tus evaluaciones asignadas.",
+  },
+  {
+    ancla: "nav",
+    titulo: "Menú",
+    descripcion: "Desde aquí vuelves al panel o cierras sesión.",
+  },
+  {
+    ancla: "pestaña-caso",
+    titulo: "Caso",
+    descripcion: "Aquí están las respuestas del participante. Revisa cada pregunta y sus adjuntos.",
+  },
+  {
+    ancla: "ficha-caso",
+    titulo: "Respuestas del caso",
+    descripcion: "A la izquierda ves las respuestas del participante. Revisa cada pregunta con calma.",
+  },
+  {
+    ancla: "pestaña-evaluacion",
+    titulo: "Evaluación",
+    descripcion: "En esta pestaña calificas cada criterio de la rúbrica. El comentario es opcional.",
+  },
+  {
+    ancla: "observacion-pregunta",
+    titulo: "Rúbrica",
+    descripcion:
+      "Asigna una nota a cada criterio. El participante no verá estas notas y no podrá modificar su caso.",
+  },
+  {
+    ancla: "guardar-revision",
+    titulo: "Guardar borrador",
+    descripcion: "Guarda tu avance sin finalizar la evaluación.",
+  },
+  {
+    ancla: "finalizar-evaluacion",
+    titulo: "Finalizar evaluación",
+    descripcion:
+      "Cierra el caso con las notas de la rúbrica. El participante no las verá y no podrá editar.",
+  },
+];
 
 export const PASOS_CARGA_INFORMACION: PasoTutorial[] = [
   {
@@ -141,6 +210,10 @@ export function resolverTutorial(
 ): PasoTutorial[] {
   if (contexto === CONTEXTO_PANEL_MENTORIA) return PASOS_PANEL_MENTORIA;
   if (contexto === CONTEXTO_CARGA_INFORMACION) return PASOS_CARGA_INFORMACION;
+  if (contexto === CONTEXTO_RUBRICA) {
+    if (rol === "EVALUADOR") return PASOS_RUBRICA_EVALUADOR;
+    if (rol === "EMPRENDEDOR") return PASOS_RUBRICA_PARTICIPANTE;
+  }
 
   const path = pathname.replace(/\/+$/, "") || "/";
 

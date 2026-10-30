@@ -29,6 +29,7 @@ import {
   esTipoFormato,
   formatearValorPregunta,
   parseArchivos,
+  parseConfigAdjuntos,
   parseConfigCorreo,
   parseConfigFecha,
   parseConfigLimites,
@@ -47,17 +48,36 @@ function CampoAdjunto({
   name,
   tipo,
   guardados,
+  max,
 }: {
   id: string;
   name: string;
   tipo: "imagen" | "archivo";
   guardados: StoredFile[];
+  max?: number | null;
 }) {
   const [nombres, setNombres] = useState<string[]>([]);
   const esImagen = tipo === "imagen";
+  const tope = max != null && max >= 1 ? max : null;
+  const reemplaza = tope === 1;
+  const restante = tope == null ? null : reemplaza ? 1 : Math.max(0, tope - guardados.length);
+  const permiteVarios = restante == null || restante > 1;
+  const bloqueado = restante === 0;
 
-  function alCambiar(files: FileList | null) {
-    setNombres(files ? Array.from(files).map((file) => file.name) : []);
+  function alCambiar(input: HTMLInputElement, files: FileList | null) {
+    if (!files || files.length === 0) {
+      setNombres([]);
+      return;
+    }
+    let list = Array.from(files);
+    const cupo = restante ?? list.length;
+    if (list.length > cupo) {
+      const dt = new DataTransfer();
+      list.slice(0, cupo).forEach((file) => dt.items.add(file));
+      input.files = dt.files;
+      list = Array.from(dt.files);
+    }
+    setNombres(list.map((file) => file.name));
   }
 
   function quitar() {
@@ -68,6 +88,25 @@ function CampoAdjunto({
     }
     setNombres([]);
   }
+
+  const etiquetaElegir = esImagen
+    ? reemplaza
+      ? "Elegir imagen"
+      : "Elegir imágenes"
+    : reemplaza
+      ? "Elegir archivo"
+      : "Elegir archivos";
+  const ayudaCantidad = bloqueado
+    ? `Ya hay ${tope} ${esImagen ? (tope === 1 ? "imagen" : "imágenes") : tope === 1 ? "archivo" : "archivos"}.`
+    : tope == null
+      ? esImagen
+        ? "Puedes elegir varias imágenes."
+        : "Puedes elegir varios archivos."
+      : reemplaza
+        ? esImagen
+          ? "Puedes elegir 1 imagen."
+          : "Puedes elegir 1 archivo."
+        : `Puedes elegir hasta ${tope} ${esImagen ? "imágenes" : "archivos"}.`;
 
   return (
     <div className="campo-adjunto">
@@ -81,19 +120,23 @@ function CampoAdjunto({
           ))}
         </ul>
       ) : null}
-      <input
-        className="sr-only"
-        id={id}
-        name={name}
-        type="file"
-        multiple
-        accept={esImagen ? "image/jpeg,image/png,.jpg,.jpeg,.png" : undefined}
-        onChange={(event) => alCambiar(event.target.files)}
-      />
+      {bloqueado ? null : (
+        <input
+          className="sr-only"
+          id={id}
+          name={name}
+          type="file"
+          multiple={permiteVarios}
+          accept={esImagen ? "image/jpeg,image/png,.jpg,.jpeg,.png" : undefined}
+          onChange={(event) => alCambiar(event.currentTarget, event.target.files)}
+        />
+      )}
       <div className="campo-adjunto-fila">
-        <label className="btn btn-sm btn-secondary cursor-pointer" htmlFor={id}>
-          {esImagen ? "Elegir imágenes" : "Elegir archivos"}
-        </label>
+        {bloqueado ? null : (
+          <label className="btn btn-sm btn-secondary cursor-pointer" htmlFor={id}>
+            {etiquetaElegir}
+          </label>
+        )}
         {nombres.length > 0 ? (
           <button className="btn btn-sm btn-ghost" type="button" onClick={quitar}>
             Quitar selección
@@ -109,9 +152,7 @@ function CampoAdjunto({
           ))}
         </ul>
       ) : (
-        <span className="campo-adjunto-vacio">
-          {esImagen ? "Puedes elegir varias imágenes." : "Puedes elegir varios archivos."}
-        </span>
+        <span className="campo-adjunto-vacio">{ayudaCantidad}</span>
       )}
       <p className="text-xs text-muted">
         {esImagen ? "Acepta JPG o PNG." : "PDF u otro documento, máximo 2 MB cada uno."}
@@ -126,15 +167,22 @@ function CampoVideoLinks({
   urlsIniciales,
   disabled,
   preview,
+  max,
 }: {
   id: string;
   name?: string;
   urlsIniciales: string[];
   disabled?: boolean;
   preview?: boolean;
+  max?: number | null;
 }) {
-  const [urls, setUrls] = useState(() => (preview ? [""] : urlsIniciales.length > 0 ? urlsIniciales : [""]));
+  const tope = max != null && max >= 1 ? max : null;
+  const [urls, setUrls] = useState(() => {
+    const inicial = preview ? [""] : urlsIniciales.length > 0 ? urlsIniciales : [""];
+    return tope == null ? inicial : inicial.slice(0, tope);
+  });
   const bloqueado = Boolean(disabled || preview);
+  const puedeAgregar = !bloqueado && (tope == null || urls.length < tope);
 
   function actualizar(index: number, value: string) {
     setUrls((prev) => prev.map((url, i) => (i === index ? value : url)));
@@ -174,12 +222,15 @@ function CampoVideoLinks({
           </div>
         ))}
       </div>
-      {bloqueado ? null : (
+      {puedeAgregar ? (
         <button className="btn btn-sm btn-secondary self-start" type="button" onClick={() => setUrls((prev) => [...prev, ""])}>
           Agregar otro link
         </button>
-      )}
-      <p className="text-xs text-muted">YouTube, Vimeo, Google Drive o SharePoint.</p>
+      ) : null}
+      <p className="text-xs text-muted">
+        YouTube, Vimeo, Google Drive o SharePoint.
+        {tope == null ? "" : tope === 1 ? " Máximo 1 link." : ` Máximo ${tope} links.`}
+      </p>
     </div>
   );
 }
@@ -356,16 +407,21 @@ export function ArchivosLista({ archivos }: { archivos: StoredAttachment[] }) {
 export function AdjuntosRespuesta({
   archivos,
   modoPdf = false,
+  videoInline = false,
 }: {
   archivos: StoredAttachment[];
   /** Marca miniaturas para hotspots del PDF y abre videos como enlace externo. */
   modoPdf?: boolean;
+  /** En rúbrica: iframe a ancho de panel en lugar de miniatura. */
+  videoInline?: boolean;
 }) {
   const { imagenes, documentos, videos } = agruparAdjuntos(archivos);
   if (imagenes.length === 0 && documentos.length === 0 && videos.length === 0) return null;
 
+  const videosEmbed = videoInline && !modoPdf;
+
   return (
-    <aside className="pregunta-adjuntos">
+    <aside className={`pregunta-adjuntos${videosEmbed ? " is-con-video-embed" : ""}`}>
       <h4>Adjuntos</h4>
       <div className="pregunta-adjuntos-grupos">
         {imagenes.length > 0 ? (
@@ -395,10 +451,14 @@ export function AdjuntosRespuesta({
         {videos.length > 0 ? (
           <section className="pregunta-adjuntos-grupo">
             <h5>Links de video</h5>
-            <ul className="pregunta-adjuntos-lista is-videos">
+            <ul className={`pregunta-adjuntos-lista is-videos${videosEmbed ? " is-videos-embed" : ""}`}>
               {videos.map((video) => (
                 <li key={video.id}>
-                  <VideoMiniatura url={video.url} enlaceExterno={modoPdf} />
+                  {videosEmbed ? (
+                    <VideoEmbed url={video.url} />
+                  ) : (
+                    <VideoMiniatura url={video.url} enlaceExterno={modoPdf} />
+                  )}
                 </li>
               ))}
             </ul>
@@ -451,6 +511,7 @@ export function PreguntaCampo({
   modificada = false,
   ocultarAdjuntos = false,
   adjuntosModoPdf = false,
+  videoInline = false,
 }: {
   pregunta: {
     id: string;
@@ -472,6 +533,7 @@ export function PreguntaCampo({
   ocultarAdjuntos?: boolean;
   /** Marca miniaturas para hotspots del PDF y abre videos como enlace. */
   adjuntosModoPdf?: boolean;
+  videoInline?: boolean;
 }) {
   const opciones = parseOpciones(pregunta.opciones);
   const valor = parseValor(respuesta?.valor ?? "");
@@ -481,6 +543,7 @@ export function PreguntaCampo({
   const modoFecha = parseConfigFecha(pregunta.opciones);
   const cantidadCorreos = parseConfigCorreo(pregunta.opciones);
   const limites = parseConfigLimites(pregunta.opciones);
+  const limitesAdjuntos = parseConfigAdjuntos(pregunta.opciones);
   const ocultarTextbox = parseOcultarTextbox(pregunta.opciones);
   const name = preview ? `preview-${pregunta.id}` : `valor-${pregunta.id}`;
   const locked = Boolean(readOnly || disabled);
@@ -544,7 +607,11 @@ export function PreguntaCampo({
             {ocultarAdjuntos ? null : !hayAdjuntos && ocultarTextbox ? (
               <p className="texto-solo-lectura is-vacio">Sin adjuntos</p>
             ) : (
-              <AdjuntosRespuesta archivos={archivos} modoPdf={adjuntosModoPdf} />
+              <AdjuntosRespuesta
+                archivos={archivos}
+                modoPdf={adjuntosModoPdf}
+                videoInline={videoInline}
+              />
             )}
           </div>
         </div>
@@ -690,10 +757,22 @@ export function PreguntaCampo({
       ) : null}
 
       {pregunta.permiteImagen ? (
-        <CampoAdjunto id={`imagen-${pregunta.id}`} name={`imagen-${pregunta.id}`} tipo="imagen" guardados={imagenes} />
+        <CampoAdjunto
+          id={`imagen-${pregunta.id}`}
+          name={`imagen-${pregunta.id}`}
+          tipo="imagen"
+          guardados={imagenes}
+          max={limitesAdjuntos.maxImagenes}
+        />
       ) : null}
       {pregunta.permiteArchivo ? (
-        <CampoAdjunto id={`archivo-${pregunta.id}`} name={`archivo-${pregunta.id}`} tipo="archivo" guardados={documentos} />
+        <CampoAdjunto
+          id={`archivo-${pregunta.id}`}
+          name={`archivo-${pregunta.id}`}
+          tipo="archivo"
+          guardados={documentos}
+          max={limitesAdjuntos.maxArchivos}
+        />
       ) : null}
       {pregunta.permiteVideoLink ? (
         <CampoVideoLinks
@@ -701,6 +780,7 @@ export function PreguntaCampo({
           name={preview ? undefined : `video-${pregunta.id}`}
           urlsIniciales={videos.map((video) => video.url)}
           preview={preview}
+          max={limitesAdjuntos.maxVideos}
         />
       ) : null}
       </div>

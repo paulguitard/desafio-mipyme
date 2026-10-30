@@ -54,12 +54,14 @@ export function HistorialVersionesRespuesta({
   opciones,
   modificada = false,
   vigente,
+  videoInline = false,
 }: {
   versiones: VersionHistorial[];
   tipo: string;
   opciones: string;
   modificada?: boolean;
   vigente?: { id: string; valor: string; archivos: string; createdAt: string } | null;
+  videoInline?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -126,7 +128,10 @@ export function HistorialVersionesRespuesta({
                     {formatValorRespuesta(version.valor, version.archivos, tipo, opciones)}
                   </p>
                 )}
-                <AdjuntosRespuesta archivos={parseArchivos(version.archivos)} />
+                <AdjuntosRespuesta
+                  archivos={parseArchivos(version.archivos)}
+                  videoInline={videoInline}
+                />
               </div>
             </li>
           ))}

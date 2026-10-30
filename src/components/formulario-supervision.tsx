@@ -26,6 +26,7 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
   );
   const modoEvaluacion = parseModoEvaluacion(data.modoEvaluacion);
   const esGeneral = modoEvaluacion === "GENERAL";
+  const esRubrica = modoEvaluacion === "RUBRICA";
   const ronda = asignacion?.rondaActual ?? 1;
   const ciclo = asignacion?.cicloSupervision ?? 1;
   const canEdit = Boolean(asignacion && asignacion.estado === "EN_SUPERVISION");
@@ -161,11 +162,13 @@ export function FormularioSupervision({ data }: { data: DetalleFichaAdmin }) {
               respuesta={respuesta ?? null}
               disabled
               modificada={modificada}
+              videoInline={esRubrica}
               acciones={
                 respuesta?.versiones && respuesta.versiones.length > 0 ? (
                   <HistorialVersionesRespuesta
                     tipo={pregunta.tipo}
                     opciones={pregunta.opciones}
+                    videoInline={esRubrica}
                     vigente={{
                       id: respuesta.id,
                       valor: respuesta.valor,

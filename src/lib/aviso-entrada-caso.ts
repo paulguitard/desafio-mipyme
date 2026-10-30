@@ -27,12 +27,33 @@ const PANELES_PARTICIPANTE =
 
 export function avisoEntradaEvaluador(
   estado: string,
-  opciones?: { publicaDirecto?: boolean },
+  opciones?: { publicaDirecto?: boolean; esRubrica?: boolean },
 ): AvisoEntradaCaso {
   const publicaDirecto = Boolean(opciones?.publicaDirecto);
-  const panelEval = publicaDirecto
-    ? "En Caso ves las respuestas. En Evaluación escribes tu comentario."
-    : PANELES_EVALUACION;
+  const esRubrica = Boolean(opciones?.esRubrica);
+  const panelEval = esRubrica
+    ? "En Caso ves las respuestas. En Evaluación calificas cada criterio de la rúbrica."
+    : publicaDirecto
+      ? "En Caso ves las respuestas. En Evaluación escribes tu comentario."
+      : PANELES_EVALUACION;
+
+  if (esRubrica) {
+    if (estado === "FINALIZADA") {
+      return {
+        title: "Evaluación finalizada",
+        parrafos: ["Este caso está cerrado. Puedes consultarlo, pero ya no se edita."],
+        pasos: [panelEval],
+      };
+    }
+    return {
+      title: "Revisar el caso",
+      parrafos: ["Lee las respuestas y escribe tu evaluación."],
+      pasos: [
+        panelEval,
+        "Puedes usar Guardar borrador y Finalizar evaluación. El participante no verá estas notas y no podrá modificar su caso.",
+      ],
+    };
+  }
 
   if (estado === "EN_SUPERVISION" && !publicaDirecto) {
     return {
@@ -154,14 +175,16 @@ export function avisoEntradaParticipante(args: {
   descripcionMentoria?: string;
   conEvaluacionVisible?: boolean;
   procesoTerminaAlEnviar?: boolean;
+  esRubrica?: boolean;
 }): AvisoEntradaCaso {
+  const esRubrica = Boolean(args.esRubrica);
   if (args.estado === "FINALIZADA") {
     return {
       title: "Tu caso fue aprobado",
       parrafos: [
         "¡Felicidades! Los evaluadores aprobaron tu caso. El equipo del desafío te avisará los siguientes pasos.",
       ],
-      pasos: [PANELES_PARTICIPANTE, EXTRA_HISTORIAL],
+      pasos: esRubrica ? undefined : [PANELES_PARTICIPANTE, EXTRA_HISTORIAL],
     };
   }
   if (!args.mentoriaAbierta && !args.canEdit) {
@@ -170,12 +193,14 @@ export function avisoEntradaParticipante(args: {
       parrafos: [
         "Esta asesoría ya no recibe cambios. Solo puedes consultar lo que enviaste.",
       ],
-      pasos: args.conEvaluacionVisible
-        ? [PANELES_PARTICIPANTE, EXTRA_HISTORIAL]
-        : [EXTRA_HISTORIAL],
+      pasos: esRubrica
+        ? undefined
+        : args.conEvaluacionVisible
+          ? [PANELES_PARTICIPANTE, EXTRA_HISTORIAL]
+          : [EXTRA_HISTORIAL],
     };
   }
-  if (args.esCorreccion) {
+  if (args.esCorreccion && !esRubrica) {
     return {
       title: "Hay observaciones para corregir",
       parrafos: [
@@ -199,6 +224,12 @@ export function avisoEntradaParticipante(args: {
     return {
       title: "Información enviada",
       parrafos: ["Puedes consultarla, pero ya no puedes editarla."],
+    };
+  }
+  if (esRubrica) {
+    return {
+      title: "Caso enviado",
+      parrafos: ["Tu caso ya está en evaluación. No podrás modificarlo."],
     };
   }
   if (args.conEvaluacionVisible) {

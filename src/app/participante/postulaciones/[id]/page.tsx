@@ -100,6 +100,7 @@ export default async function PostulacionPage({
   const esCarga = esCargaInformacion(postulacion.convocatoria.tipo);
   const modoEvaluacion = parseModoEvaluacion(postulacion.convocatoria.formulario.modoEvaluacion);
   const esGeneral = modoEvaluacion === "GENERAL";
+  const esRubrica = modoEvaluacion === "RUBRICA";
 
   const observadas = new Set<string>();
   if (esCorreccion) {
@@ -156,7 +157,8 @@ export default async function PostulacionPage({
       (asignacion) =>
         asignacion.revisiones.length > 0 || asignacion.revisionesGenerales.length > 0,
     );
-  const conEvaluacionVisible = esCorreccion || asignacionesVista.length > 0;
+  const conEvaluacionVisible =
+    !esRubrica && (esCorreccion || asignacionesVista.length > 0);
   const idsModificadas = new Set(
     preguntasModificadasEnUltimoEnvio({
       respuestas: postulacion.respuestas.map((respuesta) => ({
@@ -211,6 +213,7 @@ export default async function PostulacionPage({
         />
       }
       esCargaInformacion={esCarga}
+      esRubrica={esRubrica}
       avisoEntrada={avisoEntradaParticipante({
         estado,
         esCorreccion,
@@ -219,6 +222,7 @@ export default async function PostulacionPage({
         descripcionMentoria: postulacion.convocatoria.descripcion,
         conEvaluacionVisible,
         procesoTerminaAlEnviar: esCarga,
+        esRubrica,
       })}
     >
       {conEvaluacionVisible ? (
@@ -252,6 +256,7 @@ export default async function PostulacionPage({
               pregunta={pregunta}
               respuesta={respuesta}
               disabled={!canEdit}
+              videoInline={esRubrica}
             />
           );
         })

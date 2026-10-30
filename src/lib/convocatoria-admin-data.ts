@@ -4,8 +4,17 @@ import { esEvaluacionObservada } from "@/lib/cupo-asignacion";
 import { extraerNombreCaso } from "@/lib/nombre-caso";
 import { USER_PUBLIC_SELECT } from "@/lib/user-public";
 import { medioDesdeFila } from "@/lib/contenido";
+import { esModoRubrica } from "@/lib/modo-evaluacion";
+import {
+  formatearNotaRubrica,
+  notaPonderadaRubrica,
+  parseEscalaRubrica,
+  parseExplicacionesRubrica,
+  promedioNotasRubrica,
+} from "@/lib/rubrica";
 import { parseTipoFormulario, esMentoriaContenido } from "@/lib/tipo-formulario";
 import { esTokenPublicoValido } from "@/lib/ficha-publica";
+import { revisionVigente } from "@/lib/revision-ciclo";
 
 export type CasoPoolResumen = {
   postulacionId: string;
@@ -54,6 +63,7 @@ export async function getRespuestasConvocatoria(id: string) {
   return {
     id: convocatoria.id,
     titulo: convocatoria.titulo,
+    modoEvaluacion: convocatoria.formulario.modoEvaluacion,
     preguntas: convocatoria.formulario.preguntas.map((pregunta) => ({
       id: pregunta.id,
       enunciado: pregunta.enunciado,
@@ -99,6 +109,7 @@ export async function getPanelEvaluacion(id: string) {
               orderBy: { orden: "asc" },
               include: { medios: { orderBy: { orden: "asc" } } },
             },
+            rubrica: { include: { criterios: { orderBy: { orden: "asc" } } } },
           },
         },
         evaluadores: {
@@ -115,7 +126,12 @@ export async function getPanelEvaluacion(id: string) {
             respuestas: { select: { preguntaId: true, valor: true, archivos: true } },
             vistasContenido: { select: { piezaId: true } },
             asignaciones: {
-              include: { evaluador: { select: USER_PUBLIC_SELECT } },
+              include: {
+                evaluador: { select: USER_PUBLIC_SELECT },
+                revisionesCriterio: {
+                  select: { criterioId: true, nota: true, ronda: true, ciclo: true },
+                },
+              },
               orderBy: { orden: "asc" },
             },
             supervision: { include: { supervisor: { select: USER_PUBLIC_SELECT } } },
@@ -212,8 +228,11 @@ export async function getPanelEvaluacion(id: string) {
     titulo: convocatoria.titulo,
     estado: convocatoria.estado,
     tipo: parseTipoFormulario(convocatoria.tipo),
+    modoEvaluacion: convocatoria.formulario.modoEvaluacion,
     evaluadoresHabilitados: convocatoria.evaluadoresHabilitados !== false,
-    supervisoresHabilitados: convocatoria.supervisoresHabilitados !== false,
+    supervisoresHabilitados: esModoRubrica(convocatoria.formulario.modoEvaluacion)
+      ? false
+      : convocatoria.supervisoresHabilitados !== false,
     evaluacionesPorPostulacion: convocatoria.evaluacionesPorPostulacion,
     totalPostulaciones: convocatoria.postulaciones.length,
     preguntas: convocatoria.formulario.preguntas.map((pregunta) => ({
@@ -292,14 +311,57 @@ export async function getPanelEvaluacion(id: string) {
       vistasPiezaIds: postulacion.vistasContenido.map((item) => item.piezaId),
       nombreCaso: postulacion.nombreCaso || extraerNombreCaso(convocatoria.formulario.preguntas, postulacion.respuestas),
       tokenPublico: postulacion.tokenPublico,
-      asignaciones: postulacion.asignaciones.map((asignacion) => ({
-        evaluadorId: asignacion.evaluadorId,
-        evaluadorNombre: asignacion.evaluador.name,
-        orden: asignacion.orden,
-        estado: asignacion.estado,
-        rondaActual: asignacion.rondaActual,
-        intencionPendiente: asignacion.intencionPendiente,
-      })),
+      asignaciones: postulacion.asignaciones.map((asignacion) => {
+        const nota =
+          esModoRubrica(convocatoria.formulario.modoEvaluacion) &&
+          asignacion.estado === "FINALIZADA" &&
+          convocatoria.formulario.rubrica
+            ? notaPonderadaRubrica(
+                convocatoria.formulario.rubrica.criterios.map((criterio) => ({
+                  peso: criterio.peso,
+                  nota:
+                    revisionVigente(
+                      asignacion.revisionesCriterio.filter((item) => item.criterioId === criterio.id),
+                      asignacion.rondaActual,
+                      asignacion.cicloSupervision,
+                    )?.nota ?? null,
+                })),
+              )
+            : null;
+        return {
+          evaluadorId: asignacion.evaluadorId,
+          evaluadorNombre: asignacion.evaluador.name,
+          orden: asignacion.orden,
+          estado: asignacion.estado,
+          rondaActual: asignacion.rondaActual,
+          intencionPendiente: asignacion.intencionPendiente,
+          notaRubrica: nota,
+          notaRubricaTexto: formatearNotaRubrica(nota),
+        };
+      }),
+      notaRubricaPromedio: (() => {
+        if (!esModoRubrica(convocatoria.formulario.modoEvaluacion)) return null;
+        const asignaciones = postulacion.asignaciones;
+        const cupo = Math.max(convocatoria.evaluacionesPorPostulacion, 1);
+        if (asignaciones.length < cupo) return null;
+        const todosFinalizaron = asignaciones.every((item) => item.estado === "FINALIZADA");
+        const notas = asignaciones.map((asignacion) =>
+          convocatoria.formulario.rubrica
+            ? notaPonderadaRubrica(
+                convocatoria.formulario.rubrica.criterios.map((criterio) => ({
+                  peso: criterio.peso,
+                  nota:
+                    revisionVigente(
+                      asignacion.revisionesCriterio.filter((item) => item.criterioId === criterio.id),
+                      asignacion.rondaActual,
+                      asignacion.cicloSupervision,
+                    )?.nota ?? null,
+                })),
+              )
+            : null,
+        );
+        return formatearNotaRubrica(promedioNotasRubrica({ notas, todosFinalizaron })) || null;
+      })(),
       supervision: postulacion.supervision
         ? {
             supervisorId: postulacion.supervision.supervisorId,
@@ -323,6 +385,7 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
           evaluador: { select: USER_PUBLIC_SELECT },
           revisiones: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
           revisionesGenerales: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
+          revisionesCriterio: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
           supervisionesPregunta: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
           supervisionesGenerales: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
         },
@@ -338,6 +401,7 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
                 orderBy: { orden: "asc" },
                 include: { medios: { orderBy: { orden: "asc" } } },
               },
+              rubrica: { include: { criterios: { orderBy: { orden: "asc" } } } },
             },
           },
         },
@@ -360,6 +424,20 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
     convocatoriaEstado: postulacion.convocatoria.estado,
     tipo: parseTipoFormulario(postulacion.convocatoria.tipo),
     modoEvaluacion: postulacion.convocatoria.formulario.modoEvaluacion,
+    rubrica: postulacion.convocatoria.formulario.rubrica
+      ? {
+          escala: parseEscalaRubrica(postulacion.convocatoria.formulario.rubrica.escala),
+          criterios: postulacion.convocatoria.formulario.rubrica.criterios.map((criterio) => ({
+            id: criterio.id,
+            orden: criterio.orden,
+            nombre: criterio.nombre,
+            preguntaGuia: criterio.preguntaGuia,
+            detalle: criterio.detalle,
+            peso: criterio.peso,
+            explicaciones: parseExplicacionesRubrica(criterio.explicaciones),
+          })),
+        }
+      : null,
     supervisorNombre: postulacion.supervision?.supervisor.name ?? null,
     supervisorEmail: postulacion.supervision?.supervisor.email
       ? normalizarCorreo(postulacion.supervision.supervisor.email)
@@ -427,6 +505,14 @@ export async function getDetalleFichaAdmin(postulacionId: string) {
         ciclo: revision.ciclo,
         veredicto: revision.veredicto,
         comentario: revision.comentario,
+        createdAt: revision.createdAt.toISOString(),
+      })),
+      revisionesCriterio: asignacion.revisionesCriterio.map((revision) => ({
+        id: revision.id,
+        criterioId: revision.criterioId,
+        ronda: revision.ronda,
+        ciclo: revision.ciclo,
+        nota: revision.nota,
         createdAt: revision.createdAt.toISOString(),
       })),
       supervisionesPregunta: asignacion.supervisionesPregunta.map((item) => ({

@@ -12,9 +12,11 @@ import { extraerNombreCaso } from "@/lib/nombre-caso";
 import {
   agruparAdjuntos,
   parseArchivos,
+  parseConfigAdjuntos,
   parseConfigCorreo,
   parseConfigFecha,
   parseValor,
+  recortarAdjuntosAlTope,
   resolveVideoEmbed,
   serializeValor,
   textoPlanoDesdeHtml,
@@ -215,23 +217,38 @@ type ArchivoPendiente = {
   file: File;
 };
 
+function cupoAdjuntosNuevos(existentes: number, max: number | null | undefined): number | null {
+  if (max == null) return null;
+  if (max === 1) return 1;
+  return Math.max(0, max - existentes);
+}
+
 function listarArchivosNuevos(
   formData: FormData,
-  pregunta: { id: string; permiteArchivo: boolean; permiteImagen: boolean },
+  pregunta: { id: string; opciones: string; permiteArchivo: boolean; permiteImagen: boolean },
+  existentes: StoredAttachment[],
 ): ArchivoPendiente[] {
   const out: ArchivoPendiente[] = [];
+  const limites = parseConfigAdjuntos(pregunta.opciones);
+  const agrupados = agruparAdjuntos(existentes);
   if (pregunta.permiteArchivo) {
+    const cupo = cupoAdjuntosNuevos(agrupados.documentos.length, limites.maxArchivos);
+    let tomados = 0;
     for (const item of formData.getAll(`archivo-${pregunta.id}`)) {
-      if (item instanceof File && item.size > 0) {
-        out.push({ preguntaId: pregunta.id, campo: `archivo-${pregunta.id}`, kind: "file", file: item });
-      }
+      if (!(item instanceof File) || item.size <= 0) continue;
+      if (cupo != null && tomados >= cupo) break;
+      out.push({ preguntaId: pregunta.id, campo: `archivo-${pregunta.id}`, kind: "file", file: item });
+      tomados += 1;
     }
   }
   if (pregunta.permiteImagen) {
+    const cupo = cupoAdjuntosNuevos(agrupados.imagenes.length, limites.maxImagenes);
+    let tomados = 0;
     for (const item of formData.getAll(`imagen-${pregunta.id}`)) {
-      if (item instanceof File && item.size > 0) {
-        out.push({ preguntaId: pregunta.id, campo: `imagen-${pregunta.id}`, kind: "image", file: item });
-      }
+      if (!(item instanceof File) || item.size <= 0) continue;
+      if (cupo != null && tomados >= cupo) break;
+      out.push({ preguntaId: pregunta.id, campo: `imagen-${pregunta.id}`, kind: "image", file: item });
+      tomados += 1;
     }
   }
   return out;
@@ -239,7 +256,7 @@ function listarArchivosNuevos(
 
 function videosDesdeFormulario(
   formData: FormData,
-  pregunta: { id: string; permiteVideoLink: boolean },
+  pregunta: { id: string; opciones: string; permiteVideoLink: boolean },
   previos: ReturnType<typeof agruparAdjuntos> | null,
 ): StoredAttachment[] {
   if (!pregunta.permiteVideoLink) {
@@ -247,6 +264,7 @@ function videosDesdeFormulario(
   }
   const archivos: StoredAttachment[] = [];
   const urlsVistas = new Set<string>();
+  const maxVideos = parseConfigAdjuntos(pregunta.opciones).maxVideos ?? null;
   for (const item of formData.getAll(`video-${pregunta.id}`)) {
     const videoRaw = String(item ?? "").trim();
     if (!videoRaw || urlsVistas.has(videoRaw.toLowerCase())) continue;
@@ -262,6 +280,7 @@ function videosDesdeFormulario(
       provider: resolved.provider,
     };
     archivos.push(video);
+    if (maxVideos != null && archivos.length >= maxVideos) break;
   }
   return archivos;
 }
@@ -309,19 +328,23 @@ export async function persistirRespuestas(args: {
       pregunta.tipo === "texto_largo" ? sanitizeRichText(String(valor ?? "")) : valor;
 
     const previos = existing ? agruparAdjuntos(parseArchivos(existing.archivos)) : null;
+    const existentes = previos
+      ? [...previos.imagenes, ...previos.documentos, ...previos.videos]
+      : [];
     const archivos: StoredAttachment[] = previos
       ? [...previos.imagenes, ...previos.documentos]
       : [];
     archivos.push(...videosDesdeFormulario(args.formData, pregunta, previos));
+    const limitesAdjuntos = parseConfigAdjuntos(pregunta.opciones);
 
     if (!args.omitirArchivosNuevos) {
-      archivosNuevos.push(...listarArchivosNuevos(args.formData, pregunta));
+      archivosNuevos.push(...listarArchivosNuevos(args.formData, pregunta, existentes));
     }
 
     if (omitirValor && archivosNuevos.every((a) => a.preguntaId !== pregunta.id)) {
       // Sin cambio de texto y sin archivos nuevos en esta pasada de texto: igual hay que
       // considerar videos. Si solo hay MANTENER y los archivos se suben después, omitir.
-      const archivosStr = JSON.stringify(archivos);
+      const archivosStr = JSON.stringify(recortarAdjuntosAlTope(archivos, limitesAdjuntos));
       if (
         existing &&
         respuestasEquivalentes({
@@ -340,7 +363,7 @@ export async function persistirRespuestas(args: {
       preguntaId: pregunta.id,
       tipo: pregunta.tipo,
       valorStr: omitirValor && existing ? existing.valor : serializeValor(valorSanitizado),
-      archivosStr: JSON.stringify(archivos),
+      archivosStr: JSON.stringify(recortarAdjuntosAlTope(archivos, limitesAdjuntos)),
       existing,
       omitirValor,
     });
@@ -510,7 +533,11 @@ export async function persistirRespuestas(args: {
         });
         const previos = existing ? parseArchivos(existing.archivos) : [];
         const sinMismoNombre = filtrarAdjuntosMismoNombre(previos, nombre);
-        const archivos = [...sinMismoNombre, adjunto];
+        const pregunta = args.preguntas.find((item) => item.id === pendiente.preguntaId);
+        const archivos = recortarAdjuntosAlTope(
+          [...sinMismoNombre, adjunto],
+          parseConfigAdjuntos(pregunta?.opciones ?? "[]"),
+        );
         const archivosStr = JSON.stringify(archivos);
         const respuesta = await tx.respuesta.upsert({
           where: {

@@ -6,6 +6,7 @@ import { BotonAtras } from "@/components/boton-atras";
 import { PreguntaCampo } from "@/components/pregunta-campo";
 import type { RespuestasConvocatoria } from "@/lib/convocatoria-admin-data";
 import { normalizarCorreo } from "@/lib/correo";
+import { esModoRubrica } from "@/lib/modo-evaluacion";
 import { parseValor } from "@/lib/preguntas";
 
 function textoPlano(valor: unknown) {
@@ -21,6 +22,7 @@ function contiene(haystack: string, needle: string) {
 }
 
 export function ConvocatoriaRespuestas({ data }: { data: RespuestasConvocatoria }) {
+  const videoInline = esModoRubrica(data.modoEvaluacion);
   const [fichaId, setFichaId] = useState<string | null>(null);
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
@@ -69,6 +71,7 @@ export function ConvocatoriaRespuestas({ data }: { data: RespuestasConvocatoria 
                 pregunta={pregunta}
                 respuesta={respuesta ?? null}
                 disabled
+                videoInline={videoInline}
               />
             );
           })}

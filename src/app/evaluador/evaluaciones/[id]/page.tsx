@@ -11,6 +11,8 @@ import { prisma } from "@/lib/db";
 import { evaluadorPuedeEditar } from "@/lib/estado";
 import { avisoEntradaEvaluador } from "@/lib/aviso-entrada-caso";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
+import { mapearRubricaFila } from "@/lib/rubrica";
+import { PanelRubricaEvaluador } from "@/components/panel-rubrica";
 import {
   modoRevisionDeConvocatoria,
   publicaDirectoAlParticipante,
@@ -36,6 +38,7 @@ export default async function EvaluacionDetallePage({
       evaluador: true,
       revisiones: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
       revisionesGenerales: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
+      revisionesCriterio: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
       supervisionesPregunta: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
       supervisionesGenerales: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
       postulacion: {
@@ -43,7 +46,14 @@ export default async function EvaluacionDetallePage({
           postulante: true,
           supervision: { include: { supervisor: true } },
           convocatoria: {
-            include: { formulario: { include: { preguntas: { orderBy: { orden: "asc" } } } } },
+            include: {
+              formulario: {
+                include: {
+                  preguntas: { orderBy: { orden: "asc" } },
+                  rubrica: { include: { criterios: { orderBy: { orden: "asc" } } } },
+                },
+              },
+            },
           },
           respuestas: {
             include: { versiones: { orderBy: { createdAt: "desc" } } },
@@ -75,6 +85,8 @@ export default async function EvaluacionDetallePage({
     asignacion.postulacion.convocatoria.formulario.modoEvaluacion,
   );
   const esGeneral = modoEvaluacion === "GENERAL";
+  const esRubrica = modoEvaluacion === "RUBRICA";
+  const rubrica = mapearRubricaFila(asignacion.postulacion.convocatoria.formulario.rubrica);
   const nombreCaso = etiquetaNombreCaso(
     extraerNombreCaso(
       asignacion.postulacion.convocatoria.formulario.preguntas,
@@ -148,9 +160,14 @@ export default async function EvaluacionDetallePage({
           {nombreCaso} · {asignacion.postulacion.convocatoria.titulo}
         </h1>
       }
-      headerEvaluacion={esGeneral ? "Comentario del caso" : "Comentarios por pregunta"}
+      headerEvaluacion={
+        esRubrica ? "Rúbrica" : esGeneral ? "Comentario del caso" : "Comentarios por pregunta"
+      }
+      avisoEntrada={avisoEntradaEvaluador(asignacion.estado, {
+        publicaDirecto,
+        esRubrica,
+      })}
       veredictosIniciales={veredictosIniciales}
-      avisoEntrada={avisoEntradaEvaluador(asignacion.estado, { publicaDirecto })}
       meta={
         <FichaCasoMeta
           participante={asignacion.postulacion.postulante.name}
@@ -159,10 +176,12 @@ export default async function EvaluacionDetallePage({
       }
       caso={
         <>
-          <ResumenCambiosReenvio key="cambios-reenvio" preguntas={preguntasModificadas} />
+          {esRubrica ? null : (
+            <ResumenCambiosReenvio key="cambios-reenvio" preguntas={preguntasModificadas} />
+          )}
           {asignacion.postulacion.convocatoria.formulario.preguntas.map((pregunta) => {
         const respuesta = asignacion.postulacion.respuestas.find((r) => r.preguntaId === pregunta.id);
-        const modificada = idsModificadas.has(pregunta.id);
+        const modificada = !esRubrica && idsModificadas.has(pregunta.id);
         return (
           <EvalDetalleCelda key={pregunta.id} panel="caso">
             <PreguntaCampo
@@ -170,11 +189,13 @@ export default async function EvaluacionDetallePage({
               respuesta={respuesta}
               disabled
               modificada={modificada}
+              videoInline={esRubrica}
               acciones={
-                respuesta?.versiones && respuesta.versiones.length > 0 ? (
+                !esRubrica && respuesta?.versiones && respuesta.versiones.length > 0 ? (
                   <HistorialVersionesRespuesta
                     tipo={pregunta.tipo}
                     opciones={pregunta.opciones}
+                    videoInline={esRubrica}
                     vigente={{
                       id: respuesta.id,
                       valor: respuesta.valor,
@@ -199,7 +220,21 @@ export default async function EvaluacionDetallePage({
         </>
       }
       evaluacion={
-        esGeneral ? (
+        esRubrica ? (
+          <EvalDetalleCelda key="eval-rubrica" panel="eval">
+            <PanelRubricaEvaluador
+              escala={rubrica.escala}
+              criterios={rubrica.criterios}
+              notasIniciales={asignacion.revisionesCriterio
+                .filter((item) => item.ronda === ronda && item.ciclo === ciclo)
+                .map((item) => ({ criterioId: item.criterioId, nota: item.nota }))}
+              comentarioInicial={
+                revisionParaEditar(asignacion.revisionesGenerales, ronda, ciclo)?.comentario ?? ""
+              }
+              canEdit={canEdit}
+            />
+          </EvalDetalleCelda>
+        ) : esGeneral ? (
           <EvalDetalleCelda key="eval-general" panel="eval">
             <PanelHiloRevision
               audiencia="equipo"

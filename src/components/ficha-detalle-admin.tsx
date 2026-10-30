@@ -6,11 +6,16 @@ import { FichaCasoMeta } from "@/components/ficha-caso-meta";
 import { useFichaPublicaToken } from "@/components/ficha-publica-token";
 import { HistorialVersionesRespuesta } from "@/components/historial-versiones-respuesta";
 import { PanelHiloRevision } from "@/components/hilo-revision";
+import {
+  PanelRubricaConsolidado,
+  PanelRubricaLectura,
+} from "@/components/panel-rubrica";
 import { PreguntaCampo } from "@/components/pregunta-campo";
 import { PiezaContenidoVista } from "@/components/pieza-contenido-vista";
 import type { DetalleFichaAdmin } from "@/lib/convocatoria-admin-data";
 import { normalizarCorreo } from "@/lib/correo";
-import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
+import { esModoRubrica, parseModoEvaluacion } from "@/lib/modo-evaluacion";
+import { revisionVigente } from "@/lib/revision-ciclo";
 import { parseEscalaNotas } from "@/lib/preguntas";
 import { esCargaInformacion, esMentoriaContenido } from "@/lib/tipo-formulario";
 
@@ -25,7 +30,9 @@ function lineaPersona(
 
 export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
   const tokenPublico = useFichaPublicaToken();
-  const [asignacionId, setAsignacionId] = useState(data.asignaciones[0]?.id ?? "");
+  const [asignacionId, setAsignacionId] = useState(
+    esModoRubrica(data.modoEvaluacion) ? "consolidado" : data.asignaciones[0]?.id ?? "",
+  );
 
   const asignacion = useMemo(
     () => data.asignaciones.find((item) => item.id === asignacionId) ?? null,
@@ -34,6 +41,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
 
   const modoEvaluacion = parseModoEvaluacion(data.modoEvaluacion);
   const esGeneral = modoEvaluacion === "GENERAL";
+  const esRubrica = modoEvaluacion === "RUBRICA";
   const esContenido = esMentoriaContenido(data.tipo);
   const esCarga = esCargaInformacion(data.tipo);
   const metaPublica = tokenPublico ? (
@@ -54,11 +62,13 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
           pregunta={pregunta}
           respuesta={respuesta ?? null}
           disabled
+          videoInline={esRubrica}
           acciones={
-            respuesta?.versiones && respuesta.versiones.length > 0 ? (
+            !esRubrica && respuesta?.versiones && respuesta.versiones.length > 0 ? (
               <HistorialVersionesRespuesta
                 tipo={pregunta.tipo}
                 opciones={pregunta.opciones}
+                videoInline={esRubrica}
                 vigente={{
                   id: respuesta.id,
                   valor: respuesta.valor,
@@ -80,7 +90,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
     );
   });
 
-  if (esCarga) {
+  if (esCarga || (esRubrica && tokenPublico)) {
     return (
       <div className="ficha-detalle-admin eval-shell-open">
         {metaPublica}
@@ -125,6 +135,113 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
                 <div className="card space-y-2 p-4">
                   <p className="text-muted">Las asesorías de contenido no tienen evaluación.</p>
                 </div>
+              </EvalDetalleCelda>
+            }
+          />
+        </section>
+      </div>
+    );
+  }
+
+  if (esRubrica) {
+    const consolidado = asignacionId === "consolidado";
+    return (
+      <div className="ficha-detalle-admin eval-shell-open">
+        {metaPublica}
+        <div className="ficha-detalle-admin-meta">
+          <div className="ficha-detalle-admin-eval">
+            <label htmlFor="ficha-detalle-evaluador">Evaluación de</label>
+            <select
+              className="input"
+              id="ficha-detalle-evaluador"
+              value={asignacionId}
+              onChange={(event) => setAsignacionId(event.target.value)}
+            >
+              <option value="consolidado">Consolidado</option>
+              {data.asignaciones.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.evaluadorNombre}
+                  {item.estado === "FINALIZADA" ? " · Finalizada" : " · Pendiente"}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <section className="eval-detalle-shell" aria-label="Caso y rúbrica">
+          <EvalDetalleColumnas
+            sinSupervision
+            casoTitle="Caso"
+            casoSubtitle={lineaPersona(
+              data.emprendedorNombre,
+              data.emprendedorEmail,
+              "Sin participante",
+            )}
+            caso={respuestasSoloLectura}
+            evalTitle="Evaluación"
+            evalSubtitle={
+              consolidado
+                ? "Consolidado"
+                : lineaPersona(
+                    asignacion?.evaluadorNombre,
+                    asignacion?.evaluadorEmail,
+                    "Sin evaluadores asignados",
+                  )
+            }
+            evaluacion={
+              <EvalDetalleCelda panel="eval">
+                {!data.rubrica ? (
+                  <div className="card space-y-2 p-4">
+                    <p className="text-muted">Este formulario no tiene rúbrica.</p>
+                  </div>
+                ) : consolidado ? (
+                  <PanelRubricaConsolidado
+                    escala={data.rubrica.escala}
+                    criterios={data.rubrica.criterios}
+                    evaluadores={data.asignaciones.map((item) => ({
+                      id: item.id,
+                      nombre: item.evaluadorNombre,
+                      estado: item.estado,
+                      notas: data.rubrica!.criterios.map((criterio) => ({
+                        criterioId: criterio.id,
+                        nota:
+                          revisionVigente(
+                            item.revisionesCriterio.filter((rev) => rev.criterioId === criterio.id),
+                            item.rondaActual,
+                            item.cicloSupervision,
+                          )?.nota ?? null,
+                      })),
+                      comentario:
+                        revisionVigente(item.revisionesGenerales, item.rondaActual, item.cicloSupervision)
+                          ?.comentario ?? "",
+                    }))}
+                  />
+                ) : asignacion ? (
+                  <PanelRubricaLectura
+                    escala={data.rubrica.escala}
+                    criterios={data.rubrica.criterios}
+                    evaluadorNombre={asignacion.evaluadorNombre}
+                    comentario={
+                      revisionVigente(
+                        asignacion.revisionesGenerales,
+                        asignacion.rondaActual,
+                        asignacion.cicloSupervision,
+                      )?.comentario ?? ""
+                    }
+                    notas={data.rubrica.criterios.map((criterio) => ({
+                      criterioId: criterio.id,
+                      nota:
+                        revisionVigente(
+                          asignacion.revisionesCriterio.filter((rev) => rev.criterioId === criterio.id),
+                          asignacion.rondaActual,
+                          asignacion.cicloSupervision,
+                        )?.nota ?? null,
+                    }))}
+                  />
+                ) : (
+                  <div className="card space-y-2 p-4">
+                    <p className="text-muted">Aún no hay evaluadores asignados a esta ficha.</p>
+                  </div>
+                )}
               </EvalDetalleCelda>
             }
           />

@@ -48,6 +48,7 @@ export default async function MentoriasPage({
         id: form.id,
         titulo: form.titulo,
         tipo: parseTipoFormulario(form.tipo),
+        modoEvaluacion: form.modoEvaluacion,
       }))}
     />
   );

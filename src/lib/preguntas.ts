@@ -448,6 +448,90 @@ export function parseOcultarTextbox(raw?: string | null): boolean {
   }
 }
 
+export const MAX_ADJUNTOS_POR_TIPO = 20;
+
+export type ConfigAdjuntos = {
+  maxArchivos?: number | null;
+  maxImagenes?: number | null;
+  maxVideos?: number | null;
+};
+
+export function normalizarTopeAdjunto(value: unknown): number | null {
+  const n = toNullableInt(value);
+  if (n == null || n < 1) return null;
+  return Math.min(MAX_ADJUNTOS_POR_TIPO, n);
+}
+
+export function parseConfigAdjuntos(raw?: string | null): ConfigAdjuntos {
+  try {
+    const parsed = JSON.parse(raw || "") as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const obj = parsed as Record<string, unknown>;
+    return {
+      maxArchivos: normalizarTopeAdjunto(obj.maxArchivos),
+      maxImagenes: normalizarTopeAdjunto(obj.maxImagenes),
+      maxVideos: normalizarTopeAdjunto(obj.maxVideos),
+    };
+  } catch {
+    return {};
+  }
+}
+
+function parcheOpcionesJson(raw: string, mutate: (obj: Record<string, unknown>) => void): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw || "[]");
+  } catch {
+    parsed = [];
+  }
+
+  let obj: Record<string, unknown>;
+  if (Array.isArray(parsed)) {
+    obj = parsed.length === 0 ? {} : { opciones: parsed };
+  } else if (parsed && typeof parsed === "object") {
+    obj = { ...(parsed as Record<string, unknown>) };
+  } else {
+    obj = {};
+  }
+
+  mutate(obj);
+
+  const keys = Object.keys(obj);
+  if (keys.length === 0) return "[]";
+  if (keys.length === 1 && keys[0] === "opciones" && Array.isArray(obj.opciones)) {
+    return JSON.stringify(obj.opciones);
+  }
+  return JSON.stringify(obj);
+}
+
+/** Conserva el JSON de opciones y guarda o quita el tope de cada tipo de adjunto. */
+export function conLimitesAdjuntos(raw: string, limites: ConfigAdjuntos): string {
+  return parcheOpcionesJson(raw, (obj) => {
+    const aplicar = (clave: keyof ConfigAdjuntos) => {
+      const n = normalizarTopeAdjunto(limites[clave]);
+      if (n == null) delete obj[clave];
+      else obj[clave] = n;
+    };
+    aplicar("maxArchivos");
+    aplicar("maxImagenes");
+    aplicar("maxVideos");
+  });
+}
+
+export function recortarAdjuntosAlTope(
+  archivos: StoredAttachment[],
+  limites: ConfigAdjuntos,
+): StoredAttachment[] {
+  const { imagenes, documentos, videos } = agruparAdjuntos(archivos);
+  const cortar = <T,>(items: T[], max: number | null | undefined): T[] =>
+    max == null ? items : items.slice(-max);
+  return [
+    ...cortar(imagenes, limites.maxImagenes ?? null),
+    ...cortar(documentos, limites.maxArchivos ?? null),
+    ...cortar(videos, limites.maxVideos ?? null),
+  ];
+}
+
 /** Conserva el JSON de opciones y agrega o quita el flag de ocultar el campo de texto. */
 export function conOcultarTextbox(raw: string, ocultar: boolean): string {
   let parsed: unknown;

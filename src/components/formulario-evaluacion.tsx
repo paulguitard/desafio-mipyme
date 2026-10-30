@@ -180,6 +180,7 @@ export function FormularioEvaluacion({
   const [bloqueado, setBloqueado] = useState(false);
   const accion = useAccionOptimista();
   const esGeneral = modoEvaluacion === "GENERAL";
+  const esRubrica = modoEvaluacion === "RUBRICA";
   const esSupervisor = rolAccion === "supervisor";
   const reportarVeredicto = useCallback((_clave: string, _veredicto: string) => {}, []);
   const mostrarAcciones = canEdit && rolAccion !== "lectura" && !bloqueado;
@@ -235,13 +236,28 @@ export function FormularioEvaluacion({
     const form = formRef.current;
     if (!form) return;
     if (tipo !== "proceder") {
-      const mensaje = marcarVeredictosPendientes(form, {
-        exigirSeleccion: esSupervisor,
-        exigirComentarioSiempre: !esSupervisor || tipo === "enviar-observaciones-evaluador",
-      });
-      if (mensaje) {
-        setError(mensaje);
-        return;
+      if (esRubrica) {
+        const faltan = [...form.querySelectorAll<HTMLElement>("[data-rubrica-nota]")].some(
+          (nodo) => !nodo.getAttribute("data-rubrica-nota"),
+        );
+        if (faltan) {
+          setError("Para finalizar, debes asignar una nota a cada criterio.");
+          const primero = form.querySelector<HTMLElement>("[data-rubrica-nota='']");
+          if (primero) {
+            asegurarPanelVisible(primero);
+            primero.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+          return;
+        }
+      } else {
+        const mensaje = marcarVeredictosPendientes(form, {
+          exigirSeleccion: esSupervisor,
+          exigirComentarioSiempre: !esSupervisor || tipo === "enviar-observaciones-evaluador",
+        });
+        if (mensaje) {
+          setError(mensaje);
+          return;
+        }
       }
     }
     setError(null);
@@ -407,6 +423,21 @@ export function FormularioEvaluacion({
     }
 
     if (accion === "finalizar-evaluacion") {
+      if (esRubrica) {
+        return {
+          title: "¿Finalizar evaluación?",
+          confirmLabel: "Finalizar evaluación",
+          body: (
+            <>
+              <p>Debes asignar una nota a cada criterio. El comentario es opcional.</p>
+              <p>
+                Al confirmar, tu evaluación quedará finalizada. El participante no verá estas notas
+                y no podrá modificar su caso.
+              </p>
+            </>
+          ),
+        };
+      }
       return {
         title: "¿Finalizar evaluación?",
         confirmLabel: "Finalizar evaluación",
@@ -483,6 +514,7 @@ export function FormularioEvaluacion({
       onSubmit={(event) => event.preventDefault()}
       onClick={limpiarAvisoSiQuedoCompleto}
       onChange={limpiarAvisoSiQuedoCompleto}
+      data-tour-contexto-pagina={esRubrica ? "rubrica" : undefined}
       className={`page-workspace is-formulario-caso grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden${
         mostrarAcciones ? " has-acciones-caso" : ""
       }`}
@@ -523,6 +555,7 @@ export function FormularioEvaluacion({
             disabled: Boolean(guardadoModal) || Boolean(envioModal) || accion.guardando,
             esSupervisor,
             esGeneral,
+            esRubrica,
             intencionPendiente: intencionPendiente ?? null,
             veredictoPanel,
             setVeredictoPanel,
@@ -542,7 +575,7 @@ export function FormularioEvaluacion({
                 (esGeneral ? "Comentario del caso" : "Comentarios por pregunta")
               }
               evaluacion={conservarCampos ? camposVisibles.current.evaluacion : evaluacion}
-              evalAcciones={mostrarAcciones && !esGeneral ? <AccionesPanelRevision /> : null}
+              evalAcciones={mostrarAcciones && !esGeneral && !esRubrica ? <AccionesPanelRevision /> : null}
             />
           </ProveedorVeredictoSupervision>
         </ProveedorAccionesRevision>

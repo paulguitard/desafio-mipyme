@@ -7,6 +7,7 @@ import {
   agregarPregunta,
   crearFormularioCompleto,
   eliminarPregunta,
+  guardarRubrica,
   moverPregunta,
 } from "@/actions/formularios";
 import { BotonAtras } from "@/components/boton-atras";
@@ -14,6 +15,7 @@ import { CampoEditable } from "@/components/campo-editable";
 import { IndicadorGuardando } from "@/components/indicador-guardando";
 import { Modal } from "@/components/modal";
 import { PreguntaCampo } from "@/components/pregunta-campo";
+import { RubricaEditor } from "@/components/rubrica-editor";
 import {
   InterruptorObligatoria,
   InterruptorSiNo,
@@ -31,11 +33,14 @@ import {
   parseModoEvaluacion,
   type ModoEvaluacion,
 } from "@/lib/modo-evaluacion";
+import { rubricaVacia, validarRubrica, type RubricaVista } from "@/lib/rubrica";
 import {
   campoLimiteCuenta,
+  conLimitesAdjuntos,
   conOcultarTextbox,
   CUENTAS_PRESUPUESTO,
   esTipoFormato,
+  parseConfigAdjuntos,
   parseConfigCorreo,
   parseConfigFecha,
   parseConfigGantt,
@@ -137,7 +142,11 @@ function serializarOpcionesBorrador(borrador: PreguntaBorrador): string {
   else if (borrador.tipo === "objetivos_indicadores") raw = serializeConfigObjetivos(borrador.configObjetivos);
   else if (tipoTieneOpciones(borrador.tipo)) raw = serializeOpcionesConLimites(borrador.opciones, limites);
   const hayAdjuntos = borrador.permiteArchivo || borrador.permiteImagen || borrador.permiteVideoLink;
-  return conOcultarTextbox(raw, hayAdjuntos && borrador.ocultarTextbox);
+  return conLimitesAdjuntos(conOcultarTextbox(raw, hayAdjuntos && borrador.ocultarTextbox), {
+    maxArchivos: borrador.permiteArchivo ? borrador.maxArchivos : null,
+    maxImagenes: borrador.permiteImagen ? borrador.maxImagenes : null,
+    maxVideos: borrador.permiteVideoLink ? borrador.maxVideos : null,
+  });
 }
 
 function preguntaDesdeBorrador(id: string, borrador: PreguntaBorrador): PreguntaVista {
@@ -234,6 +243,15 @@ function formDataPregunta(formularioId: string, preguntaId: string | null, borra
   if (borrador.permiteArchivo) formData.set("permiteArchivo", "on");
   if (borrador.permiteImagen) formData.set("permiteImagen", "on");
   if (borrador.permiteVideoLink) formData.set("permiteVideoLink", "on");
+  if (borrador.permiteArchivo && borrador.maxArchivos != null) {
+    formData.set("maxArchivos", String(borrador.maxArchivos));
+  }
+  if (borrador.permiteImagen && borrador.maxImagenes != null) {
+    formData.set("maxImagenes", String(borrador.maxImagenes));
+  }
+  if (borrador.permiteVideoLink && borrador.maxVideos != null) {
+    formData.set("maxVideos", String(borrador.maxVideos));
+  }
   if (borrador.ocultarTextbox) formData.set("ocultarTextbox", "on");
   if (borrador.conNotas) formData.set("conNotas", "on");
   formData.set("escalaNotas", serializeEscalaNotas(borrador.conNotas ? borrador.escalaNotas : []));
@@ -254,6 +272,7 @@ export function FormularioBuilder({
     modoEvaluacion?: string;
     puedeCambiarModo?: boolean;
     preguntas: PreguntaVista[];
+    rubrica?: RubricaVista | null;
   };
   permitirEvaluacionPorPregunta: boolean;
 }) {
@@ -278,6 +297,15 @@ export function FormularioBuilder({
   const [obligatoria, setObligatoria] = useState(true);
   const [ocultarTextbox, setOcultarTextbox] = useState(false);
   const [hayAdjuntos, setHayAdjuntos] = useState(false);
+  const [rubrica, setRubrica] = useState(() =>
+    formulario?.rubrica
+      ? {
+          escala: formulario.rubrica.escala,
+          criterios: formulario.rubrica.criterios,
+        }
+      : rubricaVacia(),
+  );
+  const estructuraRubricaBloqueada = Boolean(formulario?.rubrica?.estructuraBloqueada);
   const error = preguntasState.error ?? accion.error;
   const setError = (valor: string | null) => {
     preguntasState.setError(valor);
@@ -286,7 +314,9 @@ export function FormularioBuilder({
 
   const esNuevo = modo === "nuevo";
   const sinEvaluacion = esCargaInformacion(tipo);
+  const esRubrica = modoEvaluacion === "RUBRICA";
   const puedeCambiarModo = !sinEvaluacion && (esNuevo || Boolean(formulario?.puedeCambiarModo));
+  const sinNotasPorPregunta = sinEvaluacion || esRubrica;
 
   useEffect(() => {
     if (esNuevo || !formulario?.titulo) setEditandoTitulo(true);
@@ -349,6 +379,31 @@ export function FormularioBuilder({
     setModoEvaluacion(siguiente);
     if (esNuevo) return;
     persistirTitulo(titulo, siguiente);
+  }
+
+  function persistirRubricaActual(siguiente = rubrica) {
+    if (esNuevo || !formulario || modoEvaluacion !== "RUBRICA") return;
+    const errorRubrica = validarRubrica(siguiente);
+    if (errorRubrica) {
+      setError(errorRubrica);
+      return;
+    }
+    const formData = new FormData();
+    formData.set("formularioId", formulario.id);
+    formData.set("rubrica", JSON.stringify(siguiente));
+    void accion.ejecutar(() => guardarRubrica(formData));
+  }
+
+  function onCambiarRubrica(siguiente: typeof rubrica) {
+    setRubrica(siguiente);
+    if (esNuevo) return;
+    const errorRubrica = validarRubrica(siguiente);
+    if (errorRubrica) {
+      setError(errorRubrica);
+      return;
+    }
+    setError(null);
+    persistirRubricaActual(siguiente);
   }
 
   function onAgregar(borrador: PreguntaBorrador) {
@@ -465,11 +520,19 @@ export function FormularioBuilder({
       setError("El título es obligatorio.");
       return;
     }
+    if (modoEvaluacion === "RUBRICA") {
+      const errorRubrica = validarRubrica(rubrica);
+      if (errorRubrica) {
+        setError(errorRubrica);
+        return;
+      }
+    }
     void accion.ejecutar(() =>
       crearFormularioCompleto({
         titulo: titulo.trim(),
         tipo,
         modoEvaluacion: sinEvaluacion ? "GENERAL" : modoEvaluacion,
+        rubrica: modoEvaluacion === "RUBRICA" ? rubrica : undefined,
         preguntas: preguntas.map((pregunta) => ({
           enunciado: pregunta.enunciado,
           ayuda: pregunta.ayuda,
@@ -479,8 +542,8 @@ export function FormularioBuilder({
           permiteArchivo: pregunta.permiteArchivo,
           permiteImagen: pregunta.permiteImagen,
           permiteVideoLink: pregunta.permiteVideoLink,
-          conNotas: sinEvaluacion ? false : pregunta.conNotas,
-          escalaNotas: sinEvaluacion ? [] : parseEscalaNotas(pregunta.escalaNotas),
+          conNotas: sinNotasPorPregunta ? false : pregunta.conNotas,
+          escalaNotas: sinNotasPorPregunta ? [] : parseEscalaNotas(pregunta.escalaNotas),
         })),
       }),
     );
@@ -656,6 +719,14 @@ export function FormularioBuilder({
           >
             Agregar pregunta
           </button>
+
+          {esRubrica ? (
+            <RubricaEditor
+              value={rubrica}
+              estructuraBloqueada={estructuraRubricaBloqueada}
+              onChange={onCambiarRubrica}
+            />
+          ) : null}
       </div>
 
       <Modal
@@ -696,6 +767,7 @@ export function FormularioBuilder({
               permiteArchivo: preguntaEditando.permiteArchivo,
               permiteImagen: preguntaEditando.permiteImagen,
               permiteVideoLink: preguntaEditando.permiteVideoLink,
+              ...parseConfigAdjuntos(preguntaEditando.opciones),
               ocultarTextbox: parseOcultarTextbox(preguntaEditando.opciones),
               conNotas: preguntaEditando.conNotas,
               escalaNotas: parseEscalaNotas(preguntaEditando.escalaNotas),
@@ -703,7 +775,7 @@ export function FormularioBuilder({
             error={error}
             submitLabel="Guardar pregunta"
             obligatoria={obligatoria}
-            sinEvaluacion={sinEvaluacion}
+            sinEvaluacion={sinNotasPorPregunta}
             ocultarTextbox={ocultarTextbox}
             onHayAdjuntosChange={(hay) => {
               setHayAdjuntos(hay);
@@ -718,7 +790,7 @@ export function FormularioBuilder({
             error={error}
             submitLabel="Agregar esta pregunta"
             obligatoria={obligatoria}
-            sinEvaluacion={sinEvaluacion}
+            sinEvaluacion={sinNotasPorPregunta}
             ocultarTextbox={ocultarTextbox}
             onHayAdjuntosChange={(hay) => {
               setHayAdjuntos(hay);

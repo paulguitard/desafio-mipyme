@@ -12,6 +12,8 @@ import {
   parseImagenConvocatoria,
 } from "@/lib/convocatoria";
 import { isStoredFile, parseArchivos } from "@/lib/preguntas";
+import { esModoRubrica } from "@/lib/modo-evaluacion";
+import { mapearRubricaFila, validarRubrica } from "@/lib/rubrica";
 import { mentoriaTieneRevision, parseTipoFormulario, type TipoFormulario } from "@/lib/tipo-formulario";
 import { asignarEvaluadoresAutomaticoEnConvocatoria } from "@/lib/asignacion-automatica";
 import { asignarSupervisoresAutomaticoEnConvocatoria } from "@/lib/asignacion-supervisor";
@@ -43,9 +45,13 @@ async function conteosAsignacionesRevision(convocatoriaId: string) {
 function flagsRevisionParaTipo(
   tipo: TipoFormulario,
   formData: FormData,
+  modoEvaluacion?: string | null,
 ): FlagsRevision | { error: string } {
   if (!mentoriaTieneRevision(tipo)) {
     return { evaluadoresHabilitados: false, supervisoresHabilitados: false };
+  }
+  if (esModoRubrica(modoEvaluacion)) {
+    return { evaluadoresHabilitados: true, supervisoresHabilitados: false };
   }
   const flags = flagsRevisionDesdeCheckboxes(formData);
   if (!flags) {
@@ -60,6 +66,7 @@ async function validarFormulario(formularioId: string, tipoMentoria: TipoFormula
     include: {
       _count: { select: { preguntas: true, piezasContenido: true } },
       piezasContenido: { include: { _count: { select: { medios: true } } } },
+      rubrica: { include: { criterios: { orderBy: { orden: "asc" } } } },
     },
   });
   if (!form) return { error: "Formulario no encontrado." };
@@ -76,6 +83,12 @@ async function validarFormulario(formularioId: string, tipoMentoria: TipoFormula
     }
   } else if (form._count.preguntas === 0) {
     return { error: "El formulario aún no tiene preguntas." };
+  }
+  if (esModoRubrica(form.modoEvaluacion)) {
+    const errorRubrica = validarRubrica(mapearRubricaFila(form.rubrica));
+    if (errorRubrica) {
+      return { error: `La rúbrica de este formulario no está lista: ${errorRubrica}` };
+    }
   }
   return { form };
 }
@@ -175,7 +188,11 @@ export async function crearConvocatoria(formData: FormData) {
     evaluadoresHabilitados: true,
     supervisoresHabilitados: true,
   };
-  const flags = flagsRevisionParaTipo(tipo, formData);
+  const flags = flagsRevisionParaTipo(
+    tipo,
+    formData,
+    "form" in formOk ? formOk.form.modoEvaluacion : undefined,
+  );
   if ("error" in flags) return flags;
   if (mentoriaTieneRevision(tipo)) {
     const validacionFlags = validarCambioRoles({
@@ -226,13 +243,8 @@ export async function actualizarConvocatoria(formData: FormData) {
       : parseTipoFormulario(String(formData.get("tipo") ?? convocatoria.tipo));
   const formIdFinal =
     convocatoria._count.postulaciones > 0 ? convocatoria.formularioId : formularioId;
-  if (formIdFinal !== convocatoria.formularioId || tipoFinal !== parseTipoFormulario(convocatoria.tipo)) {
-    const formOk = await validarFormulario(formIdFinal, tipoFinal);
-    if ("error" in formOk && formOk.error) return { error: formOk.error };
-  } else if (formIdFinal === convocatoria.formularioId) {
-    const formOk = await validarFormulario(formIdFinal, tipoFinal);
-    if ("error" in formOk && formOk.error) return { error: formOk.error };
-  }
+  const formOk = await validarFormulario(formIdFinal, tipoFinal);
+  if ("error" in formOk && formOk.error) return { error: formOk.error };
 
   const fechas = leerFechas(formData);
   if ("error" in fechas && fechas.error) return { error: fechas.error };
@@ -244,7 +256,11 @@ export async function actualizarConvocatoria(formData: FormData) {
     evaluadoresHabilitados: convocatoria.evaluadoresHabilitados,
     supervisoresHabilitados: convocatoria.supervisoresHabilitados,
   };
-  const flags = flagsRevisionParaTipo(tipoFinal, formData);
+  const flags = flagsRevisionParaTipo(
+    tipoFinal,
+    formData,
+    "form" in formOk ? formOk.form.modoEvaluacion : undefined,
+  );
   if ("error" in flags) return flags;
   if (mentoriaTieneRevision(tipoFinal)) {
     const conteos = await conteosAsignacionesRevision(id);

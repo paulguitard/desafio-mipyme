@@ -4,6 +4,7 @@ import type { ResultadoBorrador } from "@/lib/borrador-caso";
 import { prisma } from "@/lib/db";
 import { evaluadorPuedeEditar } from "@/lib/estado";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
+import { campoNotaCriterio, notaEnEscala, parseEscalaRubrica } from "@/lib/rubrica";
 import {
   modoRevisionDeConvocatoria,
   puedeGuardarBorradorEvaluacion,
@@ -84,6 +85,52 @@ async function persistirRevisionPorPregunta(
         ciclo,
         veredicto: veredictoGuardado,
         comentario,
+        nota,
+      },
+    });
+  }
+}
+
+async function persistirRevisionRubrica(
+  formData: FormData,
+  asignacionId: string,
+  ronda: number,
+  ciclo: number,
+  rubrica: { escala: string; criterios: { id: string }[] } | null,
+) {
+  const comentario = leerComentario(formData, "comentario-general");
+  await prisma.revisionGeneral.upsert({
+    where: { asignacionId_ronda_ciclo: { asignacionId, ronda, ciclo } },
+    update: { veredicto: "OK", comentario },
+    create: {
+      asignacionId,
+      ronda,
+      ciclo,
+      veredicto: "OK",
+      comentario,
+    },
+  });
+  if (!rubrica) return;
+  const escala = parseEscalaRubrica(rubrica.escala);
+  for (const criterio of rubrica.criterios) {
+    const raw = String(formData.get(campoNotaCriterio(criterio.id)) ?? "").trim();
+    const nota = Number(raw);
+    if (raw === "" || !Number.isInteger(nota) || !notaEnEscala(nota, escala)) continue;
+    await prisma.revisionCriterio.upsert({
+      where: {
+        asignacionId_criterioId_ronda_ciclo: {
+          asignacionId,
+          criterioId: criterio.id,
+          ronda,
+          ciclo,
+        },
+      },
+      update: { nota },
+      create: {
+        asignacionId,
+        criterioId: criterio.id,
+        ronda,
+        ciclo,
         nota,
       },
     });
@@ -234,7 +281,16 @@ async function cargaAsignacionEvaluador(id: string, evaluadorId: string) {
     include: {
       postulacion: {
         include: {
-          convocatoria: { include: { formulario: { include: { preguntas: true } } } },
+          convocatoria: {
+            include: {
+              formulario: {
+                include: {
+                  preguntas: true,
+                  rubrica: { include: { criterios: { orderBy: { orden: "asc" } } } },
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -319,7 +375,15 @@ export async function persistirBorradorEvaluacion(args: {
     permitirSinVeredicto: args.permitirSinVeredicto,
   };
 
-  if (modo === "GENERAL") {
+  if (modo === "RUBRICA") {
+    await persistirRevisionRubrica(
+      args.formData,
+      asignacionId,
+      ronda,
+      ciclo,
+      asignacion.postulacion.convocatoria.formulario.rubrica,
+    );
+  } else if (modo === "GENERAL") {
     await persistirRevisionGeneral(args.formData, asignacionId, ronda, ciclo, opciones);
     await persistirRevisionPorPregunta(args.formData, asignacionId, ronda, ciclo, preguntas, {
       ...opciones,

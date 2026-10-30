@@ -15,10 +15,12 @@ import {
   parseConfigCorreo,
   parseConfigFecha,
   parseConfigGantt,
+  parseConfigAdjuntos,
   parseConfigLimites,
   parseConfigObjetivos,
   parseConfigPresupuesto,
   tipoTieneOpciones,
+  MAX_ADJUNTOS_POR_TIPO,
   type ConfigGantt,
   type CuentaPresupuesto,
   type ConfigObjetivos,
@@ -46,6 +48,9 @@ export type PreguntaBorrador = {
   permiteArchivo: boolean;
   permiteImagen: boolean;
   permiteVideoLink: boolean;
+  maxArchivos: number | null;
+  maxImagenes: number | null;
+  maxVideos: number | null;
   conNotas: boolean;
   escalaNotas: PeldanoEscala[];
   ocultarTextbox: boolean;
@@ -69,6 +74,9 @@ const VACIA: PreguntaBorrador = {
   permiteArchivo: false,
   permiteImagen: false,
   permiteVideoLink: false,
+  maxArchivos: null,
+  maxImagenes: null,
+  maxVideos: null,
   conNotas: false,
   escalaNotas: ESCALA_NOTAS_DEFAULT,
   ocultarTextbox: false,
@@ -110,6 +118,7 @@ export function PreguntaComposer({
   onHayAdjuntosChange?: (hayAdjuntos: boolean) => void;
 }) {
   const limitesInicial = inicial?.opcionesRaw ? parseConfigLimites(inicial.opcionesRaw) : {};
+  const adjuntosInicial = inicial?.opcionesRaw ? parseConfigAdjuntos(inicial.opcionesRaw) : {};
   const fechaInicial =
     inicial?.fechaModo ??
     (inicial?.opcionesRaw ? parseConfigFecha(inicial.opcionesRaw) : VACIA.fechaModo);
@@ -129,6 +138,15 @@ export function PreguntaComposer({
   const [permiteArchivo, setPermiteArchivo] = useState(inicial?.permiteArchivo ?? false);
   const [permiteImagen, setPermiteImagen] = useState(inicial?.permiteImagen ?? false);
   const [permiteVideoLink, setPermiteVideoLink] = useState(inicial?.permiteVideoLink ?? false);
+  const [maxArchivos, setMaxArchivos] = useState<number | null>(
+    inicial?.maxArchivos ?? adjuntosInicial.maxArchivos ?? null,
+  );
+  const [maxImagenes, setMaxImagenes] = useState<number | null>(
+    inicial?.maxImagenes ?? adjuntosInicial.maxImagenes ?? null,
+  );
+  const [maxVideos, setMaxVideos] = useState<number | null>(
+    inicial?.maxVideos ?? adjuntosInicial.maxVideos ?? null,
+  );
   const [tipo, setTipo] = useState<TipoPregunta>(inicial?.tipo ?? VACIA.tipo);
   const [fechaModo, setFechaModo] = useState<ModoFecha>(fechaInicial);
   const [cantidadCorreos, setCantidadCorreos] = useState(correosInicial);
@@ -212,6 +230,9 @@ export function PreguntaComposer({
           permiteArchivo,
           permiteImagen,
           permiteVideoLink,
+          maxArchivos: permiteArchivo ? toOptionalNumber(formData.get("maxArchivos")) : null,
+          maxImagenes: permiteImagen ? toOptionalNumber(formData.get("maxImagenes")) : null,
+          maxVideos: permiteVideoLink ? toOptionalNumber(formData.get("maxVideos")) : null,
           ocultarTextbox: ocultarCampoTexto,
           conNotas: sinEvaluacion ? false : conNotas,
           escalaNotas: sinEvaluacion || !conNotas ? [] : escala,
@@ -304,33 +325,42 @@ export function PreguntaComposer({
       <div className={`grid gap-4 ${esFormato ? "" : "md:grid-cols-2"}`}>
         <section className="space-y-3 rounded-xl border border-border p-4">
           <p className="font-semibold text-navy">Adjuntos</p>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              name="permiteArchivo"
-              checked={permiteArchivo}
-              onChange={(event) => setPermiteArchivo(event.target.checked)}
-            />
-            Permitir subir archivos (varios)
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              name="permiteImagen"
-              checked={permiteImagen}
-              onChange={(event) => setPermiteImagen(event.target.checked)}
-            />
-            Permitir subir imágenes (varias)
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              name="permiteVideoLink"
-              checked={permiteVideoLink}
-              onChange={(event) => setPermiteVideoLink(event.target.checked)}
-            />
-            Permitir pegar links de video (varios)
-          </label>
+          <FilaAdjuntoPermitido
+            name="permiteArchivo"
+            maxName="maxArchivos"
+            checked={permiteArchivo}
+            max={maxArchivos}
+            label="Permitir subir archivos"
+            onChecked={(value) => {
+              setPermiteArchivo(value);
+              if (value && maxArchivos == null) setMaxArchivos(1);
+            }}
+            onMax={setMaxArchivos}
+          />
+          <FilaAdjuntoPermitido
+            name="permiteImagen"
+            maxName="maxImagenes"
+            checked={permiteImagen}
+            max={maxImagenes}
+            label="Permitir subir imágenes"
+            onChecked={(value) => {
+              setPermiteImagen(value);
+              if (value && maxImagenes == null) setMaxImagenes(1);
+            }}
+            onMax={setMaxImagenes}
+          />
+          <FilaAdjuntoPermitido
+            name="permiteVideoLink"
+            maxName="maxVideos"
+            checked={permiteVideoLink}
+            max={maxVideos}
+            label="Permitir pegar links de video"
+            onChecked={(value) => {
+              setPermiteVideoLink(value);
+              if (value && maxVideos == null) setMaxVideos(1);
+            }}
+            onMax={setMaxVideos}
+          />
         </section>
 
         {!esFormato && !ocultarCampoTexto ? (
@@ -736,6 +766,63 @@ export function PreguntaComposer({
         </aside>
       ) : null}
     </form>
+  );
+}
+
+function FilaAdjuntoPermitido({
+  name,
+  maxName,
+  checked,
+  max,
+  label,
+  onChecked,
+  onMax,
+}: {
+  name: string;
+  maxName: string;
+  checked: boolean;
+  max: number | null;
+  label: string;
+  onChecked: (value: boolean) => void;
+  onMax: (value: number | null) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <label className="flex min-w-0 flex-1 items-center gap-2">
+        <input
+          type="checkbox"
+          name={name}
+          checked={checked}
+          onChange={(event) => onChecked(event.target.checked)}
+        />
+        {label}
+      </label>
+      {checked ? (
+        <label className="flex items-center gap-2 text-sm font-medium text-navy">
+          <span>Máximo</span>
+          <input
+            className="input w-20"
+            id={maxName}
+            name={maxName}
+            type="number"
+            min={1}
+            max={MAX_ADJUNTOS_POR_TIPO}
+            value={max ?? ""}
+            placeholder="—"
+            aria-label={`${label}: cantidad máxima`}
+            onChange={(event) => {
+              const raw = event.target.value.trim();
+              if (!raw) {
+                onMax(null);
+                return;
+              }
+              const n = Number(raw);
+              onMax(Number.isFinite(n) && n >= 1 ? Math.min(MAX_ADJUNTOS_POR_TIPO, Math.floor(n)) : null);
+            }}
+          />
+        </label>
+      ) : null}
+    </div>
   );
 }
 

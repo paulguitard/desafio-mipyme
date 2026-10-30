@@ -12,6 +12,7 @@ export type AccionesRevisionValor = {
   disabled: boolean;
   esSupervisor: boolean;
   esGeneral: boolean;
+  esRubrica?: boolean;
   intencionPendiente: string | null;
   veredictoPanel: string;
   setVeredictoPanel: (valor: "OK" | "OBSERVACION") => void;

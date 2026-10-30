@@ -29,15 +29,23 @@ function embedSrc(embedUrl: string, autoPlay?: boolean) {
   }
 }
 
-export function VideoEmbed({ url, autoPlay }: { url: string; autoPlay?: boolean }) {
+export function VideoEmbed({
+  url,
+  autoPlay,
+  className,
+}: {
+  url: string;
+  autoPlay?: boolean;
+  className?: string;
+}) {
   const resolved = resolveVideoEmbed(url);
   if (!resolved) {
     return <p className="text-sm text-muted">Link de video no válido.</p>;
   }
 
   return (
-    <div className="space-y-2">
-      <div className="overflow-hidden rounded-lg border border-border bg-black">
+    <div className={`pregunta-video-embed space-y-2${className ? ` ${className}` : ""}`}>
+      <div className="pregunta-video-embed-frame overflow-hidden rounded-lg border border-border bg-black">
         <iframe
           src={embedSrc(resolved.embedUrl, autoPlay)}
           title={`Video ${PROVIDER_LABEL[resolved.provider]}`}

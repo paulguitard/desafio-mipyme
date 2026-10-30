@@ -71,6 +71,7 @@ describe("resolverTutorial", () => {
       resolverTutorial("ADMIN", "/admin/mentorias", "panel-mentoria").map((p) => p.ancla),
     ).toEqual([
       "mentoria-ficha",
+      "vista-panel-asesoria",
       "pool-evaluadores",
       "pool-supervisores",
       "pool-incorporar",
@@ -78,6 +79,31 @@ describe("resolverTutorial", () => {
       "lista-casos",
     ]);
     expect(resolverTutorial("ADMIN", "/admin/mentorias").map((p) => p.ancla)).toContain("mentorias-lista");
+    expect(
+      resolverTutorial("EMPRENDEDOR", "/participante/postulaciones/abc", "rubrica").map((p) => p.ancla),
+    ).toEqual(["volver", "formulario-caso", "guardar-borrador", "enviar-caso"]);
+    expect(
+      resolverTutorial("EMPRENDEDOR", "/participante/postulaciones/abc", "rubrica")
+        .map((p) => p.descripcion)
+        .join(" "),
+    ).not.toMatch(/observaciones/i);
+    expect(
+      resolverTutorial("EVALUADOR", "/evaluador/evaluaciones/xyz", "rubrica").map((p) => p.ancla),
+    ).toEqual([
+      "volver",
+      "nav",
+      "pestaña-caso",
+      "ficha-caso",
+      "pestaña-evaluacion",
+      "observacion-pregunta",
+      "guardar-revision",
+      "finalizar-evaluacion",
+    ]);
+    expect(
+      resolverTutorial("EVALUADOR", "/evaluador/evaluaciones/xyz", "rubrica")
+        .map((p) => `${p.titulo} ${p.descripcion}`)
+        .join(" "),
+    ).not.toMatch(/Modificada|Pedir cambios|observaciones|supervisor/i);
   });
 
   it("no ofrece tutorial de perfil a evaluador ni supervisor", () => {

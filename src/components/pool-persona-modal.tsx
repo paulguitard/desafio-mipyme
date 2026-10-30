@@ -60,6 +60,7 @@ export function PoolPersonaModal({
   item,
   convocatoriaId: _convocatoriaId,
   esSupervisor,
+  mostrarObservadas = true,
   onClose,
   onGuardarCupo,
 }: {
@@ -67,6 +68,7 @@ export function PoolPersonaModal({
   item: PoolPersonaModalItem | null;
   convocatoriaId: string;
   esSupervisor: boolean;
+  mostrarObservadas?: boolean;
   onClose: () => void;
   onGuardarCupo?: (cupo: number, esSupervisor: boolean) => void;
 }) {
@@ -143,12 +145,14 @@ export function PoolPersonaModal({
             casos={item.casosAsignados}
             vacio={esSupervisor ? "Sin supervisiones asignadas." : "Sin evaluaciones asignadas."}
           />
+          {mostrarObservadas ? (
           <ListaCasos
             titulo="Observadas"
             cantidad={item.revisadas}
             casos={item.casosObservados}
             vacio="Ningún caso en observaciones."
           />
+          ) : null}
           <ListaCasos
             titulo="Finalizadas"
             cantidad={item.finalizadas}

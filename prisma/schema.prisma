@@ -96,7 +96,7 @@ model Formulario {
   descripcion    String   @default("")
   /// FEEDBACK | CONTENIDO | CARGA_INFORMACION
   tipo           String   @default("FEEDBACK")
-  modoEvaluacion String   @default("GENERAL") // POR_PREGUNTA | GENERAL
+  modoEvaluacion String   @default("GENERAL") // POR_PREGUNTA | GENERAL | RUBRICA
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   creadoPorId    String
@@ -105,6 +105,37 @@ model Formulario {
   preguntas        Pregunta[]
   piezasContenido  PiezaContenido[]
   convocatorias    Convocatoria[]
+  rubrica          Rubrica?
+}
+
+model Rubrica {
+  id           String   @id @default(cuid())
+  formularioId String   @unique
+  formulario   Formulario @relation(fields: [formularioId], references: [id], onDelete: Cascade)
+  /// JSON number[] p.ej. [1,2,3,4,5]
+  escala       String   @default("[1,2,3,4,5]")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  criterios CriterioRubrica[]
+}
+
+model CriterioRubrica {
+  id            String  @id @default(cuid())
+  rubricaId     String
+  rubrica       Rubrica @relation(fields: [rubricaId], references: [id], onDelete: Cascade)
+  orden         Int
+  nombre        String
+  preguntaGuia  String
+  detalle       String  @default("")
+  /// Porcentaje entero. La suma de la rúbrica debe ser 100.
+  peso          Int
+  /// JSON { "1": "texto", "2": "texto", ... }
+  explicaciones String  @default("{}")
+
+  revisiones RevisionCriterio[]
+
+  @@index([rubricaId])
 }
 
 model Pregunta {
@@ -293,6 +324,7 @@ model AsignacionEvaluador {
 
   revisiones              RevisionPregunta[]
   revisionesGenerales     RevisionGeneral[]
+  revisionesCriterio      RevisionCriterio[]
   supervisionesPregunta   SupervisionPregunta[]
   supervisionesGenerales  SupervisionGeneral[]
 
@@ -339,6 +371,21 @@ model RevisionGeneral {
   createdAt    DateTime @default(now())
 
   @@unique([asignacionId, ronda, ciclo])
+}
+
+model RevisionCriterio {
+  id           String   @id @default(cuid())
+  asignacionId String
+  asignacion   AsignacionEvaluador @relation(fields: [asignacionId], references: [id], onDelete: Cascade)
+  criterioId   String
+  criterio     CriterioRubrica @relation(fields: [criterioId], references: [id], onDelete: Cascade)
+  ronda        Int
+  ciclo        Int      @default(1)
+  nota         Int
+  createdAt    DateTime @default(now())
+
+  @@unique([asignacionId, criterioId, ronda, ciclo])
+  @@index([criterioId])
 }
 
 model SupervisionPregunta {

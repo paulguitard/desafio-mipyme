@@ -15,6 +15,11 @@ describe("modoEvaluacionAlCrear", () => {
     expect(modoEvaluacionAlCrear("POR_PREGUNTA", true)).toBe("POR_PREGUNTA");
     expect(modoEvaluacionAlCrear("GENERAL", true)).toBe("GENERAL");
   });
+
+  it("deja pasar Rúbrica aunque el tipo por pregunta esté desactivado", () => {
+    expect(modoEvaluacionAlCrear("RUBRICA", false)).toBe("RUBRICA");
+    expect(modoEvaluacionAlCrear("RUBRICA", true)).toBe("RUBRICA");
+  });
 });
 
 describe("puedeAsignarModoEvaluacion", () => {
@@ -23,6 +28,7 @@ describe("puedeAsignarModoEvaluacion", () => {
     expect(puedeAsignarModoEvaluacion("POR_PREGUNTA", false, "GENERAL")).toBe(false);
     expect(puedeAsignarModoEvaluacion("POR_PREGUNTA", false, "POR_PREGUNTA")).toBe(true);
     expect(puedeAsignarModoEvaluacion("GENERAL", false)).toBe(true);
+    expect(puedeAsignarModoEvaluacion("RUBRICA", false)).toBe(true);
     expect(puedeAsignarModoEvaluacion("POR_PREGUNTA", true)).toBe(true);
   });
 });
@@ -31,5 +37,6 @@ describe("parseModoEvaluacion", () => {
   it("cae a POR_PREGUNTA si el valor no es válido", () => {
     expect(parseModoEvaluacion("")).toBe("POR_PREGUNTA");
     expect(parseModoEvaluacion("GENERAL")).toBe("GENERAL");
+    expect(parseModoEvaluacion("RUBRICA")).toBe("RUBRICA");
   });
 });
