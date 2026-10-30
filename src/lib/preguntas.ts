@@ -434,6 +434,51 @@ export function serializeSoloLimites(limites: ConfigLimites = {}): string {
   return Object.keys(lim).length === 0 ? "[]" : JSON.stringify(lim);
 }
 
+export function parseOcultarTextbox(raw?: string | null): boolean {
+  try {
+    const parsed = JSON.parse(raw || "") as unknown;
+    return Boolean(
+      parsed &&
+        typeof parsed === "object" &&
+        !Array.isArray(parsed) &&
+        (parsed as { ocultarTextbox?: unknown }).ocultarTextbox === true,
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Conserva el JSON de opciones y agrega o quita el flag de ocultar el campo de texto. */
+export function conOcultarTextbox(raw: string, ocultar: boolean): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw || "[]");
+  } catch {
+    parsed = [];
+  }
+
+  if (!ocultar) {
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return raw || "[]";
+    const obj = { ...(parsed as Record<string, unknown>) };
+    delete obj.ocultarTextbox;
+    const keys = Object.keys(obj);
+    if (keys.length === 0) return "[]";
+    if (keys.length === 1 && keys[0] === "opciones" && Array.isArray(obj.opciones)) {
+      return JSON.stringify(obj.opciones);
+    }
+    return JSON.stringify(obj);
+  }
+
+  if (Array.isArray(parsed)) {
+    if (parsed.length === 0) return JSON.stringify({ ocultarTextbox: true });
+    return JSON.stringify({ opciones: parsed, ocultarTextbox: true });
+  }
+  if (parsed && typeof parsed === "object") {
+    return JSON.stringify({ ...(parsed as Record<string, unknown>), ocultarTextbox: true });
+  }
+  return JSON.stringify({ ocultarTextbox: true });
+}
+
 function compactLimites(limites: ConfigLimites): ConfigLimites {
   const out: ConfigLimites = {};
   if (limites.minCaracteres != null) out.minCaracteres = limites.minCaracteres;
@@ -931,6 +976,7 @@ export function validarValorRespuesta(args: {
   obligatoria: boolean;
 }): string | null {
   const { tipo, opciones, valor, obligatoria } = args;
+  if (parseOcultarTextbox(opciones)) return null;
 
   if (tipo === "texto_corto" || tipo === "texto_largo") {
     const raw = valor == null ? "" : String(valor);

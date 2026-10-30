@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/db";
 import { MODO_EVALUACION_LABEL, parseModoEvaluacion } from "@/lib/modo-evaluacion";
-import { esMentoriaContenido, TIPO_FORMULARIO_LABEL, parseTipoFormulario } from "@/lib/tipo-formulario";
+import {
+  esCargaInformacion,
+  esMentoriaContenido,
+  TIPO_FORMULARIO_LABEL,
+  parseTipoFormulario,
+} from "@/lib/tipo-formulario";
 
 export default async function FormulariosPage() {
   const formularios = await prisma.formulario.findMany({
@@ -25,7 +30,9 @@ export default async function FormulariosPage() {
           const modo = parseModoEvaluacion(form.modoEvaluacion);
           const detalle = contenido
             ? `${form._count.piezasContenido} casillas`
-            : `${MODO_EVALUACION_LABEL[modo]} · ${form._count.preguntas} preguntas`;
+            : esCargaInformacion(tipo)
+              ? `${form._count.preguntas} preguntas`
+              : `${MODO_EVALUACION_LABEL[modo]} · ${form._count.preguntas} preguntas`;
           return (
             <a key={form.id} href={`/admin/formularios/${form.id}`} className="card block p-5">
               <h2 className="text-xl font-semibold">{form.titulo}</h2>

@@ -16,6 +16,7 @@ import { Modal } from "@/components/modal";
 import { PreguntaCampo } from "@/components/pregunta-campo";
 import {
   InterruptorObligatoria,
+  InterruptorSiNo,
   PreguntaComposer,
   type PreguntaBorrador,
 } from "@/components/pregunta-composer";
@@ -32,6 +33,7 @@ import {
 } from "@/lib/modo-evaluacion";
 import {
   campoLimiteCuenta,
+  conOcultarTextbox,
   CUENTAS_PRESUPUESTO,
   esTipoFormato,
   parseConfigCorreo,
@@ -41,6 +43,7 @@ import {
   parseConfigObjetivos,
   parseConfigPresupuesto,
   parseEscalaNotas,
+  parseOcultarTextbox,
   parseOpciones,
   serializeConfigCorreo,
   serializeConfigFecha,
@@ -55,6 +58,7 @@ import {
   type ConfigLimites,
   type TipoPregunta,
 } from "@/lib/preguntas";
+import { esCargaInformacion, type TipoFormulario } from "@/lib/tipo-formulario";
 import { useAccionOptimista, useDatoOptimista } from "@/lib/use-dato-optimista";
 
 function IconoSubir() {
@@ -125,13 +129,15 @@ function limitesDe(borrador: PreguntaBorrador): ConfigLimites {
 
 function serializarOpcionesBorrador(borrador: PreguntaBorrador): string {
   const limites = limitesDe(borrador);
-  if (borrador.tipo === "fecha") return serializeConfigFecha(borrador.fechaModo, limites);
-  if (borrador.tipo === "correo") return serializeConfigCorreo(borrador.cantidadCorreos, limites);
-  if (borrador.tipo === "gantt") return serializeConfigGantt(borrador.configGantt);
-  if (borrador.tipo === "presupuesto") return serializeConfigPresupuesto(borrador.configPresupuesto);
-  if (borrador.tipo === "objetivos_indicadores") return serializeConfigObjetivos(borrador.configObjetivos);
-  if (tipoTieneOpciones(borrador.tipo)) return serializeOpcionesConLimites(borrador.opciones, limites);
-  return serializeSoloLimites(limites);
+  let raw = serializeSoloLimites(limites);
+  if (borrador.tipo === "fecha") raw = serializeConfigFecha(borrador.fechaModo, limites);
+  else if (borrador.tipo === "correo") raw = serializeConfigCorreo(borrador.cantidadCorreos, limites);
+  else if (borrador.tipo === "gantt") raw = serializeConfigGantt(borrador.configGantt);
+  else if (borrador.tipo === "presupuesto") raw = serializeConfigPresupuesto(borrador.configPresupuesto);
+  else if (borrador.tipo === "objetivos_indicadores") raw = serializeConfigObjetivos(borrador.configObjetivos);
+  else if (tipoTieneOpciones(borrador.tipo)) raw = serializeOpcionesConLimites(borrador.opciones, limites);
+  const hayAdjuntos = borrador.permiteArchivo || borrador.permiteImagen || borrador.permiteVideoLink;
+  return conOcultarTextbox(raw, hayAdjuntos && borrador.ocultarTextbox);
 }
 
 function preguntaDesdeBorrador(id: string, borrador: PreguntaBorrador): PreguntaVista {
@@ -157,6 +163,14 @@ function validarPregunta(borrador: PreguntaBorrador): string | null {
   }
   if (borrador.tipo === "correo" && (borrador.cantidadCorreos < 1 || borrador.cantidadCorreos > 20)) {
     return "La cantidad de correos debe estar entre 1 y 20.";
+  }
+  if (
+    borrador.ocultarTextbox &&
+    !borrador.permiteArchivo &&
+    !borrador.permiteImagen &&
+    !borrador.permiteVideoLink
+  ) {
+    return "Para ocultar el textbox debes permitir al menos un tipo de adjunto.";
   }
   if (borrador.conNotas) return validarEscalaNotas(borrador.escalaNotas);
   return null;
@@ -220,6 +234,7 @@ function formDataPregunta(formularioId: string, preguntaId: string | null, borra
   if (borrador.permiteArchivo) formData.set("permiteArchivo", "on");
   if (borrador.permiteImagen) formData.set("permiteImagen", "on");
   if (borrador.permiteVideoLink) formData.set("permiteVideoLink", "on");
+  if (borrador.ocultarTextbox) formData.set("ocultarTextbox", "on");
   if (borrador.conNotas) formData.set("conNotas", "on");
   formData.set("escalaNotas", serializeEscalaNotas(borrador.conNotas ? borrador.escalaNotas : []));
   return formData;
@@ -228,9 +243,11 @@ function formDataPregunta(formularioId: string, preguntaId: string | null, borra
 export function FormularioBuilder({
   modo,
   formulario,
+  tipo = "FEEDBACK",
   permitirEvaluacionPorPregunta,
 }: {
   modo: "nuevo" | "existente";
+  tipo?: TipoFormulario;
   formulario?: {
     id: string;
     titulo: string;
@@ -259,6 +276,8 @@ export function FormularioBuilder({
   const [agregando, setAgregando] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [obligatoria, setObligatoria] = useState(true);
+  const [ocultarTextbox, setOcultarTextbox] = useState(false);
+  const [hayAdjuntos, setHayAdjuntos] = useState(false);
   const error = preguntasState.error ?? accion.error;
   const setError = (valor: string | null) => {
     preguntasState.setError(valor);
@@ -266,7 +285,8 @@ export function FormularioBuilder({
   };
 
   const esNuevo = modo === "nuevo";
-  const puedeCambiarModo = esNuevo || Boolean(formulario?.puedeCambiarModo);
+  const sinEvaluacion = esCargaInformacion(tipo);
+  const puedeCambiarModo = !sinEvaluacion && (esNuevo || Boolean(formulario?.puedeCambiarModo));
 
   useEffect(() => {
     if (esNuevo || !formulario?.titulo) setEditandoTitulo(true);
@@ -283,6 +303,8 @@ export function FormularioBuilder({
     setAgregando(false);
     setEditandoId(null);
     setObligatoria(true);
+    setOcultarTextbox(false);
+    setHayAdjuntos(false);
     setError(null);
   }
 
@@ -299,7 +321,7 @@ export function FormularioBuilder({
     const formData = new FormData();
     formData.set("id", formulario.id);
     formData.set("titulo", tituloFinal);
-    formData.set("modoEvaluacion", siguienteModo);
+    if (!sinEvaluacion) formData.set("modoEvaluacion", siguienteModo);
     void accion.ejecutar(() => actualizarFormulario(formData));
   }
 
@@ -446,8 +468,8 @@ export function FormularioBuilder({
     void accion.ejecutar(() =>
       crearFormularioCompleto({
         titulo: titulo.trim(),
-        tipo: "FEEDBACK",
-        modoEvaluacion,
+        tipo,
+        modoEvaluacion: sinEvaluacion ? "GENERAL" : modoEvaluacion,
         preguntas: preguntas.map((pregunta) => ({
           enunciado: pregunta.enunciado,
           ayuda: pregunta.ayuda,
@@ -457,8 +479,8 @@ export function FormularioBuilder({
           permiteArchivo: pregunta.permiteArchivo,
           permiteImagen: pregunta.permiteImagen,
           permiteVideoLink: pregunta.permiteVideoLink,
-          conNotas: pregunta.conNotas,
-          escalaNotas: parseEscalaNotas(pregunta.escalaNotas),
+          conNotas: sinEvaluacion ? false : pregunta.conNotas,
+          escalaNotas: sinEvaluacion ? [] : parseEscalaNotas(pregunta.escalaNotas),
         })),
       }),
     );
@@ -515,6 +537,7 @@ export function FormularioBuilder({
         </div>
         {error ? <p className="text-danger">{error}</p> : null}
         <IndicadorGuardando visible={preguntasState.guardando || accion.guardando} />
+        {sinEvaluacion ? null : (
         <div className="flex flex-col items-end gap-1">
           <div className="flex flex-wrap items-center justify-end gap-2">
             <p className="text-sm font-semibold text-navy">Tipo de evaluación</p>
@@ -548,6 +571,7 @@ export function FormularioBuilder({
             </p>
           ) : null}
         </div>
+        )}
       </div>
 
       <div className="page-scroll min-h-0 overflow-y-auto overscroll-contain space-y-8 pr-1">
@@ -592,6 +616,10 @@ export function FormularioBuilder({
                         setAgregando(false);
                         setError(null);
                         setObligatoria(pregunta.obligatoria);
+                        setHayAdjuntos(
+                          pregunta.permiteArchivo || pregunta.permiteImagen || pregunta.permiteVideoLink,
+                        );
+                        setOcultarTextbox(parseOcultarTextbox(pregunta.opciones));
                         setEditandoId(pregunta.id);
                       }}
                     >
@@ -621,6 +649,8 @@ export function FormularioBuilder({
               setEditandoId(null);
               setError(null);
               setObligatoria(true);
+              setOcultarTextbox(false);
+              setHayAdjuntos(false);
               setAgregando(true);
             }}
           >
@@ -635,7 +665,16 @@ export function FormularioBuilder({
         wide
         sinCerrar
         headerExtra={
-          <InterruptorObligatoria checked={obligatoria} onChange={setObligatoria} />
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {hayAdjuntos ? (
+              <InterruptorSiNo
+                label="Ocultar textbox"
+                checked={ocultarTextbox}
+                onChange={setOcultarTextbox}
+              />
+            ) : null}
+            <InterruptorObligatoria checked={obligatoria} onChange={setObligatoria} />
+          </div>
         }
       >
         {preguntaEditando ? (
@@ -657,12 +696,19 @@ export function FormularioBuilder({
               permiteArchivo: preguntaEditando.permiteArchivo,
               permiteImagen: preguntaEditando.permiteImagen,
               permiteVideoLink: preguntaEditando.permiteVideoLink,
+              ocultarTextbox: parseOcultarTextbox(preguntaEditando.opciones),
               conNotas: preguntaEditando.conNotas,
               escalaNotas: parseEscalaNotas(preguntaEditando.escalaNotas),
             }}
             error={error}
             submitLabel="Guardar pregunta"
             obligatoria={obligatoria}
+            sinEvaluacion={sinEvaluacion}
+            ocultarTextbox={ocultarTextbox}
+            onHayAdjuntosChange={(hay) => {
+              setHayAdjuntos(hay);
+              if (!hay) setOcultarTextbox(false);
+            }}
             onCancel={cerrarModalPregunta}
             onSubmit={onGuardarEdicion}
           />
@@ -672,6 +718,12 @@ export function FormularioBuilder({
             error={error}
             submitLabel="Agregar esta pregunta"
             obligatoria={obligatoria}
+            sinEvaluacion={sinEvaluacion}
+            ocultarTextbox={ocultarTextbox}
+            onHayAdjuntosChange={(hay) => {
+              setHayAdjuntos(hay);
+              if (!hay) setOcultarTextbox(false);
+            }}
             onCancel={cerrarModalPregunta}
             onSubmit={onAgregar}
           />

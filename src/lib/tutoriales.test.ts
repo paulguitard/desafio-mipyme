@@ -31,6 +31,14 @@ describe("resolverTutorial", () => {
     expect(
       resolverTutorial("EMPRENDEDOR", "/participante/postulaciones/abc").map((p) => p.ancla),
     ).toEqual(["volver", "formulario-caso", "pestaña-evaluacion", "observacion-pregunta", "guardar-borrador", "enviar-caso"]);
+    expect(
+      resolverTutorial("EMPRENDEDOR", "/participante/postulaciones/abc", "carga-informacion").map((p) => p.ancla),
+    ).toEqual(["volver", "formulario-caso", "guardar-borrador", "enviar-caso"]);
+    expect(
+      resolverTutorial("EMPRENDEDOR", "/participante/postulaciones/abc", "carga-informacion")
+        .map((p) => p.descripcion)
+        .join(" "),
+    ).not.toMatch(/evaluaci[oó]n|observaciones/i);
     expect(resolverTutorial("EVALUADOR", "/evaluador/evaluaciones/xyz").map((p) => p.ancla)).toEqual([
       "volver",
       "nav",

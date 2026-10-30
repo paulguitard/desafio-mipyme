@@ -24,6 +24,15 @@ export type TextosCorreoNotificacion = {
   pie: string;
 };
 
+/** Variante de envío para Carga de información; no sustituye la plantilla de Feedback. */
+export const TEXTOS_RECORDATORIO_CARGA_COMPLETA: Partial<TextosCorreoNotificacion> = {
+  asunto: "Recordatorio: envía tu información — {{caso}}",
+  titulo: "Falta enviar tu información",
+  cuerpo:
+    "Hola {{nombre}},\n\nTu información de «{{caso}}» en {{mentoria}} ya está completa. Pulsa «Enviar información». Después ya no podrás editarla.\n\nAntes de enviarla todavía puedes editar e incluir imágenes y archivos.",
+  textoBoton: "Enviar información",
+};
+
 export const SECCIONES_CORREO_NOTIFICACION: {
   id: TipoCorreoNotificacion;
   label: string;

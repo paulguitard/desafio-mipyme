@@ -153,6 +153,7 @@ export function avisoEntradaParticipante(args: {
   mentoriaAbierta: boolean;
   descripcionMentoria?: string;
   conEvaluacionVisible?: boolean;
+  procesoTerminaAlEnviar?: boolean;
 }): AvisoEntradaCaso {
   if (args.estado === "FINALIZADA") {
     return {
@@ -189,9 +190,15 @@ export function avisoEntradaParticipante(args: {
   }
   if (args.canEdit) {
     return {
-      title: "Completa tu caso",
+      title: args.procesoTerminaAlEnviar ? "Completa la información" : "Completa tu caso",
       parrafos: parrafosDescripcionMentoria(args.descripcionMentoria ?? ""),
       claseModal: "modal-aviso-completa-caso",
+    };
+  }
+  if (args.procesoTerminaAlEnviar) {
+    return {
+      title: "Información enviada",
+      parrafos: ["Puedes consultarla, pero ya no puedes editarla."],
     };
   }
   if (args.conEvaluacionVisible) {

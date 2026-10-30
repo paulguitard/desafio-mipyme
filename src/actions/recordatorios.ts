@@ -2,7 +2,8 @@
 
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { esMentoriaContenido, parseTipoFormulario } from "@/lib/tipo-formulario";
+import { esCargaInformacion, esMentoriaContenido, mentoriaTieneRevision, parseTipoFormulario } from "@/lib/tipo-formulario";
+import { TEXTOS_RECORDATORIO_CARGA_COMPLETA } from "@/lib/correo-notificacion-ui";
 import {
   cantidadesPendientesEvaluadores,
   cantidadesPendientesSupervisores,
@@ -35,6 +36,7 @@ type Destino = {
   caso?: string;
   mentoria?: string;
   cantidad?: string;
+  textos?: { asunto?: string; titulo?: string; cuerpo?: string; textoBoton?: string; pie?: string };
 };
 
 async function enviarLote(destinos: Destino[]): Promise<
@@ -53,6 +55,7 @@ async function enviarLote(destinos: Destino[]): Promise<
         mentoria: destino.mentoria,
         cantidad: destino.cantidad,
       },
+      textos: destino.textos,
     });
     if ("notConfigured" in sent && sent.notConfigured) {
       return { error: sent.error };
@@ -132,7 +135,8 @@ export async function enviarRecordatorioParticipante(postulacionId: string) {
     select: postulacionRecordatorioSelect,
   });
   if (!postulacion) return { error: "Caso no encontrado." };
-  if (esMentoriaContenido(parseTipoFormulario(postulacion.convocatoria.tipo))) {
+  const tipoMentoria = parseTipoFormulario(postulacion.convocatoria.tipo);
+  if (esMentoriaContenido(tipoMentoria)) {
     return { error: "Esta asesoría no tiene recordatorios de caso." };
   }
   const regla = recordatorioParticipante(
@@ -140,6 +144,9 @@ export async function enviarRecordatorioParticipante(postulacionId: string) {
     postulacion.convocatoria.formulario.preguntas,
   );
   if (!regla.habilitado) return { error: regla.motivo };
+  if (esCargaInformacion(tipoMentoria) && regla.tipo === "PARTICIPANTE_RECORDATORIO_OBSERVACIONES") {
+    return { error: "Esta asesoría no tiene recordatorios de observaciones." };
+  }
   const email = postulacion.postulante.email;
   if (!email?.includes("@")) return { error: "El participante no tiene un correo válido." };
   return enviarLote([
@@ -149,6 +156,10 @@ export async function enviarRecordatorioParticipante(postulacionId: string) {
       nombre: postulacion.postulante.name,
       enlace: urlCasoParticipante(postulacion.id),
       ...contextoCaso(postulacion),
+      textos:
+        esCargaInformacion(tipoMentoria) && regla.tipo === "PARTICIPANTE_RECORDATORIO_COMPLETA"
+          ? TEXTOS_RECORDATORIO_CARGA_COMPLETA
+          : undefined,
     },
   ]);
 }
@@ -160,8 +171,8 @@ export async function enviarRecordatorioEvaluadorCaso(postulacionId: string) {
     select: postulacionRecordatorioSelect,
   });
   if (!postulacion) return { error: "Caso no encontrado." };
-  if (esMentoriaContenido(parseTipoFormulario(postulacion.convocatoria.tipo))) {
-    return { error: "Esta asesoría no tiene recordatorios de caso." };
+  if (!mentoriaTieneRevision(parseTipoFormulario(postulacion.convocatoria.tipo))) {
+    return { error: "Esta asesoría no tiene recordatorios de evaluación." };
   }
   const regla = recordatorioEvaluadorCaso(postulacion.asignaciones);
   if (!regla.habilitado) return { error: regla.motivo };
@@ -190,8 +201,8 @@ export async function enviarRecordatorioSupervisorCaso(postulacionId: string) {
     select: postulacionRecordatorioSelect,
   });
   if (!postulacion) return { error: "Caso no encontrado." };
-  if (esMentoriaContenido(parseTipoFormulario(postulacion.convocatoria.tipo))) {
-    return { error: "Esta asesoría no tiene recordatorios de caso." };
+  if (!mentoriaTieneRevision(parseTipoFormulario(postulacion.convocatoria.tipo))) {
+    return { error: "Esta asesoría no tiene recordatorios de supervisión." };
   }
   const regla = recordatorioSupervisorCaso(postulacion.asignaciones, postulacion.supervision);
   if (!regla.habilitado) return { error: regla.motivo };
@@ -231,7 +242,7 @@ export async function enviarRecordatorioEvaluadoresResumen(convocatoriaId: strin
     },
   });
   if (!convocatoria) return { error: "Asesoría no encontrada." };
-  if (esMentoriaContenido(parseTipoFormulario(convocatoria.tipo))) {
+  if (!mentoriaTieneRevision(parseTipoFormulario(convocatoria.tipo))) {
     return { error: "Esta asesoría no tiene recordatorios de evaluación." };
   }
   const cantidades = cantidadesPendientesEvaluadores(convocatoria.postulaciones);
@@ -287,7 +298,7 @@ export async function enviarRecordatorioSupervisoresResumen(convocatoriaId: stri
     },
   });
   if (!convocatoria) return { error: "Asesoría no encontrada." };
-  if (esMentoriaContenido(parseTipoFormulario(convocatoria.tipo))) {
+  if (!mentoriaTieneRevision(parseTipoFormulario(convocatoria.tipo))) {
     return { error: "Esta asesoría no tiene recordatorios de supervisión." };
   }
   const cantidades = cantidadesPendientesSupervisores(convocatoria.postulaciones);

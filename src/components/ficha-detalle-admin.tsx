@@ -12,7 +12,7 @@ import type { DetalleFichaAdmin } from "@/lib/convocatoria-admin-data";
 import { normalizarCorreo } from "@/lib/correo";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { parseEscalaNotas } from "@/lib/preguntas";
-import { esMentoriaContenido } from "@/lib/tipo-formulario";
+import { esCargaInformacion, esMentoriaContenido } from "@/lib/tipo-formulario";
 
 function lineaPersona(
   nombre: string | null | undefined,
@@ -35,14 +35,70 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
   const modoEvaluacion = parseModoEvaluacion(data.modoEvaluacion);
   const esGeneral = modoEvaluacion === "GENERAL";
   const esContenido = esMentoriaContenido(data.tipo);
+  const esCarga = esCargaInformacion(data.tipo);
   const metaPublica = tokenPublico ? (
     <div className="ficha-publica-meta">
       <FichaCasoMeta
         participante={data.emprendedorNombre}
         evaluador={asignacion?.evaluadorNombre}
+        mostrarEvaluador={!esCarga}
       />
     </div>
   ) : null;
+
+  const respuestasSoloLectura = data.preguntas.map((pregunta) => {
+    const respuesta = data.respuestas.find((item) => item.preguntaId === pregunta.id);
+    return (
+      <EvalDetalleCelda key={pregunta.id} panel="caso">
+        <PreguntaCampo
+          pregunta={pregunta}
+          respuesta={respuesta ?? null}
+          disabled
+          acciones={
+            respuesta?.versiones && respuesta.versiones.length > 0 ? (
+              <HistorialVersionesRespuesta
+                tipo={pregunta.tipo}
+                opciones={pregunta.opciones}
+                vigente={{
+                  id: respuesta.id,
+                  valor: respuesta.valor,
+                  archivos: respuesta.archivos,
+                  createdAt: respuesta.updatedAt,
+                }}
+                versiones={respuesta.versiones.map((version, index) => ({
+                  id: version.id,
+                  valor: version.valor,
+                  archivos: version.archivos,
+                  createdAt: version.createdAt,
+                  numero: respuesta.versiones.length - index,
+                }))}
+              />
+            ) : null
+          }
+        />
+      </EvalDetalleCelda>
+    );
+  });
+
+  if (esCarga) {
+    return (
+      <div className="ficha-detalle-admin eval-shell-open">
+        {metaPublica}
+        <section className="eval-detalle-shell" aria-label="Respuestas del participante">
+          <EvalDetalleColumnas
+            soloCaso
+            casoTitle="Respuestas"
+            casoSubtitle={lineaPersona(
+              data.emprendedorNombre,
+              data.emprendedorEmail,
+              "Sin participante",
+            )}
+            caso={respuestasSoloLectura}
+          />
+        </section>
+      </div>
+    );
+  }
 
   if (esContenido) {
     return (
@@ -118,39 +174,7 @@ export function FichaDetalleAdmin({ data }: { data: DetalleFichaAdmin }) {
             data.emprendedorEmail,
             "Sin participante",
           )}
-          caso={data.preguntas.map((pregunta) => {
-            const respuesta = data.respuestas.find((item) => item.preguntaId === pregunta.id);
-            return (
-              <EvalDetalleCelda key={pregunta.id} panel="caso">
-                <PreguntaCampo
-                  pregunta={pregunta}
-                  respuesta={respuesta ?? null}
-                  disabled
-                  acciones={
-                    respuesta?.versiones && respuesta.versiones.length > 0 ? (
-                      <HistorialVersionesRespuesta
-                        tipo={pregunta.tipo}
-                        opciones={pregunta.opciones}
-                        vigente={{
-                          id: respuesta.id,
-                          valor: respuesta.valor,
-                          archivos: respuesta.archivos,
-                          createdAt: respuesta.updatedAt,
-                        }}
-                        versiones={respuesta.versiones.map((version, index) => ({
-                          id: version.id,
-                          valor: version.valor,
-                          archivos: version.archivos,
-                          createdAt: version.createdAt,
-                          numero: respuesta.versiones.length - index,
-                        }))}
-                      />
-                    ) : null
-                  }
-                />
-              </EvalDetalleCelda>
-            );
-          })}
+          caso={respuestasSoloLectura}
           evalTitle="Evaluación y Supervisión"
           evalSubtitle={lineaPersona(
             asignacion?.evaluadorNombre,

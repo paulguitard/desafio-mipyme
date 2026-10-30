@@ -94,7 +94,7 @@ model Formulario {
   id             String   @id @default(cuid())
   titulo         String
   descripcion    String   @default("")
-  /// FEEDBACK | CONTENIDO
+  /// FEEDBACK | CONTENIDO | CARGA_INFORMACION
   tipo           String   @default("FEEDBACK")
   modoEvaluacion String   @default("GENERAL") // POR_PREGUNTA | GENERAL
   createdAt      DateTime @default(now())
@@ -176,7 +176,7 @@ model Convocatoria {
   id                         String    @id @default(cuid())
   titulo                     String
   descripcion                String    @default("")
-  /// FEEDBACK | CONTENIDO
+  /// FEEDBACK | CONTENIDO | CARGA_INFORMACION
   tipo                       String    @default("FEEDBACK")
   formularioId               String
   formulario                 Formulario @relation(fields: [formularioId], references: [id])

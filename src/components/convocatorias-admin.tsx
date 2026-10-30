@@ -557,6 +557,7 @@ export function ConvocatoriasAdmin({
             >
               <option value="FEEDBACK">{TIPO_FORMULARIO_LABEL.FEEDBACK}</option>
               <option value="CONTENIDO">{TIPO_FORMULARIO_LABEL.CONTENIDO}</option>
+              <option value="CARGA_INFORMACION">{TIPO_FORMULARIO_LABEL.CARGA_INFORMACION}</option>
             </select>
             {tipoBloqueado ? (
               <>

@@ -17,7 +17,7 @@ import {
   convocatoriaAbiertaParaPostular,
   convocatoriaDisponibleParaNuevosCasos,
 } from "@/lib/convocatoria";
-import { esMentoriaContenido } from "@/lib/tipo-formulario";
+import { esCargaInformacion, esMentoriaContenido } from "@/lib/tipo-formulario";
 import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
 import { avisarEvaluadoresRespuestaReenviada } from "@/lib/correo-notificacion";
 
@@ -243,6 +243,9 @@ export async function guardarCasoAdmin(formData: FormData) {
   if (!postulacion) return { error: "Caso no encontrado." };
   if (esMentoriaContenido(postulacion.convocatoria.tipo)) {
     return { error: "Esta asesoría de contenido no se edita." };
+  }
+  if (esCargaInformacion(postulacion.convocatoria.tipo)) {
+    return { error: "Las respuestas de carga de información no se editan." };
   }
 
   const preguntas = postulacion.convocatoria.formulario.preguntas;

@@ -20,6 +20,7 @@ import {
   esTipoFormato,
   parseEscalaNotas,
   campoLimiteCuenta,
+  conOcultarTextbox,
   serializeConfigCorreo,
   serializeConfigFecha,
   serializeConfigGantt,
@@ -41,14 +42,22 @@ import {
 } from "@/lib/preguntas";
 import { deleteUpload, saveUpload } from "@/lib/storage";
 import { parseClaseMedio, parseMedioPayload, serializeMedioPayload } from "@/lib/contenido";
-import { esMentoriaContenido, parseTipoFormulario, type TipoFormulario } from "@/lib/tipo-formulario";
+import {
+  esCargaInformacion,
+  esMentoriaContenido,
+  parseTipoFormulario,
+  type TipoFormulario,
+} from "@/lib/tipo-formulario";
 import { randomUUID } from "node:crypto";
 
 function isTipo(value: string): value is TipoPregunta {
   return (TIPOS_PREGUNTA as readonly string[]).includes(value);
 }
 
-function leerEscala(formData: FormData) {
+function leerEscala(formData: FormData, tipoFormulario?: string | null) {
+  if (esCargaInformacion(tipoFormulario)) {
+    return { conNotas: false, escalaNotas: "[]" as const };
+  }
   const conNotas = formData.get("conNotas") === "on";
   const escala = parseEscalaNotas(String(formData.get("escalaNotas") ?? "[]"));
   if (conNotas) {
@@ -132,20 +141,22 @@ function leerConfigObjetivos(formData: FormData): ConfigObjetivos {
 
 function leerOpcionesGuardadas(tipo: TipoPregunta, formData: FormData): { opciones: string; error?: string } {
   const limites = leerLimites(formData);
+  const ocultarTextbox = formData.get("ocultarTextbox") === "on";
+  const conFlag = (opciones: string) => conOcultarTextbox(opciones, ocultarTextbox);
   if (tipo === "fecha") {
     const modo = String(formData.get("fechaModo") ?? "unica") === "rango" ? "rango" : "unica";
-    return { opciones: serializeConfigFecha(modo, limites) };
+    return { opciones: conFlag(serializeConfigFecha(modo, limites)) };
   }
   if (tipo === "correo") {
     const cantidad = Math.max(1, Math.min(20, Number(formData.get("cantidadCorreos") ?? 1) || 1));
-    return { opciones: serializeConfigCorreo(cantidad, limites) };
+    return { opciones: conFlag(serializeConfigCorreo(cantidad, limites)) };
   }
-  if (tipo === "gantt") return { opciones: serializeConfigGantt(leerConfigGantt(formData)) };
+  if (tipo === "gantt") return { opciones: conFlag(serializeConfigGantt(leerConfigGantt(formData))) };
   if (tipo === "presupuesto") {
-    return { opciones: serializeConfigPresupuesto(leerConfigPresupuesto(formData)) };
+    return { opciones: conFlag(serializeConfigPresupuesto(leerConfigPresupuesto(formData))) };
   }
   if (tipo === "objetivos_indicadores") {
-    return { opciones: serializeConfigObjetivos(leerConfigObjetivos(formData)) };
+    return { opciones: conFlag(serializeConfigObjetivos(leerConfigObjetivos(formData))) };
   }
   const opciones = String(formData.get("opciones") ?? "")
     .split("\n")
@@ -155,9 +166,9 @@ function leerOpcionesGuardadas(tipo: TipoPregunta, formData: FormData): { opcion
     return { opciones: "[]", error: "Este tipo necesita al menos dos opciones (una por línea)." };
   }
   if (tipoTieneOpciones(tipo)) {
-    return { opciones: serializeOpcionesConLimites(opciones, limites) };
+    return { opciones: conFlag(serializeOpcionesConLimites(opciones, limites)) };
   }
-  return { opciones: serializeSoloLimites(limites) };
+  return { opciones: conFlag(serializeSoloLimites(limites)) };
 }
 
 export async function crearFormulario(formData: FormData) {
@@ -165,10 +176,9 @@ export async function crearFormulario(formData: FormData) {
   const titulo = String(formData.get("titulo") ?? "").trim();
   const tipo = parseTipoFormulario(String(formData.get("tipo") ?? ""));
   const { permitirEvaluacionPorPregunta } = await leerConfigApp();
-  const modoEvaluacion = modoEvaluacionAlCrear(
-    formData.get("modoEvaluacion"),
-    permitirEvaluacionPorPregunta,
-  );
+  const modoEvaluacion = esCargaInformacion(tipo)
+    ? "GENERAL"
+    : modoEvaluacionAlCrear(formData.get("modoEvaluacion"), permitirEvaluacionPorPregunta);
   if (!titulo) return { error: "El título es obligatorio." };
 
   const form = await prisma.formulario.create({
@@ -205,7 +215,7 @@ export async function actualizarFormulario(formData: FormData) {
     titulo,
   };
 
-  if (formData.has("modoEvaluacion")) {
+  if (formData.has("modoEvaluacion") && !esCargaInformacion(existente.tipo)) {
     const modoRaw = String(formData.get("modoEvaluacion") ?? "").trim();
     if (!esModoEvaluacion(modoRaw)) {
       return { error: "El tipo de evaluación no es válido." };
@@ -249,6 +259,14 @@ export async function agregarPregunta(formData: FormData) {
   if (!formularioId || !enunciado || !isTipo(tipo)) {
     return { error: "Completa el enunciado y el tipo de pregunta." };
   }
+  if (
+    formData.get("ocultarTextbox") === "on" &&
+    !permiteArchivo &&
+    !permiteImagen &&
+    !permiteVideoLink
+  ) {
+    return { error: "Para ocultar el textbox debes permitir al menos un tipo de adjunto." };
+  }
 
   const formulario = await prisma.formulario.findUnique({
     where: { id: formularioId },
@@ -262,7 +280,7 @@ export async function agregarPregunta(formData: FormData) {
   const opcionesLeidas = leerOpcionesGuardadas(tipo, formData);
   if (opcionesLeidas.error) return { error: opcionesLeidas.error };
 
-  const escala = leerEscala(formData);
+  const escala = leerEscala(formData, formulario.tipo);
   if ("error" in escala && escala.error) return { error: escala.error };
 
   const last = await prisma.pregunta.findFirst({
@@ -349,8 +367,19 @@ export async function actualizarPregunta(formData: FormData) {
   if (!id || !formularioId || !enunciado || !isTipo(tipo)) {
     return { error: "Completa el enunciado y el tipo de pregunta." };
   }
+  if (
+    formData.get("ocultarTextbox") === "on" &&
+    !permiteArchivo &&
+    !permiteImagen &&
+    !permiteVideoLink
+  ) {
+    return { error: "Para ocultar el textbox debes permitir al menos un tipo de adjunto." };
+  }
 
-  const actual = await prisma.pregunta.findUnique({ where: { id } });
+  const actual = await prisma.pregunta.findUnique({
+    where: { id },
+    include: { formulario: { select: { tipo: true } } },
+  });
   if (!actual) return { error: "Pregunta no encontrada." };
   if (esPreguntaNombreCaso(actual)) {
     return { error: "El nombre del caso es una pregunta fija y no se puede editar." };
@@ -359,7 +388,7 @@ export async function actualizarPregunta(formData: FormData) {
   const opcionesLeidas = leerOpcionesGuardadas(tipo, formData);
   if (opcionesLeidas.error) return { error: opcionesLeidas.error };
 
-  const escala = leerEscala(formData);
+  const escala = leerEscala(formData, actual.formulario.tipo);
   if ("error" in escala && escala.error) return { error: escala.error };
 
   await prisma.pregunta.update({
@@ -401,8 +430,14 @@ export async function crearFormularioCompleto(payload: {
   const admin = await requireUser("ADMIN");
   const titulo = payload.titulo.trim();
   if (!titulo) return { error: "El título es obligatorio." };
+  const tipo = parseTipoFormulario(payload.tipo);
+  if (tipo === "CONTENIDO") {
+    return { error: "Usa el compositor de contenido para este tipo de formulario." };
+  }
   const { permitirEvaluacionPorPregunta } = await leerConfigApp();
-  const modoEvaluacion = modoEvaluacionAlCrear(payload.modoEvaluacion, permitirEvaluacionPorPregunta);
+  const modoEvaluacion = esCargaInformacion(tipo)
+    ? "GENERAL"
+    : modoEvaluacionAlCrear(payload.modoEvaluacion, permitirEvaluacionPorPregunta);
 
   const payloadPreguntas = esPreguntaNombreCaso(payload.preguntas[0] ?? { opciones: "" })
     ? payload.preguntas
@@ -422,15 +457,10 @@ export async function crearFormularioCompleto(payload: {
         return { error: "Hay una pregunta de opciones inválida." };
       }
     }
-    if (pregunta.conNotas) {
+    if (!esCargaInformacion(tipo) && pregunta.conNotas) {
       const error = validarEscalaNotas(pregunta.escalaNotas);
       if (error) return { error };
     }
-  }
-
-  const tipo = parseTipoFormulario(payload.tipo);
-  if (tipo === "CONTENIDO") {
-    return { error: "Usa el compositor de contenido para este tipo de formulario." };
   }
 
   const form = await prisma.formulario.create({
@@ -449,8 +479,11 @@ export async function crearFormularioCompleto(payload: {
           permiteImagen: pregunta.permiteImagen,
           permiteVideoLink: pregunta.permiteVideoLink,
           opciones: pregunta.opciones,
-          conNotas: pregunta.conNotas,
-          escalaNotas: pregunta.conNotas ? serializeEscalaNotas(pregunta.escalaNotas) : "[]",
+          conNotas: esCargaInformacion(tipo) ? false : pregunta.conNotas,
+          escalaNotas:
+            esCargaInformacion(tipo) || !pregunta.conNotas
+              ? "[]"
+              : serializeEscalaNotas(pregunta.escalaNotas),
           orden: index + 1,
         })),
       },

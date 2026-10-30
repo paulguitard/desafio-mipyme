@@ -62,6 +62,7 @@ export function FormularioPostulante({
   title,
   meta,
   avisoEntrada = null,
+  esCargaInformacion = false,
   children,
 }: {
   postulacionId: string;
@@ -73,6 +74,7 @@ export function FormularioPostulante({
   title: React.ReactNode;
   meta?: React.ReactNode;
   avisoEntrada?: AvisoEntradaCasoDatos | null;
+  esCargaInformacion?: boolean;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -259,6 +261,7 @@ export function FormularioPostulante({
     <form
       ref={formRef}
       onSubmit={(event) => event.preventDefault()}
+      data-tour-contexto-pagina={esCargaInformacion ? "carga-informacion" : undefined}
       className={
         [
           conPaneles
@@ -298,7 +301,7 @@ export function FormularioPostulante({
                   setPendienteEnvio(true);
                 }}
               >
-                {esCorreccion ? "Enviar correcciones" : "Enviar caso"}
+                {esCorreccion ? "Enviar correcciones" : esCargaInformacion ? "Enviar información" : "Enviar caso"}
               </button>
             </div>
           ) : null}
@@ -333,8 +336,20 @@ export function FormularioPostulante({
       <AvisoEntradaCaso aviso={avisoEntrada} />
       <ConfirmacionEnvio
         open={pendienteEnvio}
-        title={esCorreccion ? "¿Enviar correcciones?" : "¿Enviar caso?"}
-        confirmLabel={esCorreccion ? "Enviar correcciones" : "Enviar caso"}
+        title={
+          esCorreccion
+            ? "¿Enviar correcciones?"
+            : esCargaInformacion
+              ? "¿Enviar información?"
+              : "¿Enviar caso?"
+        }
+        confirmLabel={
+          esCorreccion
+            ? "Enviar correcciones"
+            : esCargaInformacion
+              ? "Enviar información"
+              : "Enviar caso"
+        }
         confirming={false}
         onCancel={() => setPendienteEnvio(false)}
         onConfirm={confirmarEnvio}
@@ -344,6 +359,8 @@ export function FormularioPostulante({
             <p>Las correcciones se enviarán al evaluador.</p>
             <p>Después no podrás editar hasta que haya nuevas observaciones.</p>
           </>
+        ) : esCargaInformacion ? (
+          <p>Tu información se enviará y ya no podrás editarla.</p>
         ) : (
           <>
             <p>El caso se enviará al evaluador.</p>
@@ -368,7 +385,9 @@ export function FormularioPostulante({
         detalleExito={
           esCorreccion
             ? "Las correcciones se enviaron al evaluador."
-            : "El caso se envió al evaluador."
+            : esCargaInformacion
+              ? "La información se envió. Ya no puedes editarla."
+              : "El caso se envió al evaluador."
         }
         onAceptar={() => {
           if (envioModal === "exito") {

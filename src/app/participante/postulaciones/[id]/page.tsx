@@ -11,7 +11,7 @@ import { medioDesdeFila } from "@/lib/contenido";
 import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
 import { etiquetaNombreCaso, extraerNombreCaso } from "@/lib/nombre-caso";
 import { preguntasModificadasEnUltimoEnvio } from "@/lib/cambios-reenvio";
-import { esMentoriaContenido } from "@/lib/tipo-formulario";
+import { esCargaInformacion, esMentoriaContenido } from "@/lib/tipo-formulario";
 import { coincideRevisionCiclo, revisionesParaParticipante } from "@/lib/revision-ciclo";
 import { avisoEntradaParticipante } from "@/lib/aviso-entrada-caso";
 import { requireUser } from "@/lib/session";
@@ -97,6 +97,7 @@ export default async function PostulacionPage({
   const abierta = convocatoriaAbiertaParaPostular(postulacion.convocatoria);
   const canEdit = postulacionEditable(estado, abierta);
   const esCorreccion = estado === "CON_OBSERVACIONES";
+  const esCarga = esCargaInformacion(postulacion.convocatoria.tipo);
   const modoEvaluacion = parseModoEvaluacion(postulacion.convocatoria.formulario.modoEvaluacion);
   const esGeneral = modoEvaluacion === "GENERAL";
 
@@ -203,8 +204,13 @@ export default async function PostulacionPage({
         </h1>
       }
       meta={
-        <FichaCasoMeta participante={user.name} evaluador={evaluadorNombre} />
+        <FichaCasoMeta
+          participante={user.name}
+          evaluador={evaluadorNombre}
+          mostrarEvaluador={!esCarga}
+        />
       }
+      esCargaInformacion={esCarga}
       avisoEntrada={avisoEntradaParticipante({
         estado,
         esCorreccion,
@@ -212,6 +218,7 @@ export default async function PostulacionPage({
         mentoriaAbierta: abierta,
         descripcionMentoria: postulacion.convocatoria.descripcion,
         conEvaluacionVisible,
+        procesoTerminaAlEnviar: esCarga,
       })}
     >
       {conEvaluacionVisible ? (

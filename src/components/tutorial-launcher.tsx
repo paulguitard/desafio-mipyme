@@ -106,7 +106,9 @@ export function TutorialLauncher({ rol }: { rol: Role }) {
     recorriendo.current?.destroy();
     const dialog = dialogTutorialAbierto() ?? dialogAbiertoMasAlto();
     const raiz: ParentNode = dialog ?? document;
-    const contexto = dialog?.getAttribute("data-tour-contexto");
+    const contexto =
+      dialog?.getAttribute("data-tour-contexto") ??
+      document.querySelector("[data-tour-contexto-pagina]")?.getAttribute("data-tour-contexto-pagina");
     const pasos = pasosPresentes(resolverTutorial(rol, pathname, contexto), raiz);
     if (pasos.length === 0) return;
 

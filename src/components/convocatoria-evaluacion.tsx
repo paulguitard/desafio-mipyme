@@ -49,7 +49,12 @@ import {
   usaEvaluadores,
   usaSupervisores,
 } from "@/lib/modo-revision";
-import { esMentoriaContenido, parseTipoFormulario, type TipoFormulario } from "@/lib/tipo-formulario";
+import {
+  esMentoriaContenido,
+  mentoriaTieneRevision,
+  parseTipoFormulario,
+  type TipoFormulario,
+} from "@/lib/tipo-formulario";
 import { workbookXlsx } from "@/lib/xlsx-workbook";
 import {
   contiene,
@@ -368,6 +373,7 @@ function AccionesCasoModal({
   error,
   mensaje,
   mostrarEditar,
+  mostrarRevision,
   onVerCaso,
   onEditarCaso,
   onRecordatorioParticipante,
@@ -380,6 +386,7 @@ function AccionesCasoModal({
   error: string | null;
   mensaje: string | null;
   mostrarEditar: boolean;
+  mostrarRevision: boolean;
   onVerCaso: () => void;
   onEditarCaso: () => void;
   onRecordatorioParticipante: () => void;
@@ -449,6 +456,8 @@ function AccionesCasoModal({
       {participante.habilitado ? null : (
         <p className="eval-acciones-hint">{participante.motivo}</p>
       )}
+      {mostrarRevision ? (
+        <>
       <button
         className="btn btn-sm btn-secondary"
         type="button"
@@ -467,6 +476,8 @@ function AccionesCasoModal({
         {enviando === "supervisor" ? "Enviando…" : "Enviar recordatorio al supervisor"}
       </button>
       {supervisor.habilitado ? null : <p className="eval-acciones-hint">{supervisor.motivo}</p>}
+        </>
+      ) : null}
       {errorPdf ? <p className="eval-acciones-aviso text-danger">{errorPdf}</p> : null}
       {error ? <p className="eval-acciones-aviso text-danger">{error}</p> : null}
       {mensaje ? <p className="eval-acciones-aviso">{mensaje}</p> : null}
@@ -613,9 +624,9 @@ export function ConvocatoriaEvaluacion({
   supervisoresHabilitados?: boolean;
 }) {
   const router = useRouter();
-  const modoRev = esMentoriaContenido(tipo)
-    ? "ninguno"
-    : modoRevision({ evaluadoresHabilitados, supervisoresHabilitados });
+  const modoRev = mentoriaTieneRevision(tipo)
+    ? modoRevision({ evaluadoresHabilitados, supervisoresHabilitados })
+    : "ninguno";
   const mostrarEvaluadores = usaEvaluadores(modoRev);
   const mostrarSupervisores = usaSupervisores(modoRev);
   const mostrarColumnaEvaluacion = mostrarEvaluadores;
@@ -659,6 +670,7 @@ export function ConvocatoriaEvaluacion({
   const [filtroSupervisorId, setFiltroSupervisorId] = useState("");
   const [filtroPiezas, setFiltroPiezas] = useState<Record<string, string>>({});
   const esContenido = esMentoriaContenido(parseTipoFormulario(tipo));
+  const conRevision = mentoriaTieneRevision(tipo);
   const columnasContenido = { "--casillas": String(piezas.length) } as CSSProperties;
   const [panelLateral, setPanelLateral] = useState<"evaluadores" | "supervisores">(
     mostrarEvaluadores ? "evaluadores" : "supervisores",
@@ -2287,7 +2299,8 @@ export function ConvocatoriaEvaluacion({
                   enviando={recordatorioEnviando}
                   error={recordatorioError}
                   mensaje={recordatorioMensaje}
-                  mostrarEditar={!esContenido}
+                  mostrarEditar={conRevision}
+                  mostrarRevision={conRevision}
                   onVerCaso={() => {
                     const caso = accionesCaso;
                     cerrarAccionesCaso();

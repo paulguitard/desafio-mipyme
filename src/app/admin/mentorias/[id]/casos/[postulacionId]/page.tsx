@@ -3,7 +3,7 @@ import { FormularioCasoAdmin } from "@/components/formulario-caso-admin";
 import { PreguntaCampo } from "@/components/pregunta-campo";
 import { prisma } from "@/lib/db";
 import { etiquetaNombreCaso, extraerNombreCaso } from "@/lib/nombre-caso";
-import { esMentoriaContenido } from "@/lib/tipo-formulario";
+import { esCargaInformacion, esMentoriaContenido } from "@/lib/tipo-formulario";
 import { requireUser } from "@/lib/session";
 import { notFound } from "next/navigation";
 
@@ -34,6 +34,7 @@ export default async function EditarCasoAdminPage({
 
   if (!postulacion || postulacion.convocatoriaId !== convocatoriaId) notFound();
   if (esMentoriaContenido(postulacion.convocatoria.tipo)) notFound();
+  if (esCargaInformacion(postulacion.convocatoria.tipo)) notFound();
 
   const nombreCaso = etiquetaNombreCaso(
     postulacion.nombreCaso ||

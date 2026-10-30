@@ -21,7 +21,7 @@ export function NuevoFormulario({
           <h1 className="text-3xl font-extrabold text-navy">Nuevo formulario</h1>
         </div>
         <p className="text-muted">Elige el tipo. Después no se puede cambiar.</p>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <button className="card p-6 text-left" type="button" onClick={() => setTipo("FEEDBACK")}>
             <p className="text-xl font-semibold">{TIPO_FORMULARIO_LABEL.FEEDBACK}</p>
             <p className="text-muted">Preguntas que el participante responde y se evalúan.</p>
@@ -29,6 +29,10 @@ export function NuevoFormulario({
           <button className="card p-6 text-left" type="button" onClick={() => setTipo("CONTENIDO")}>
             <p className="text-xl font-semibold">{TIPO_FORMULARIO_LABEL.CONTENIDO}</p>
             <p className="text-muted">Casillas con fotos, videos o archivos para ver, sin responder.</p>
+          </button>
+          <button className="card p-6 text-left" type="button" onClick={() => setTipo("CARGA_INFORMACION")}>
+            <p className="text-xl font-semibold">{TIPO_FORMULARIO_LABEL.CARGA_INFORMACION}</p>
+            <p className="text-muted">Preguntas que el participante responde, sin evaluación ni notas.</p>
           </button>
         </div>
       </div>
@@ -40,6 +44,10 @@ export function NuevoFormulario({
   }
 
   return (
-    <FormularioBuilder modo="nuevo" permitirEvaluacionPorPregunta={permitirEvaluacionPorPregunta} />
+    <FormularioBuilder
+      modo="nuevo"
+      tipo={tipo}
+      permitirEvaluacionPorPregunta={permitirEvaluacionPorPregunta}
+    />
   );
 }

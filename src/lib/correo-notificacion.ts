@@ -186,6 +186,7 @@ export async function notifyNovedadCaso(input: {
   tipo: TipoCorreoNotificacion;
   to: string;
   vars: VarsNovedadCaso;
+  textos?: Partial<TextosCorreoNotificacion>;
 }): Promise<NotifyNovedadResult> {
   if (!input.to.includes("@")) {
     return { ok: false, error: "Correo inválido." };
@@ -200,10 +201,11 @@ export async function notifyNovedadCaso(input: {
   }
 
   try {
-    const [diseno, textos] = await Promise.all([
+    const [diseno, textosBase] = await Promise.all([
       loadConfigCorreoRecuperacionForMail(),
       loadTextosCorreoNotificacion(input.tipo),
     ]);
+    const textos = { ...textosBase, ...input.textos };
     const config = combinarDisenoYTextos(diseno, textos);
     const vars = {
       nombre: input.vars.nombre,

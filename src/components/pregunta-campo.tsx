@@ -32,6 +32,7 @@ import {
   parseConfigCorreo,
   parseConfigFecha,
   parseConfigLimites,
+  parseOcultarTextbox,
   parseOpciones,
   parseValor,
   publicUploadUrl,
@@ -480,6 +481,7 @@ export function PreguntaCampo({
   const modoFecha = parseConfigFecha(pregunta.opciones);
   const cantidadCorreos = parseConfigCorreo(pregunta.opciones);
   const limites = parseConfigLimites(pregunta.opciones);
+  const ocultarTextbox = parseOcultarTextbox(pregunta.opciones);
   const name = preview ? `preview-${pregunta.id}` : `valor-${pregunta.id}`;
   const locked = Boolean(readOnly || disabled);
   const tituloId = `pregunta-titulo-${pregunta.id}`;
@@ -506,8 +508,9 @@ export function PreguntaCampo({
 
   if (locked) {
     const textoCorto = formatearValorPregunta(tipo, valor, pregunta.opciones);
-    const valorNodo =
-      tipo === "texto_largo" ? (
+    const valorNodo = ocultarTextbox
+      ? null
+      : tipo === "texto_largo" ? (
         <TextoLargoVista html={valorTexto(valor)} />
       ) : tipo === "si_no" ? (
         <BotonesSiNo name={name} valor={valorTexto(valor)} readOnly />
@@ -536,9 +539,11 @@ export function PreguntaCampo({
       <MarcoPregunta id={anclaId} className={clasePregunta} modificada={modificada}>
         <div className="pregunta-lectura-enunciado">{encabezado}</div>
         <div className="pregunta-lectura-cuerpo">
-          <div className={hayAdjuntos ? "pregunta-con-adjuntos" : undefined}>
-            <div className="pregunta-valor min-w-0">{valorNodo}</div>
-            {ocultarAdjuntos ? null : (
+          <div className={hayAdjuntos || valorNodo ? "pregunta-con-adjuntos" : undefined}>
+            {valorNodo ? <div className="pregunta-valor min-w-0">{valorNodo}</div> : null}
+            {ocultarAdjuntos ? null : !hayAdjuntos && ocultarTextbox ? (
+              <p className="texto-solo-lectura is-vacio">Sin adjuntos</p>
+            ) : (
               <AdjuntosRespuesta archivos={archivos} modoPdf={adjuntosModoPdf} />
             )}
           </div>
@@ -564,7 +569,8 @@ export function PreguntaCampo({
     <MarcoPregunta id={anclaId} className={clasePregunta} modificada={modificada} etiqueta={tituloId}>
       <div className="pregunta-lectura-enunciado">{encabezado}</div>
       <div className="pregunta-lectura-cuerpo">
-      {tipo === "texto_corto" ? (
+      {ocultarTextbox ? <input type="hidden" name={name} value="" /> : null}
+      {!ocultarTextbox && tipo === "texto_corto" ? (
         <input
           className="input w-full"
           name={name}
@@ -572,10 +578,10 @@ export function PreguntaCampo({
           maxLength={limites.maxCaracteres ?? undefined}
         />
       ) : null}
-      {tipo === "texto_largo" ? (
+      {!ocultarTextbox && tipo === "texto_largo" ? (
         <EditorTextoLargo name={name} defaultValue={valorTexto(valor)} />
       ) : null}
-      {tipo === "numero" ? (
+      {!ocultarTextbox && tipo === "numero" ? (
         <input
           className="input w-full"
           name={name}
@@ -585,10 +591,10 @@ export function PreguntaCampo({
           defaultValue={valorTexto(valor)}
         />
       ) : null}
-      {tipo === "fecha" && modoFecha === "unica" ? (
+      {!ocultarTextbox && tipo === "fecha" && modoFecha === "unica" ? (
         <input className="input w-full" name={name} type="date" defaultValue={valorTexto(valor)} />
       ) : null}
-      {tipo === "fecha" && modoFecha === "rango" ? (
+      {!ocultarTextbox && tipo === "fecha" && modoFecha === "rango" ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="field">
             <label htmlFor={`${name}-desde`}>Fecha inicio</label>
@@ -612,7 +618,7 @@ export function PreguntaCampo({
           </div>
         </div>
       ) : null}
-      {tipo === "correo" ? (
+      {!ocultarTextbox && tipo === "correo" ? (
         <div className="space-y-3">
           {Array.from({ length: cantidadCorreos }, (_, index) => (
             <div key={index} className="field">
@@ -631,7 +637,7 @@ export function PreguntaCampo({
           ))}
         </div>
       ) : null}
-      {tipo === "lista" ? (
+      {!ocultarTextbox && tipo === "lista" ? (
         <select className="input w-full" name={name} defaultValue={valorTexto(valor)}>
           <option value="">Selecciona una opción</option>
           {opciones.map((opcion) => (
@@ -641,8 +647,8 @@ export function PreguntaCampo({
           ))}
         </select>
       ) : null}
-      {tipo === "si_no" ? <BotonesSiNo name={name} valor={valorTexto(valor)} /> : null}
-      {tipo === "opcion_unica" ? (
+      {!ocultarTextbox && tipo === "si_no" ? <BotonesSiNo name={name} valor={valorTexto(valor)} /> : null}
+      {!ocultarTextbox && tipo === "opcion_unica" ? (
         <div className="space-y-2">
           {opciones.map((opcion) => (
             <label key={opcion} className="flex items-center gap-2">
@@ -657,7 +663,7 @@ export function PreguntaCampo({
           ))}
         </div>
       ) : null}
-      {tipo === "opcion_multiple" ? (
+      {!ocultarTextbox && tipo === "opcion_multiple" ? (
         <div className="space-y-2">
           {opciones.map((opcion) => (
             <label key={opcion} className="flex items-center gap-2">
@@ -673,13 +679,13 @@ export function PreguntaCampo({
         </div>
       ) : null}
 
-      {tipo === "gantt" ? (
+      {!ocultarTextbox && tipo === "gantt" ? (
         <CampoGantt name={name} opcionesRaw={pregunta.opciones} valorInicial={valor} />
       ) : null}
-      {tipo === "presupuesto" ? (
+      {!ocultarTextbox && tipo === "presupuesto" ? (
         <CampoPresupuesto name={name} opcionesRaw={pregunta.opciones} valorInicial={valor} />
       ) : null}
-      {tipo === "objetivos_indicadores" ? (
+      {!ocultarTextbox && tipo === "objetivos_indicadores" ? (
         <CampoObjetivosIndicadores name={name} opcionesRaw={pregunta.opciones} valorInicial={valor} />
       ) : null}
 

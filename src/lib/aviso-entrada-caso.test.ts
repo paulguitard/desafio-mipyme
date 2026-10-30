@@ -131,6 +131,31 @@ describe("avisoEntradaParticipante", () => {
     expect(aviso.pasos?.join(" ")).toContain("Modificada");
   });
 
+  it("pide completar la información en una carga editable", () => {
+    const aviso = avisoEntradaParticipante({
+      estado: "BORRADOR",
+      esCorreccion: false,
+      canEdit: true,
+      mentoriaAbierta: true,
+      descripcionMentoria: "Entrega los documentos de la asesoría.",
+      procesoTerminaAlEnviar: true,
+    });
+    expect(aviso.title).toBe("Completa la información");
+    expect(aviso.parrafos).toEqual(["Entrega los documentos de la asesoría."]);
+  });
+
+  it("explica que la carga de información queda bloqueada al enviar", () => {
+    const aviso = avisoEntradaParticipante({
+      estado: "ENVIADA",
+      esCorreccion: false,
+      canEdit: false,
+      mentoriaAbierta: true,
+      procesoTerminaAlEnviar: true,
+    });
+    expect(aviso.title).toBe("Información enviada");
+    expect(aviso.parrafos[0]).toContain("ya no puedes editarla");
+  });
+
   it("felicita cuando el caso quedó aprobado y finalizado", () => {
     const aviso = avisoEntradaParticipante({
       estado: "FINALIZADA",

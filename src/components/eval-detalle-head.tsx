@@ -91,6 +91,7 @@ export function EvalDetalleColumnas({
   supSubtitle,
   supervision,
   sinSupervision = false,
+  soloCaso = false,
   bloqueado = false,
   className,
   evalAcciones,
@@ -98,22 +99,25 @@ export function EvalDetalleColumnas({
   casoTitle: string;
   casoSubtitle?: ReactNode;
   caso: ReactNode;
-  evalTitle: string;
+  evalTitle?: string;
   evalSubtitle?: ReactNode;
-  evaluacion: ReactNode;
+  evaluacion?: ReactNode;
   supTitle?: string;
   supSubtitle?: ReactNode;
   supervision?: ReactNode;
   sinSupervision?: boolean;
+  soloCaso?: boolean;
   bloqueado?: boolean;
   className?: string;
   evalAcciones?: ReactNode;
 }) {
   const paneles = useEvalPanelesColapsables();
   const [tab, setTab] = useState<"caso" | "eval" | "sup">("caso");
+  const ocultarEval = soloCaso;
 
   return (
     <div className="eval-detalle-movil">
+      {ocultarEval ? null : (
       <div className="eval-detalle-tabs" role="tablist" aria-label="Paneles de la ficha">
         <button
           type="button"
@@ -125,6 +129,7 @@ export function EvalDetalleColumnas({
         >
           {casoTitle}
         </button>
+        {ocultarEval ? null : (
         <button
           type="button"
           role="tab"
@@ -135,7 +140,8 @@ export function EvalDetalleColumnas({
         >
           {evalTitle}
         </button>
-        {sinSupervision ? null : (
+        )}
+        {sinSupervision || ocultarEval ? null : (
           <button
             type="button"
             role="tab"
@@ -148,11 +154,13 @@ export function EvalDetalleColumnas({
           </button>
         )}
       </div>
+      )}
     <div
       className={[
         "eval-detalle-body is-columnas",
         `is-tab-${tab}`,
         sinSupervision ? "is-sin-sup" : "",
+        ocultarEval ? "is-sin-eval is-sin-sup" : "",
         paneles.bodyClassName,
         bloqueado ? "is-bloqueado" : "",
         className ?? "",
@@ -164,10 +172,11 @@ export function EvalDetalleColumnas({
         <EvalDetalleHead panel="caso" title={casoTitle} subtitle={casoSubtitle} />
         <div className="eval-detalle-col-scroll">{caso}</div>
       </div>
+      {ocultarEval ? null : (
       <div className={`eval-detalle-col is-eval${paneles.evalColapsado ? " is-collapsed" : ""}`}>
         <EvalDetalleHead
           panel="eval"
-          title={evalTitle}
+          title={evalTitle ?? "Evaluación"}
           subtitle={evalSubtitle}
           collapsed={paneles.evalColapsado}
           onToggle={paneles.toggleEval}
@@ -177,7 +186,8 @@ export function EvalDetalleColumnas({
           {evalAcciones ? <div className="eval-detalle-eval-acciones">{evalAcciones}</div> : null}
         </div>
       </div>
-      {sinSupervision ? null : (
+      )}
+      {sinSupervision || ocultarEval ? null : (
         <div className={`eval-detalle-col is-sup${paneles.supColapsado ? " is-collapsed" : ""}`}>
           <EvalDetalleHead
             panel="sup"

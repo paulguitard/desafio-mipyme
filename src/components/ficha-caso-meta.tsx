@@ -5,9 +5,11 @@ function recorteNombre(nombre: string | null | undefined) {
 export function FichaCasoMeta({
   participante,
   evaluador,
+  mostrarEvaluador = true,
 }: {
   participante: string | null | undefined;
-  evaluador: string | null | undefined;
+  evaluador?: string | null;
+  mostrarEvaluador?: boolean;
 }) {
   const nombreParticipante = participante ?? "";
   const nombreEvaluador = evaluador ?? "";
@@ -15,7 +17,9 @@ export function FichaCasoMeta({
   return (
     <div className="ficha-caso-meta">
       <p title={nombreParticipante}>Particip.: {recorteNombre(nombreParticipante)}</p>
-      <p title={nombreEvaluador}>Evaluador: {recorteNombre(nombreEvaluador)}</p>
+      {mostrarEvaluador ? (
+        <p title={nombreEvaluador}>Evaluador: {recorteNombre(nombreEvaluador)}</p>
+      ) : null}
     </div>
   );
 }

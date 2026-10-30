@@ -12,7 +12,7 @@ import {
   parseImagenConvocatoria,
 } from "@/lib/convocatoria";
 import { isStoredFile, parseArchivos } from "@/lib/preguntas";
-import { esMentoriaContenido, parseTipoFormulario, type TipoFormulario } from "@/lib/tipo-formulario";
+import { mentoriaTieneRevision, parseTipoFormulario, type TipoFormulario } from "@/lib/tipo-formulario";
 import { asignarEvaluadoresAutomaticoEnConvocatoria } from "@/lib/asignacion-automatica";
 import { asignarSupervisoresAutomaticoEnConvocatoria } from "@/lib/asignacion-supervisor";
 import { cupoAlcanzado, mensajeCupoPersona } from "@/lib/cupo-asignacion";
@@ -43,10 +43,9 @@ async function conteosAsignacionesRevision(convocatoriaId: string) {
 function flagsRevisionParaTipo(
   tipo: TipoFormulario,
   formData: FormData,
-  fallback: FlagsRevision,
 ): FlagsRevision | { error: string } {
-  if (tipo !== "FEEDBACK") {
-    return fallback;
+  if (!mentoriaTieneRevision(tipo)) {
+    return { evaluadoresHabilitados: false, supervisoresHabilitados: false };
   }
   const flags = flagsRevisionDesdeCheckboxes(formData);
   if (!flags) {
@@ -92,8 +91,8 @@ async function exigirMentoriaFeedback(convocatoriaId: string) {
     },
   });
   if (!convocatoria) return { error: "Asesoría no encontrada." };
-  if (esMentoriaContenido(convocatoria.tipo)) {
-    return { error: "Las asesorías de contenido no tienen evaluación ni supervisión." };
+  if (!mentoriaTieneRevision(convocatoria.tipo)) {
+    return { error: "Esta asesoría no tiene evaluación ni supervisión." };
   }
   return { ok: true as const, convocatoria };
 }
@@ -176,14 +175,16 @@ export async function crearConvocatoria(formData: FormData) {
     evaluadoresHabilitados: true,
     supervisoresHabilitados: true,
   };
-  const flags = flagsRevisionParaTipo(tipo, formData, flagsFallback);
+  const flags = flagsRevisionParaTipo(tipo, formData);
   if ("error" in flags) return flags;
-  const validacionFlags = validarCambioRoles({
-    actual: flagsFallback,
-    siguiente: flags,
-    conteos: { asignacionesEvaluador: 0, asignacionesSupervisor: 0 },
-  });
-  if (!validacionFlags.ok) return { error: validacionFlags.error };
+  if (mentoriaTieneRevision(tipo)) {
+    const validacionFlags = validarCambioRoles({
+      actual: flagsFallback,
+      siguiente: flags,
+      conteos: { asignacionesEvaluador: 0, asignacionesSupervisor: 0 },
+    });
+    if (!validacionFlags.ok) return { error: validacionFlags.error };
+  }
 
   const convocatoria = await prisma.convocatoria.create({
     data: {
@@ -243,15 +244,17 @@ export async function actualizarConvocatoria(formData: FormData) {
     evaluadoresHabilitados: convocatoria.evaluadoresHabilitados,
     supervisoresHabilitados: convocatoria.supervisoresHabilitados,
   };
-  const flags = flagsRevisionParaTipo(tipoFinal, formData, flagsActuales);
+  const flags = flagsRevisionParaTipo(tipoFinal, formData);
   if ("error" in flags) return flags;
-  const conteos = await conteosAsignacionesRevision(id);
-  const validacionFlags = validarCambioRoles({
-    actual: flagsActuales,
-    siguiente: flags,
-    conteos,
-  });
-  if (!validacionFlags.ok) return { error: validacionFlags.error };
+  if (mentoriaTieneRevision(tipoFinal)) {
+    const conteos = await conteosAsignacionesRevision(id);
+    const validacionFlags = validarCambioRoles({
+      actual: flagsActuales,
+      siguiente: flags,
+      conteos,
+    });
+    if (!validacionFlags.ok) return { error: validacionFlags.error };
+  }
 
   await prisma.convocatoria.update({
     where: { id },
@@ -461,8 +464,8 @@ export async function asignarEvaluadorAPostulacion(formData: FormData) {
     },
   });
   if (!postulacion) return { error: "Caso no encontrado." };
-  if (esMentoriaContenido(postulacion.convocatoria.tipo)) {
-    return { error: "Las asesorías de contenido no tienen evaluación ni supervisión." };
+  if (!mentoriaTieneRevision(postulacion.convocatoria.tipo)) {
+    return { error: "Esta asesoría no tiene evaluación ni supervisión." };
   }
   const modo = modoRevisionDeConvocatoria(postulacion.convocatoria);
   if (!usaEvaluadores(modo)) {
@@ -530,8 +533,8 @@ export async function asignarEvaluadores(formData: FormData) {
     },
   });
   if (!postulacion) return { error: "Caso no encontrado." };
-  if (esMentoriaContenido(postulacion.convocatoria.tipo)) {
-    return { error: "Las asesorías de contenido no tienen evaluación ni supervisión." };
+  if (!mentoriaTieneRevision(postulacion.convocatoria.tipo)) {
+    return { error: "Esta asesoría no tiene evaluación ni supervisión." };
   }
   if (postulacion.estado === "FINALIZADA" || !postulacion.enviadaAt) {
     return { error: "Solo se asignan casos enviados y no finalizados." };
@@ -787,8 +790,8 @@ export async function asignarSupervisorAPostulacion(formData: FormData) {
     },
   });
   if (!postulacion) return { error: "Caso no encontrado." };
-  if (esMentoriaContenido(postulacion.convocatoria.tipo)) {
-    return { error: "Las asesorías de contenido no tienen evaluación ni supervisión." };
+  if (!mentoriaTieneRevision(postulacion.convocatoria.tipo)) {
+    return { error: "Esta asesoría no tiene evaluación ni supervisión." };
   }
   const modo = modoRevisionDeConvocatoria(postulacion.convocatoria);
   if (!usaSupervisores(modo)) {

@@ -67,6 +67,30 @@ function idBajo(pathname: string, prefijo: string) {
 }
 
 export const CONTEXTO_PANEL_MENTORIA = "panel-mentoria";
+export const CONTEXTO_CARGA_INFORMACION = "carga-informacion";
+
+export const PASOS_CARGA_INFORMACION: PasoTutorial[] = [
+  {
+    ancla: "volver",
+    titulo: "Volver al panel",
+    descripcion: "Este control te lleva de vuelta a tus asesorías y casos.",
+  },
+  {
+    ancla: "formulario-caso",
+    titulo: "Formulario",
+    descripcion: "Responde cada pregunta y adjunta lo que se pida.",
+  },
+  {
+    ancla: "guardar-borrador",
+    titulo: "Guardar borrador",
+    descripcion: "Guarda tu avance sin enviarlo. Puedes volver más tarde a seguir editando.",
+  },
+  {
+    ancla: "enviar-caso",
+    titulo: "Enviar información",
+    descripcion: "Cuando esté lista, envía la información. Después ya no podrás editarla.",
+  },
+];
 
 export const PASOS_PANEL_MENTORIA: PasoTutorial[] = [
   {
@@ -116,6 +140,7 @@ export function resolverTutorial(
   contexto?: string | null,
 ): PasoTutorial[] {
   if (contexto === CONTEXTO_PANEL_MENTORIA) return PASOS_PANEL_MENTORIA;
+  if (contexto === CONTEXTO_CARGA_INFORMACION) return PASOS_CARGA_INFORMACION;
 
   const path = pathname.replace(/\/+$/, "") || "/";
 

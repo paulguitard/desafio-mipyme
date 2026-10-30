@@ -1,6 +1,7 @@
 "use client";
 
 import { FormularioBuilder } from "@/components/formulario-builder";
+import type { TipoFormulario } from "@/lib/tipo-formulario";
 
 export function FormularioEditor({
   formulario,
@@ -9,6 +10,7 @@ export function FormularioEditor({
   formulario: {
     id: string;
     titulo: string;
+    tipo?: TipoFormulario;
     modoEvaluacion: string;
     puedeCambiarModo: boolean;
     preguntas: {
@@ -30,6 +32,7 @@ export function FormularioEditor({
   return (
     <FormularioBuilder
       modo="existente"
+      tipo={formulario.tipo}
       formulario={formulario}
       permitirEvaluacionPorPregunta={permitirEvaluacionPorPregunta}
     />

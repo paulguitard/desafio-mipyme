@@ -1,4 +1,4 @@
-import { esMentoriaContenido } from "@/lib/tipo-formulario";
+import { mentoriaTieneRevision } from "@/lib/tipo-formulario";
 
 export type ModoRevision = "ambos" | "solo_evaluadores" | "solo_supervisores" | "ninguno";
 
@@ -58,7 +58,7 @@ export function modoRevisionDeConvocatoria(convocatoria: {
   evaluadoresHabilitados?: boolean | null;
   supervisoresHabilitados?: boolean | null;
 }): ModoRevision {
-  if (esMentoriaContenido(convocatoria.tipo)) return "ninguno";
+  if (!mentoriaTieneRevision(convocatoria.tipo)) return "ninguno";
   return modoRevision({
     evaluadoresHabilitados: convocatoria.evaluadoresHabilitados !== false,
     supervisoresHabilitados: convocatoria.supervisoresHabilitados !== false,

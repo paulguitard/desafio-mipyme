@@ -3,7 +3,7 @@ import { FormularioEditor } from "@/components/formulario-editor";
 import { leerConfigApp } from "@/lib/config-app";
 import { prisma } from "@/lib/db";
 import { asegurarPreguntaNombreCaso } from "@/lib/nombre-caso";
-import { esMentoriaContenido } from "@/lib/tipo-formulario";
+import { esMentoriaContenido, parseTipoFormulario } from "@/lib/tipo-formulario";
 import { notFound } from "next/navigation";
 
 export default async function FormularioDetallePage({
@@ -61,6 +61,7 @@ export default async function FormularioDetallePage({
         permitirEvaluacionPorPregunta={configApp.permitirEvaluacionPorPregunta}
         formulario={{
           ...formulario,
+          tipo: parseTipoFormulario(formulario.tipo),
           puedeCambiarModo: formulario._count.convocatorias === 0,
         }}
       />

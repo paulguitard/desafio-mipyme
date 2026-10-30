@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   campoLimiteCuenta,
   CUENTAS_PRESUPUESTO,
@@ -48,6 +48,7 @@ export type PreguntaBorrador = {
   permiteVideoLink: boolean;
   conNotas: boolean;
   escalaNotas: PeldanoEscala[];
+  ocultarTextbox: boolean;
 };
 
 const VACIA: PreguntaBorrador = {
@@ -70,6 +71,7 @@ const VACIA: PreguntaBorrador = {
   permiteVideoLink: false,
   conNotas: false,
   escalaNotas: ESCALA_NOTAS_DEFAULT,
+  ocultarTextbox: false,
 };
 
 function toOptionalNumber(value: FormDataEntryValue | null): number | null {
@@ -93,6 +95,9 @@ export function PreguntaComposer({
   onSubmit,
   submitLabel,
   obligatoria,
+  sinEvaluacion = false,
+  ocultarTextbox = false,
+  onHayAdjuntosChange,
 }: {
   inicial?: Partial<PreguntaBorrador> & { opcionesRaw?: string };
   error?: string | null;
@@ -100,6 +105,9 @@ export function PreguntaComposer({
   onSubmit: (pregunta: PreguntaBorrador) => void;
   submitLabel: string;
   obligatoria: boolean;
+  sinEvaluacion?: boolean;
+  ocultarTextbox?: boolean;
+  onHayAdjuntosChange?: (hayAdjuntos: boolean) => void;
 }) {
   const limitesInicial = inicial?.opcionesRaw ? parseConfigLimites(inicial.opcionesRaw) : {};
   const fechaInicial =
@@ -118,6 +126,9 @@ export function PreguntaComposer({
     inicial?.configObjetivos ??
     (inicial?.opcionesRaw ? parseConfigObjetivos(inicial.opcionesRaw) : VACIA.configObjetivos);
 
+  const [permiteArchivo, setPermiteArchivo] = useState(inicial?.permiteArchivo ?? false);
+  const [permiteImagen, setPermiteImagen] = useState(inicial?.permiteImagen ?? false);
+  const [permiteVideoLink, setPermiteVideoLink] = useState(inicial?.permiteVideoLink ?? false);
   const [tipo, setTipo] = useState<TipoPregunta>(inicial?.tipo ?? VACIA.tipo);
   const [fechaModo, setFechaModo] = useState<ModoFecha>(fechaInicial);
   const [cantidadCorreos, setCantidadCorreos] = useState(correosInicial);
@@ -132,6 +143,12 @@ export function PreguntaComposer({
   const esFormato = esTipoFormato(tipo);
   const conOpciones = tipoTieneOpciones(tipo);
   const conPanelLateral = esFormato || conOpciones;
+  const hayAdjuntos = permiteArchivo || permiteImagen || permiteVideoLink;
+  const ocultarCampoTexto = hayAdjuntos && ocultarTextbox;
+
+  useEffect(() => {
+    onHayAdjuntosChange?.(hayAdjuntos);
+  }, [hayAdjuntos, onHayAdjuntosChange]);
 
   return (
     <form
@@ -192,11 +209,12 @@ export function PreguntaComposer({
             maxIndicadoresPorObjetivo: toOptionalNumber(formData.get("maxIndicadoresPorObjetivo")),
           },
           obligatoria,
-          permiteArchivo: formData.get("permiteArchivo") === "on",
-          permiteImagen: formData.get("permiteImagen") === "on",
-          permiteVideoLink: formData.get("permiteVideoLink") === "on",
-          conNotas,
-          escalaNotas: conNotas ? escala : [],
+          permiteArchivo,
+          permiteImagen,
+          permiteVideoLink,
+          ocultarTextbox: ocultarCampoTexto,
+          conNotas: sinEvaluacion ? false : conNotas,
+          escalaNotas: sinEvaluacion || !conNotas ? [] : escala,
         });
       }}
     >
@@ -287,24 +305,35 @@ export function PreguntaComposer({
         <section className="space-y-3 rounded-xl border border-border p-4">
           <p className="font-semibold text-navy">Adjuntos</p>
           <label className="flex items-center gap-2">
-            <input type="checkbox" name="permiteArchivo" defaultChecked={inicial?.permiteArchivo ?? false} />
+            <input
+              type="checkbox"
+              name="permiteArchivo"
+              checked={permiteArchivo}
+              onChange={(event) => setPermiteArchivo(event.target.checked)}
+            />
             Permitir subir archivos (varios)
           </label>
           <label className="flex items-center gap-2">
-            <input type="checkbox" name="permiteImagen" defaultChecked={inicial?.permiteImagen ?? false} />
+            <input
+              type="checkbox"
+              name="permiteImagen"
+              checked={permiteImagen}
+              onChange={(event) => setPermiteImagen(event.target.checked)}
+            />
             Permitir subir imágenes (varias)
           </label>
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
               name="permiteVideoLink"
-              defaultChecked={inicial?.permiteVideoLink ?? false}
+              checked={permiteVideoLink}
+              onChange={(event) => setPermiteVideoLink(event.target.checked)}
             />
             Permitir pegar links de video (varios)
           </label>
         </section>
 
-        {!esFormato ? (
+        {!esFormato && !ocultarCampoTexto ? (
         <section className="space-y-3 rounded-xl border border-border p-4">
           <p className="font-semibold text-navy">Límites de respuesta</p>
           <div className="grid grid-cols-2 gap-3">
@@ -361,6 +390,7 @@ export function PreguntaComposer({
         ) : null}
       </div>
 
+      {sinEvaluacion ? null : (
       <section className="space-y-3 rounded-xl border border-border p-4">
         <label className="flex items-center gap-2 font-semibold text-navy">
           <input
@@ -430,6 +460,7 @@ export function PreguntaComposer({
           </div>
         ) : null}
       </section>
+      )}
 
       <div className="flex flex-wrap gap-3">
         <button className="btn btn-primary" type="submit">
@@ -708,21 +739,23 @@ export function PreguntaComposer({
   );
 }
 
-export function InterruptorObligatoria({
+export function InterruptorSiNo({
+  label,
   checked,
   onChange,
 }: {
+  label: string;
   checked: boolean;
   onChange: (value: boolean) => void;
 }) {
   return (
     <div className="flex items-center gap-2 text-sm font-semibold text-navy">
-      <span>Obligatoria</span>
+      <span>{label}</span>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
-        aria-label={checked ? "Obligatoria: sí" : "Obligatoria: no"}
+        aria-label={`${label}: ${checked ? "sí" : "no"}`}
         onClick={(event) => {
           event.stopPropagation();
           onChange(!checked);
@@ -747,4 +780,14 @@ export function InterruptorObligatoria({
       </button>
     </div>
   );
+}
+
+export function InterruptorObligatoria({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return <InterruptorSiNo label="Obligatoria" checked={checked} onChange={onChange} />;
 }

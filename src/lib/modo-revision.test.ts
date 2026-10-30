@@ -34,6 +34,16 @@ describe("modoRevision", () => {
     ).toBe("ninguno");
   });
 
+  it("trata carga de información como sin revisión aunque los flags estén activos", () => {
+    expect(
+      modoRevisionDeConvocatoria({
+        tipo: "CARGA_INFORMACION",
+        evaluadoresHabilitados: true,
+        supervisoresHabilitados: true,
+      }),
+    ).toBe("ninguno");
+  });
+
   it("publica directo cuando falta un rol", () => {
     expect(publicaDirectoAlParticipante("ambos")).toBe(false);
     expect(publicaDirectoAlParticipante("solo_evaluadores")).toBe(true);
