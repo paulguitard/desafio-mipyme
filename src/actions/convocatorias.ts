@@ -191,7 +191,7 @@ export async function crearConvocatoria(formData: FormData) {
   const flags = flagsRevisionParaTipo(
     tipo,
     formData,
-    "form" in formOk ? formOk.form.modoEvaluacion : undefined,
+    "form" in formOk ? formOk.form?.modoEvaluacion : undefined,
   );
   if ("error" in flags) return flags;
   if (mentoriaTieneRevision(tipo)) {
@@ -259,7 +259,7 @@ export async function actualizarConvocatoria(formData: FormData) {
   const flags = flagsRevisionParaTipo(
     tipoFinal,
     formData,
-    "form" in formOk ? formOk.form.modoEvaluacion : undefined,
+    "form" in formOk ? formOk.form?.modoEvaluacion : undefined,
   );
   if ("error" in flags) return flags;
   if (mentoriaTieneRevision(tipoFinal)) {

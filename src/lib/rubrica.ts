@@ -158,7 +158,7 @@ export function promedioNotasRubrica(args: {
 }): number | null {
   if (!args.todosFinalizaron || args.notas.length === 0) return null;
   if (args.notas.some((nota) => nota == null || !Number.isFinite(nota))) return null;
-  const suma = args.notas.reduce((acc, nota) => acc + Number(nota), 0);
+  const suma = args.notas.reduce<number>((acc, nota) => acc + Number(nota), 0);
   return suma / args.notas.length;
 }
 

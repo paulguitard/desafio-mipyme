@@ -587,7 +587,7 @@ async function persistirRubrica(formularioId: string, payload: PayloadRubrica) {
 
   const idsKeep = payload.criterios
     .map((item) => item.id)
-    .filter((id): id is string => Boolean(id) && !id.startsWith("tmp-"));
+    .filter((id): id is string => typeof id === "string" && id.length > 0 && !id.startsWith("tmp-"));
 
   if (idsKeep.length > 0) {
     await prisma.criterioRubrica.deleteMany({
