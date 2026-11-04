@@ -53,20 +53,84 @@ export function objectPositionCss(pos: PosicionImagen): string {
   return `${pos.x}% ${pos.y}%`;
 }
 
+export const TZ_CHILE = "America/Santiago";
+
+type PartesFecha = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+};
+
+function partesEnZona(date: Date, timeZone: string): PartesFecha {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const map: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type !== "literal") map[part.type] = part.value;
+  }
+  return {
+    year: Number(map.year),
+    month: Number(map.month),
+    day: Number(map.day),
+    hour: Number(map.hour) % 24,
+    minute: Number(map.minute),
+    second: Number(map.second),
+  };
+}
+
+function offsetMsEnZona(date: Date, timeZone: string): number {
+  const p = partesEnZona(date, timeZone);
+  const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return asUtc - date.getTime();
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** Interpreta `YYYY-MM-DDTHH:mm` como hora civil de Chile, no como TZ del servidor ni del navegador. */
+export function parseFechaForm(value: string): Date | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/[zZ]|[+-]\d{2}:\d{2}$/.test(trimmed)) {
+    const date = new Date(trimmed);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) {
+    const date = new Date(trimmed);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6] ?? 0);
+  const utcNaive = Date.UTC(year, month - 1, day, hour, minute, second);
+  let instant = utcNaive - offsetMsEnZona(new Date(utcNaive), TZ_CHILE);
+  instant = utcNaive - offsetMsEnZona(new Date(instant), TZ_CHILE);
+  const date = new Date(instant);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export function toDatetimeLocalValue(date: Date | string | null | undefined): string {
   if (!date) return "";
   const d = typeof date === "string" ? new Date(date) : date;
   if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-export function parseFechaForm(value: string): Date | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const date = new Date(trimmed);
-  if (Number.isNaN(date.getTime())) return null;
-  return date;
+  const p = partesEnZona(d, TZ_CHILE);
+  return `${p.year}-${pad2(p.month)}-${pad2(p.day)}T${pad2(p.hour)}:${pad2(p.minute)}`;
 }
 
 export function formatoFechaCorta(date: Date | string | null | undefined): string {
@@ -74,6 +138,7 @@ export function formatoFechaCorta(date: Date | string | null | undefined): strin
   const d = typeof date === "string" ? new Date(date) : date;
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleString("es-CL", {
+    timeZone: TZ_CHILE,
     dateStyle: "short",
     timeStyle: "short",
   });
@@ -91,10 +156,9 @@ export function formatoRangoFechas(
   return "";
 }
 
-const TZ_CHILE = "America/Santiago";
-
 function fechaCalendarioChile(date: Date): string {
-  return date.toLocaleDateString("en-CA", { timeZone: TZ_CHILE });
+  const p = partesEnZona(date, TZ_CHILE);
+  return `${p.year}-${pad2(p.month)}-${pad2(p.day)}`;
 }
 
 export function etiquetaCierreAbierto(cierre: Date | string | null | undefined): string {

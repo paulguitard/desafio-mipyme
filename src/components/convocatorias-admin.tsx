@@ -697,6 +697,7 @@ export function ConvocatoriasAdmin({
                 name="fechaInicio"
                 type="datetime-local"
                 required
+                key={`${editing?.id ?? "nueva"}-inicio-${defaultInicio}`}
                 defaultValue={defaultInicio}
               />
             </div>
@@ -708,9 +709,11 @@ export function ConvocatoriasAdmin({
                 name="fechaCierre"
                 type="datetime-local"
                 required
+                key={`${editing?.id ?? "nueva"}-cierre-${defaultCierre}`}
                 defaultValue={defaultCierre}
               />
             </div>
+            <p className="text-muted text-sm sm:col-span-2">Hora de Chile (Santiago).</p>
           </div>
           <button className="btn btn-primary" type="submit">
             {editing ? "Guardar cambios" : "Crear asesoría"}
