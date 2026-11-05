@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
+import { casoPuedeFinalizarseAdmin } from "@/lib/estado";
 import { sincronizarEstadoPostulacion } from "@/lib/sync-estado";
+import { avisarCasoAprobado } from "@/lib/correo-notificacion";
 import { deleteUpload, saveUpload } from "@/lib/storage";
 import {
   aplicarPosicionImagen,
@@ -975,6 +977,42 @@ export async function cargarPanelEvaluacion(convocatoriaId: string) {
   const data = await getPanelEvaluacion(convocatoriaId);
   if (!data) return { error: "Asesoría no encontrada." };
   return { data };
+}
+
+export async function finalizarCasoAdmin(postulacionId: string) {
+  await requireUser("ADMIN");
+  if (!postulacionId) return { error: "Participación no encontrada." };
+
+  const postulacion = await prisma.postulacion.findUnique({
+    where: { id: postulacionId },
+    include: {
+      convocatoria: { include: { formulario: { select: { modoEvaluacion: true } } } },
+      asignaciones: { select: { id: true, estado: true } },
+    },
+  });
+  if (!postulacion) return { error: "Participación no encontrada." };
+  if (!mentoriaTieneRevision(postulacion.convocatoria.tipo)) {
+    return { error: "Esta asesoría no tiene evaluación que finalizar." };
+  }
+  if (postulacion.asignaciones.length === 0) {
+    return { error: "Este caso no tiene evaluaciones asignadas." };
+  }
+  if (!casoPuedeFinalizarseAdmin(postulacion.asignaciones)) {
+    return { error: "Este caso ya está finalizado." };
+  }
+
+  await prisma.asignacionEvaluador.updateMany({
+    where: { postulacionId, estado: { not: "FINALIZADA" } },
+    data: { estado: "FINALIZADA", intencionPendiente: null },
+  });
+  const actualizada = await sincronizarEstadoPostulacion(postulacionId);
+  if (actualizada?.estado === "FINALIZADA" && !esModoRubrica(postulacion.convocatoria.formulario.modoEvaluacion)) {
+    await avisarCasoAprobado(postulacionId);
+  }
+
+  revalidateConvocatorias(postulacion.convocatoriaId);
+  revalidatePath("/evaluador");
+  return { ok: true as const };
 }
 
 export async function cargarDetalleFichaAdmin(postulacionId: string) {

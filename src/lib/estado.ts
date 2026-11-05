@@ -98,6 +98,11 @@ export function postulacionEditable(
   return convocatoriaAbierta && estadoPostulacion === "BORRADOR";
 }
 
+/** El admin puede forzar el cierre si queda alguna evaluación sin finalizar. */
+export function casoPuedeFinalizarseAdmin(asignaciones: { estado: string }[]): boolean {
+  return asignaciones.length > 0 && asignaciones.some((asignacion) => asignacion.estado !== "FINALIZADA");
+}
+
 export function rondaRespuestaEmprendedor(
   asignaciones: { estado: string; rondaActual: number }[],
 ): number {

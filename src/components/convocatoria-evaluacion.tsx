@@ -17,6 +17,7 @@ import {
   cargarDetalleFichaAdmin,
   asegurarTokensPublicos,
   eliminarPostulacion,
+  finalizarCasoAdmin,
   guardarConfigEvaluacion,
   guardarCupoPool,
   quitarEvaluadorDelPool,
@@ -37,7 +38,7 @@ import { Modal } from "@/components/modal";
 import { PoolPersonaModal } from "@/components/pool-persona-modal";
 import type { CasoPoolResumen } from "@/lib/convocatoria-admin-data";
 import type { DetalleFichaAdmin } from "@/lib/convocatoria-admin-data";
-import { rondaRespuestaEmprendedor } from "@/lib/estado";
+import { casoPuedeFinalizarseAdmin, rondaRespuestaEmprendedor } from "@/lib/estado";
 import { normalizarCorreo } from "@/lib/correo";
 import { parseValor } from "@/lib/preguntas";
 import { ESCUELAS } from "@/lib/escuelas";
@@ -155,6 +156,49 @@ function casoResumen(postulacion: PostulacionItem): CasoPoolResumen {
     postulacionId: postulacion.id,
     nombreCaso: postulacion.nombreCaso,
     emprendedorNombre: postulacion.emprendedorNombre,
+  };
+}
+
+function moverCasoAFinalizados(item: PoolItem, caso: CasoPoolResumen): PoolItem {
+  const ya = item.casosFinalizados.some((fila) => fila.postulacionId === caso.postulacionId);
+  const casosObservados = item.casosObservados.filter((fila) => fila.postulacionId !== caso.postulacionId);
+  const eraObservado = casosObservados.length !== item.casosObservados.length;
+  return {
+    ...item,
+    revisadas: eraObservado ? Math.max(0, item.revisadas - 1) : item.revisadas,
+    finalizadas: ya ? item.finalizadas : item.finalizadas + 1,
+    casosObservados,
+    casosFinalizados: ya ? item.casosFinalizados : [...item.casosFinalizados, caso],
+  };
+}
+
+function conCasoFinalizadoAdmin(panel: PanelEval, postulacionId: string): PanelEval {
+  const postulacion = panel.postulaciones.find((item) => item.id === postulacionId);
+  if (!postulacion || !casoPuedeFinalizarseAdmin(postulacion.asignaciones)) return panel;
+  const caso = casoResumen(postulacion);
+  const evaluadores = new Set(postulacion.asignaciones.map((asignacion) => asignacion.evaluadorId));
+  const supervisorId = postulacion.supervision?.supervisorId;
+  return {
+    ...panel,
+    postulaciones: panel.postulaciones.map((item) =>
+      item.id !== postulacionId
+        ? item
+        : {
+            ...item,
+            estado: "FINALIZADA",
+            asignaciones: item.asignaciones.map((asignacion) => ({
+              ...asignacion,
+              estado: "FINALIZADA",
+              intencionPendiente: null,
+            })),
+          },
+    ),
+    pool: panel.pool.map((item) =>
+      evaluadores.has(item.evaluadorId) ? moverCasoAFinalizados(item, caso) : item,
+    ),
+    poolSupervisores: panel.poolSupervisores.map((item) =>
+      item.evaluadorId === supervisorId ? moverCasoAFinalizados(item, caso) : item,
+    ),
   };
 }
 
@@ -383,6 +427,7 @@ function AccionesCasoModal({
   onRecordatorioParticipante,
   onRecordatorioEvaluador,
   onRecordatorioSupervisor,
+  onFinalizarCaso,
 }: {
   postulacion: PostulacionItem;
   preguntas: PreguntaFiltro[];
@@ -396,12 +441,14 @@ function AccionesCasoModal({
   onRecordatorioParticipante: () => void;
   onRecordatorioEvaluador: () => void;
   onRecordatorioSupervisor: () => void;
+  onFinalizarCaso: () => void;
 }) {
   const [generandoPdf, setGenerandoPdf] = useState(false);
   const [errorPdf, setErrorPdf] = useState<string | null>(null);
   const participante = recordatorioParticipante(postulacion, preguntas);
   const evaluador = recordatorioEvaluadorCaso(postulacion.asignaciones);
   const supervisor = recordatorioSupervisorCaso(postulacion.asignaciones, postulacion.supervision);
+  const puedeFinalizar = casoPuedeFinalizarseAdmin(postulacion.asignaciones);
   const ocupado = enviando != null || generandoPdf;
 
   async function onDescargarPdf() {
@@ -449,6 +496,25 @@ function AccionesCasoModal({
       >
         {generandoPdf ? "Generando…" : "Descargar PDF"}
       </button>
+      {mostrarRevision ? (
+        <>
+          <button
+            className="btn btn-sm btn-primary"
+            type="button"
+            disabled={ocupado || !puedeFinalizar}
+            onClick={onFinalizarCaso}
+          >
+            {enviando === "finalizar" ? "Finalizando…" : "Finalizar caso"}
+          </button>
+          {puedeFinalizar ? null : (
+            <p className="eval-acciones-hint">
+              {postulacion.asignaciones.length === 0
+                ? "Este caso no tiene evaluaciones asignadas."
+                : "Este caso ya está finalizado."}
+            </p>
+          )}
+        </>
+      ) : null}
       <button
         className="btn btn-sm btn-secondary"
         type="button"
@@ -1135,6 +1201,47 @@ export function ConvocatoriaEvaluacion({
     setAccionesCaso(null);
     setRecordatorioError(null);
     setRecordatorioMensaje(null);
+  }
+
+  async function finalizarCasoDesdeAcciones(postulacion: PostulacionItem) {
+    if (
+      !window.confirm(
+        "¿Finalizar este caso?\n\nLas evaluaciones pasarán a finalizadas, como si el evaluador hubiera presionado Finalizar evaluación. El participante no podrá seguir editando.",
+      )
+    ) {
+      return;
+    }
+    setRecordatorioError(null);
+    setRecordatorioMensaje(null);
+    setRecordatorioEnviando("finalizar");
+    try {
+      const result = await panel.aplicar(
+        (actual) => conCasoFinalizadoAdmin(actual, postulacion.id),
+        () => finalizarCasoAdmin(postulacion.id),
+        { mensajeOk: "Caso finalizado." },
+      );
+      if (result && "error" in result && result.error) {
+        setRecordatorioError(result.error);
+        return;
+      }
+      setAccionesCaso((actual) =>
+        actual && actual.id === postulacion.id
+          ? {
+              ...actual,
+              estado: "FINALIZADA",
+              asignaciones: actual.asignaciones.map((asignacion) => ({
+                ...asignacion,
+                estado: "FINALIZADA",
+                intencionPendiente: null,
+              })),
+            }
+          : actual,
+      );
+      setRecordatorioMensaje("El caso quedó finalizado.");
+      void onMutated?.();
+    } finally {
+      setRecordatorioEnviando(null);
+    }
   }
 
   async function ejecutarRecordatorio(
@@ -2407,6 +2514,7 @@ export function ConvocatoriaEvaluacion({
                       () => enviarRecordatorioSupervisorCaso(accionesCaso.id),
                     )
                   }
+                  onFinalizarCaso={() => void finalizarCasoDesdeAcciones(accionesCaso)}
                 />
               ) : null}
             </Modal>,
