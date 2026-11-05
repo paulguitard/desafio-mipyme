@@ -16,6 +16,10 @@ export function rutaFichaPublica(token: string) {
   return `/ficha/${token}`;
 }
 
+export function rutaDashboardParticipantes(token: string) {
+  return `/dashboard/participantes/${token}`;
+}
+
 export function withFichaToken(url: string, token: string | null | undefined) {
   if (!token || !esTokenPublicoValido(token)) return url;
   if (!url.startsWith("/api/archivos/")) return url;

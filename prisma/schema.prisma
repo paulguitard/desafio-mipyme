@@ -76,6 +76,8 @@ model ConfigCorreoRecuperacion {
 model ConfigApp {
   id                              String   @id @default("default")
   permitirEvaluacionPorPregunta   Boolean  @default(false)
+  /// Token opaco del dashboard público de participantes. Vacío hasta la primera visita de admin.
+  dashboardParticipantesToken     String   @default("")
   updatedAt                       DateTime @updatedAt
 }
 

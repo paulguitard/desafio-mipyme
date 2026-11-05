@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { esTokenPublicoValido, generarTokenPublico, rutaFichaPublica, withFichaToken } from "@/lib/ficha-publica";
+import {
+  esTokenPublicoValido,
+  generarTokenPublico,
+  rutaDashboardParticipantes,
+  rutaFichaPublica,
+  withFichaToken,
+} from "@/lib/ficha-publica";
 
 describe("ficha publica", () => {
   it("generates an opaque url-safe token", () => {
     const token = generarTokenPublico();
     expect(esTokenPublicoValido(token)).toBe(true);
     expect(rutaFichaPublica(token)).toBe(`/ficha/${token}`);
+    expect(rutaDashboardParticipantes(token)).toBe(`/dashboard/participantes/${token}`);
   });
 
   it("rejects short or odd tokens", () => {

@@ -5,6 +5,11 @@ import { Modal } from "@/components/modal";
 import { formatearRut } from "@/lib/rut";
 import { workbookXlsx } from "@/lib/xlsx-workbook";
 import { normalizarCorreo } from "@/lib/correo";
+import {
+  ETIQUETA_TD_SIN_INFORMACION,
+  estadosTdEnCeldas,
+  pasaFiltroEstados,
+} from "@/lib/perfiles-asesorias";
 
 export type DocumentoFormalizacion = {
   id: string;
@@ -22,6 +27,8 @@ export type PerfilParticipanteRow = {
   telefonoMovil: string | null;
   contactoWhatsapp: boolean;
   formalizacionEmpresa: boolean;
+  asesoriaTd: string;
+  videoPitch: "Enviado" | "Pendiente";
   documentos: DocumentoFormalizacion[];
 };
 
@@ -65,6 +72,8 @@ function filasExcel(filas: PerfilParticipanteRow[]) {
       "Teléfono móvil",
       "WhatsApp",
       "Formalización empresa",
+      "Asesoría TD",
+      "Video Pitch",
     ],
     ...filas.map((perfil) => [
       perfil.name,
@@ -74,6 +83,8 @@ function filasExcel(filas: PerfilParticipanteRow[]) {
       perfil.telefonoMovil?.trim() ?? "",
       marca(perfil.contactoWhatsapp),
       marca(perfil.formalizacionEmpresa),
+      perfil.asesoriaTd === ETIQUETA_TD_SIN_INFORMACION ? "" : perfil.asesoriaTd,
+      perfil.videoPitch,
     ]),
   ];
 }
@@ -115,23 +126,82 @@ function CheckGrupo({
   );
 }
 
-export function PerfilesParticipantesAdmin({ perfiles }: { perfiles: PerfilParticipanteRow[] }) {
+function SelectEstados({
+  legend,
+  estados,
+  valor,
+  conteos,
+  onChange,
+}: {
+  legend: string;
+  estados: string[];
+  valor: string;
+  conteos: Record<string, number>;
+  onChange: (estado: string) => void;
+}) {
+  const id = "filtro-asesoria-td";
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-border bg-[var(--card)] px-4 py-1.5">
+      <label className="text-sm font-semibold text-navy" htmlFor={id}>
+        {legend}
+      </label>
+      <select
+        className="max-w-[16rem] cursor-pointer bg-transparent text-sm outline-none"
+        id={id}
+        value={valor}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="">Todos</option>
+        {estados.map((estado) => (
+          <option key={estado} value={estado}>
+            {estado} ({conteos[estado] ?? 0})
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+export function PerfilesParticipantesAdmin({
+  perfiles,
+  dashboardHref,
+}: {
+  perfiles: PerfilParticipanteRow[];
+  dashboardHref: string;
+}) {
   const [filtroWhatsapp, setFiltroWhatsapp] = useState<FiltroBinario>(FILTRO_VACIO);
   const [filtroFormalizacion, setFiltroFormalizacion] = useState<FiltroBinario>(FILTRO_VACIO);
+  const [filtroVideoPitch, setFiltroVideoPitch] = useState<FiltroBinario>(FILTRO_VACIO);
+  const [filtroTd, setFiltroTd] = useState("");
   const [documentosDe, setDocumentosDe] = useState<PerfilParticipanteRow | null>(null);
+
+  const estadosTd = useMemo(
+    () => estadosTdEnCeldas(perfiles.map((perfil) => perfil.asesoriaTd)),
+    [perfiles],
+  );
+  const conteosTd = useMemo(() => {
+    const conteos: Record<string, number> = {};
+    for (const perfil of perfiles) {
+      conteos[perfil.asesoriaTd] = (conteos[perfil.asesoriaTd] ?? 0) + 1;
+    }
+    return conteos;
+  }, [perfiles]);
 
   const visibles = useMemo(
     () =>
       perfiles.filter(
         (perfil) =>
           pasaFiltro(perfil.contactoWhatsapp, filtroWhatsapp) &&
-          pasaFiltro(perfil.formalizacionEmpresa, filtroFormalizacion),
+          pasaFiltro(perfil.formalizacionEmpresa, filtroFormalizacion) &&
+          pasaFiltro(perfil.videoPitch === "Enviado", filtroVideoPitch) &&
+          pasaFiltroEstados(perfil.asesoriaTd, filtroTd ? [filtroTd] : []),
       ),
-    [perfiles, filtroWhatsapp, filtroFormalizacion],
+    [perfiles, filtroWhatsapp, filtroFormalizacion, filtroVideoPitch, filtroTd],
   );
 
   const whatsappSi = perfiles.filter((perfil) => perfil.contactoWhatsapp).length;
   const formalizacionSi = perfiles.filter((perfil) => perfil.formalizacionEmpresa).length;
+  const videoPitchSi = perfiles.filter((perfil) => perfil.videoPitch === "Enviado").length;
 
   function descargarExcel() {
     const bytes = workbookXlsx("Perfiles", filasExcel(visibles));
@@ -165,14 +235,39 @@ export function PerfilesParticipantesAdmin({ perfiles }: { perfiles: PerfilParti
               conteoNo={perfiles.length - formalizacionSi}
               onChange={setFiltroFormalizacion}
             />
+            <CheckGrupo
+              legend="Video Pitch"
+              filtro={filtroVideoPitch}
+              conteoSi={videoPitchSi}
+              conteoNo={perfiles.length - videoPitchSi}
+              onChange={setFiltroVideoPitch}
+            />
+            <SelectEstados
+              legend="Asesoría TD"
+              estados={estadosTd}
+              valor={filtroTd}
+              conteos={conteosTd}
+              onChange={setFiltroTd}
+            />
           </div>
-          <button className="btn btn-sm btn-secondary" type="button" onClick={descargarExcel}>
-            Descarga excel
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              className="btn btn-sm btn-secondary"
+              href={dashboardHref}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Dashboard
+            </a>
+            <button className="btn btn-sm btn-secondary" type="button" onClick={descargarExcel}>
+              Descarga excel
+            </button>
+          </div>
         </div>
         <p className="text-sm text-muted">
           Mostrando {visibles.length} de {perfiles.length}. WhatsApp: {whatsappSi} de {perfiles.length}.
-          Formalización empresa: {formalizacionSi} de {perfiles.length}.
+          Formalización empresa: {formalizacionSi} de {perfiles.length}. Video Pitch enviado:{" "}
+          {videoPitchSi} de {perfiles.length}.
         </p>
       </div>
 
@@ -180,20 +275,22 @@ export function PerfilesParticipantesAdmin({ perfiles }: { perfiles: PerfilParti
         <table className="w-full table-fixed text-left">
           <thead className="sticky top-0 z-10 bg-[var(--card)]">
             <tr className="border-b border-border">
-              <th className="w-[14%] px-4 py-3.5">Nombre</th>
-              <th className="w-[17%] px-4 py-3.5">Correo</th>
-              <th className="w-[11%] px-4 py-3.5">Rut personal</th>
-              <th className="w-[14%] px-4 py-3.5">Dirección personal</th>
-              <th className="w-[11%] px-4 py-3.5">Teléfono móvil</th>
-              <th className="w-[8%] px-4 py-3.5">WhatsApp</th>
-              <th className="w-[10%] px-4 py-3.5">Formalización empresa</th>
-              <th className="w-[15%] px-2 py-3.5">Documentos</th>
+              <th className="w-[12%] px-4 py-3.5">Nombre</th>
+              <th className="w-[14%] px-4 py-3.5">Correo</th>
+              <th className="w-[9%] px-4 py-3.5">Rut personal</th>
+              <th className="w-[11%] px-4 py-3.5">Dirección personal</th>
+              <th className="w-[9%] px-4 py-3.5">Teléfono móvil</th>
+              <th className="w-[7%] px-4 py-3.5">WhatsApp</th>
+              <th className="w-[9%] px-4 py-3.5">Formalización empresa</th>
+              <th className="w-[10%] px-4 py-3.5">Asesoría TD</th>
+              <th className="w-[8%] px-4 py-3.5">Video Pitch</th>
+              <th className="w-[11%] px-2 py-3.5">Documentos</th>
             </tr>
           </thead>
           <tbody>
             {visibles.length === 0 ? (
               <tr>
-                <td className="px-4 py-6 text-muted" colSpan={8}>
+                <td className="px-4 py-6 text-muted" colSpan={10}>
                   No hay participantes en este filtro.
                 </td>
               </tr>
@@ -207,6 +304,8 @@ export function PerfilesParticipantesAdmin({ perfiles }: { perfiles: PerfilParti
                 <td className="px-4 py-3.5">{celda(perfil.telefonoMovil)}</td>
                 <td className="px-4 py-3.5">{marca(perfil.contactoWhatsapp)}</td>
                 <td className="px-4 py-3.5">{marca(perfil.formalizacionEmpresa)}</td>
+                <td className="px-4 py-3.5">{perfil.asesoriaTd}</td>
+                <td className="px-4 py-3.5">{perfil.videoPitch}</td>
                 <td className="px-2 py-3.5">
                   <button
                     className="btn btn-sm btn-secondary whitespace-nowrap px-2.5"

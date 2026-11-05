@@ -8,7 +8,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /** Subir este valor tras cambios de schema para invalidar el cliente cacheado en `next dev`. */
-const PRISMA_SCHEMA_REV = "pool-dev-limit-5";
+const PRISMA_SCHEMA_REV = "dashboard-participantes-token";
 
 if (
   process.env.NODE_ENV !== "production" &&

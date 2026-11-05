@@ -94,9 +94,11 @@ function EscuelaSelect({
 export function UsuariosAdmin({
   users,
   perfiles,
+  dashboardHref,
 }: {
   users: UserRow[];
   perfiles: PerfilParticipanteRow[];
+  dashboardHref: string;
 }) {
   const router = useRouter();
   const lista = useDatoOptimista(users);
@@ -312,7 +314,7 @@ export function UsuariosAdmin({
         </div>
 
         {vista === "perfiles" ? (
-          <PerfilesParticipantesAdmin perfiles={perfiles} />
+          <PerfilesParticipantesAdmin perfiles={perfiles} dashboardHref={dashboardHref} />
         ) : (
         <div
           className="card min-h-0 overflow-auto overscroll-contain [scrollbar-gutter:stable]"

@@ -2330,14 +2330,26 @@ a.pregunta-adjuntos-video {
   background: #e8ecf4;
 }
 
+.dashboard-participantes-page {
+  display: flex;
+  height: 100%;
+  max-height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--background);
+}
+
 html:has(.ficha-publica-page),
-html:has(.ficha-publica-page) body {
+html:has(.ficha-publica-page) body,
+html:has(.dashboard-participantes-page),
+html:has(.dashboard-participantes-page) body {
   height: 100%;
   overflow: hidden;
 }
 
 @supports (height: 100dvh) {
-  .ficha-publica-page {
+  .ficha-publica-page,
+  .dashboard-participantes-page {
     height: 100dvh;
     max-height: 100dvh;
   }
