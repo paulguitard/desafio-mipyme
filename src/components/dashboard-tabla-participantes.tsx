@@ -34,7 +34,6 @@ const control =
 
 export function DashboardTablaParticipantes({ filas }: { filas: FilaDashboardParticipante[] }) {
   const [nombre, setNombre] = useState("");
-  const [correo, setCorreo] = useState("");
   const [formalizacion, setFormalizacion] = useState("");
   const [asesoriaTd, setAsesoriaTd] = useState("");
   const [videoPitch, setVideoPitch] = useState("");
@@ -48,14 +47,13 @@ export function DashboardTablaParticipantes({ filas }: { filas: FilaDashboardPar
     () =>
       filas.filter((fila) => {
         if (!pasaFiltroTexto(fila.name, nombre)) return false;
-        if (!pasaFiltroTexto(fila.email, correo)) return false;
         if (formalizacion === "si" && !fila.formalizacionEmpresa) return false;
         if (formalizacion === "no" && fila.formalizacionEmpresa) return false;
         if (!pasaFiltroEstados(fila.asesoriaTd, asesoriaTd ? [asesoriaTd] : [])) return false;
         if (videoPitch && fila.videoPitch !== videoPitch) return false;
         return true;
       }),
-    [filas, nombre, correo, formalizacion, asesoriaTd, videoPitch],
+    [filas, nombre, formalizacion, asesoriaTd, videoPitch],
   );
 
   return (
@@ -71,17 +69,6 @@ export function DashboardTablaParticipantes({ filas }: { filas: FilaDashboardPar
                     id="filtro-dash-nombre"
                     value={nombre}
                     onChange={(event) => setNombre(event.target.value)}
-                    placeholder="Buscar"
-                  />
-                </FiltroCampo>
-              </th>
-              <th className="w-[28%] px-2.5 py-1.5 align-bottom">
-                <FiltroCampo id="filtro-dash-correo" etiqueta="Correo">
-                  <input
-                    className={control}
-                    id="filtro-dash-correo"
-                    value={correo}
-                    onChange={(event) => setCorreo(event.target.value)}
                     placeholder="Buscar"
                   />
                 </FiltroCampo>
@@ -136,7 +123,7 @@ export function DashboardTablaParticipantes({ filas }: { filas: FilaDashboardPar
           <tbody>
             {visibles.length === 0 ? (
               <tr>
-                <td className="px-3 py-4 text-muted" colSpan={5}>
+                <td className="px-3 py-4 text-muted" colSpan={4}>
                   No hay participantes en este filtro.
                 </td>
               </tr>
@@ -144,7 +131,6 @@ export function DashboardTablaParticipantes({ filas }: { filas: FilaDashboardPar
             {visibles.map((fila) => (
               <tr key={fila.email} className="border-b border-border">
                 <td className="break-words px-3 py-2">{fila.name}</td>
-                <td className="break-all px-3 py-2">{fila.email}</td>
                 <td className="px-3 py-2">{marca(fila.formalizacionEmpresa)}</td>
                 <td className="px-3 py-2">{fila.asesoriaTd}</td>
                 <td className="px-3 py-2">{fila.videoPitch}</td>
