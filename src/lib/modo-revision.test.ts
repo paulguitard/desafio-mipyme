@@ -53,6 +53,8 @@ describe("modoRevision", () => {
     expect(puedeGuardarBorradorEvaluacion("SUPERVISOR", "ambos")).toBe(false);
     expect(puedeGuardarBorradorEvaluacion("EVALUADOR", "solo_supervisores")).toBe(false);
     expect(puedeGuardarBorradorEvaluacion("EVALUADOR", "ambos")).toBe(true);
+    expect(puedeGuardarBorradorEvaluacion("ADMIN", "ambos")).toBe(true);
+    expect(puedeGuardarBorradorEvaluacion("ADMIN", "ninguno")).toBe(true);
     expect(supervisorActuaComoEvaluador("ambos")).toBe(false);
   });
 

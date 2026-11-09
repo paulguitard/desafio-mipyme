@@ -100,6 +100,28 @@ export async function guardarRevision(formData: FormData) {
   return { ok: true as const, updatedAt: resultado.updatedAt };
 }
 
+export async function guardarRevisionAdmin(formData: FormData) {
+  await requireUser("ADMIN");
+  const asignacionId = String(formData.get("asignacionId") ?? "");
+  const expectedUpdatedAt = String(formData.get("expectedUpdatedAt") ?? "").trim() || null;
+  const resultado = await persistirBorradorEvaluacion({
+    userId: "",
+    rol: "ADMIN",
+    formData,
+    expectedUpdatedAt,
+    cambiarEstado: false,
+    permitirSinVeredicto: true,
+    comoAdmin: true,
+  });
+  if ("error" in resultado) return { error: resultado.error };
+  if ("conflict" in resultado) {
+    return { error: "No se pudo guardar.", conflict: true as const, updatedAt: resultado.updatedAt };
+  }
+
+  revalidatePath("/admin/mentorias");
+  return { ok: true as const, updatedAt: resultado.updatedAt };
+}
+
 async function validarComentarioEvaluacion(
   formData: FormData,
   modo: ModoEvaluacion,

@@ -6,7 +6,7 @@ import { textoIntencionEvaluador } from "@/lib/intencion-evaluador";
 
 export function BotonesEvaluadorRevision({ disabled }: { disabled: boolean }) {
   const ctx = useAccionesRevision();
-  if (!ctx) return null;
+  if (!ctx || ctx.soloGuardar) return null;
   return (
     <div className="hilo-editor-acciones">
       {ctx.esRubrica ? null : (

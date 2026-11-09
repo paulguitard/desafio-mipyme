@@ -1,0 +1,249 @@
+import { EvalDetalleCelda } from "@/components/eval-detalle-head";
+import { FichaCasoMeta } from "@/components/ficha-caso-meta";
+import { FormularioEvaluacion } from "@/components/formulario-evaluacion";
+import { HistorialVersionesRespuesta } from "@/components/historial-versiones-respuesta";
+import { PanelHiloRevision } from "@/components/hilo-revision";
+import { PreguntaCampo } from "@/components/pregunta-campo";
+import { ResumenCambiosReenvio } from "@/components/resumen-cambios-reenvio";
+import { PanelRubricaEvaluador } from "@/components/panel-rubrica";
+import { preguntasModificadasEnUltimoEnvio } from "@/lib/cambios-reenvio";
+import type { FichaEvaluacionAsignacion } from "@/lib/cargar-ficha-evaluacion";
+import { avisoEntradaEvaluador } from "@/lib/aviso-entrada-caso";
+import { parseModoEvaluacion } from "@/lib/modo-evaluacion";
+import { mapearRubricaFila } from "@/lib/rubrica";
+import { modoRevisionDeConvocatoria, publicaDirectoAlParticipante } from "@/lib/modo-revision";
+import { etiquetaNombreCaso, extraerNombreCaso } from "@/lib/nombre-caso";
+import { notasParaEvaluacionGeneral, parseEscalaNotas } from "@/lib/preguntas";
+import { revisionParaEditar } from "@/lib/revision-ciclo";
+import type { ReactNode } from "react";
+
+export function FichaEvaluacionVista({
+  asignacion,
+  canEdit,
+  rolAccion,
+  back,
+}: {
+  asignacion: FichaEvaluacionAsignacion;
+  canEdit: boolean;
+  rolAccion: "evaluador" | "admin";
+  back: ReactNode;
+}) {
+  const modo = modoRevisionDeConvocatoria(asignacion.postulacion.convocatoria);
+  const publicaDirecto = publicaDirectoAlParticipante(modo);
+  const ronda = asignacion.rondaActual;
+  const ciclo = asignacion.cicloSupervision;
+  const modoEvaluacion = parseModoEvaluacion(
+    asignacion.postulacion.convocatoria.formulario.modoEvaluacion,
+  );
+  const esGeneral = modoEvaluacion === "GENERAL";
+  const esRubrica = modoEvaluacion === "RUBRICA";
+  const rubrica = mapearRubricaFila(asignacion.postulacion.convocatoria.formulario.rubrica);
+  const nombreCaso = etiquetaNombreCaso(
+    extraerNombreCaso(
+      asignacion.postulacion.convocatoria.formulario.preguntas,
+      asignacion.postulacion.respuestas,
+    ),
+  );
+  const preguntas = asignacion.postulacion.convocatoria.formulario.preguntas;
+  const idsModificadas = new Set(
+    preguntasModificadasEnUltimoEnvio({
+      respuestas: asignacion.postulacion.respuestas.map((respuesta) => ({
+        preguntaId: respuesta.preguntaId,
+        tipo: preguntas.find((pregunta) => pregunta.id === respuesta.preguntaId)?.tipo ?? "texto_corto",
+        valor: respuesta.valor,
+        archivos: respuesta.archivos,
+        updatedAt: respuesta.updatedAt.toISOString(),
+        versiones: respuesta.versiones.map((version) => ({
+          valor: version.valor,
+          archivos: version.archivos,
+          createdAt: version.createdAt.toISOString(),
+        })),
+      })),
+      asignaciones: asignacion.postulacion.asignaciones.map((item) => ({
+        rondaActual: item.rondaActual,
+        revisiones: [
+          ...item.revisiones.map((revision) => ({
+            ronda: revision.ronda,
+            createdAt: revision.createdAt.toISOString(),
+          })),
+          ...item.revisionesGenerales.map((revision) => ({
+            ronda: revision.ronda,
+            createdAt: revision.createdAt.toISOString(),
+          })),
+        ],
+      })),
+    }),
+  );
+  const preguntasModificadas = preguntas
+    .filter((pregunta) => idsModificadas.has(pregunta.id))
+    .map((pregunta) => ({ id: pregunta.id, enunciado: pregunta.enunciado }));
+  const veredictosIniciales = esGeneral
+    ? {
+        general:
+          revisionParaEditar(asignacion.revisionesGenerales, ronda, ciclo)?.veredicto ?? "",
+      }
+    : Object.fromEntries(
+        preguntas.map((pregunta) => [
+          pregunta.id,
+          revisionParaEditar(
+            asignacion.revisiones.filter((item) => item.preguntaId === pregunta.id),
+            ronda,
+            ciclo,
+          )?.veredicto ?? "",
+        ]),
+      );
+  const hiloAsignacion = {
+    estado: asignacion.estado,
+    rondaActual: ronda,
+    cicloSupervision: ciclo,
+  };
+
+  return (
+    <FormularioEvaluacion
+      asignacionId={asignacion.id}
+      canEdit={canEdit}
+      rolAccion={rolAccion}
+      modoEvaluacion={modoEvaluacion}
+      publicaDirecto={publicaDirecto}
+      versionInicial={asignacion.updatedAt.toISOString()}
+      back={back}
+      title={
+        <h1 className="formulario-caso-titulo text-3xl font-extrabold text-navy">
+          {nombreCaso} · {asignacion.postulacion.convocatoria.titulo}
+        </h1>
+      }
+      headerEvaluacion={
+        esRubrica ? "Rúbrica" : esGeneral ? "Comentario del caso" : "Comentarios por pregunta"
+      }
+      avisoEntrada={
+        rolAccion === "admin"
+          ? null
+          : avisoEntradaEvaluador(asignacion.estado, {
+              publicaDirecto,
+              esRubrica,
+            })
+      }
+      veredictosIniciales={veredictosIniciales}
+      meta={
+        <FichaCasoMeta
+          participante={asignacion.postulacion.postulante.name}
+          evaluador={asignacion.evaluador.name}
+        />
+      }
+      caso={
+        <>
+          {esRubrica ? null : (
+            <ResumenCambiosReenvio key="cambios-reenvio" preguntas={preguntasModificadas} />
+          )}
+          {asignacion.postulacion.convocatoria.formulario.preguntas.map((pregunta) => {
+            const respuesta = asignacion.postulacion.respuestas.find((r) => r.preguntaId === pregunta.id);
+            const modificada = !esRubrica && idsModificadas.has(pregunta.id);
+            return (
+              <EvalDetalleCelda key={pregunta.id} panel="caso">
+                <PreguntaCampo
+                  pregunta={pregunta}
+                  respuesta={respuesta}
+                  disabled
+                  modificada={modificada}
+                  videoInline={esRubrica}
+                  acciones={
+                    !esRubrica && respuesta?.versiones && respuesta.versiones.length > 0 ? (
+                      <HistorialVersionesRespuesta
+                        tipo={pregunta.tipo}
+                        opciones={pregunta.opciones}
+                        videoInline={esRubrica}
+                        vigente={{
+                          id: respuesta.id,
+                          valor: respuesta.valor,
+                          archivos: respuesta.archivos,
+                          createdAt: respuesta.updatedAt.toISOString(),
+                        }}
+                        versiones={respuesta.versiones.map((version, index) => ({
+                          id: version.id,
+                          valor: version.valor,
+                          archivos: version.archivos,
+                          createdAt: version.createdAt.toISOString(),
+                          numero: respuesta.versiones.length - index,
+                        }))}
+                        modificada={modificada}
+                      />
+                    ) : null
+                  }
+                />
+              </EvalDetalleCelda>
+            );
+          })}
+        </>
+      }
+      evaluacion={
+        esRubrica ? (
+          <EvalDetalleCelda key="eval-rubrica" panel="eval">
+            <PanelRubricaEvaluador
+              escala={rubrica.escala}
+              criterios={rubrica.criterios}
+              notasIniciales={asignacion.revisionesCriterio
+                .filter((item) => item.ronda === ronda && item.ciclo === ciclo)
+                .map((item) => ({ criterioId: item.criterioId, nota: item.nota }))}
+              comentarioInicial={
+                revisionParaEditar(asignacion.revisionesGenerales, ronda, ciclo)?.comentario ?? ""
+              }
+              canEdit={canEdit}
+            />
+          </EvalDetalleCelda>
+        ) : esGeneral ? (
+          <EvalDetalleCelda key="eval-general" panel="eval">
+            <PanelHiloRevision
+              audiencia="equipo"
+              asignacion={hiloAsignacion}
+              revisiones={asignacion.revisionesGenerales.map((item) => ({
+                ...item,
+                createdAt: item.createdAt.toISOString(),
+              }))}
+              supervisiones={asignacion.supervisionesGenerales.map((item) => ({
+                ...item,
+                createdAt: item.createdAt.toISOString(),
+              }))}
+              nombreEvaluador={asignacion.evaluador.name}
+              nombreSupervisor={asignacion.postulacion.supervision?.supervisor.name}
+              canEdit={canEdit}
+              rolEditor={canEdit ? "evaluador" : null}
+              notasPreguntas={notasParaEvaluacionGeneral(
+                asignacion.postulacion.convocatoria.formulario.preguntas,
+                asignacion.revisiones,
+                ronda,
+                ciclo,
+              )}
+              preguntasNotas={asignacion.postulacion.convocatoria.formulario.preguntas}
+              revisionesNotas={asignacion.revisiones}
+            />
+          </EvalDetalleCelda>
+        ) : (
+          asignacion.postulacion.convocatoria.formulario.preguntas.map((pregunta) => {
+            const escala = pregunta.conNotas ? parseEscalaNotas(pregunta.escalaNotas) : [];
+            return (
+              <EvalDetalleCelda key={pregunta.id} panel="eval">
+                <PanelHiloRevision
+                  audiencia="equipo"
+                  asignacion={hiloAsignacion}
+                  preguntaId={pregunta.id}
+                  escala={escala}
+                  revisiones={asignacion.revisiones
+                    .filter((item) => item.preguntaId === pregunta.id)
+                    .map((item) => ({ ...item, createdAt: item.createdAt.toISOString() }))}
+                  supervisiones={asignacion.supervisionesPregunta
+                    .filter((item) => item.preguntaId === pregunta.id)
+                    .map((item) => ({ ...item, createdAt: item.createdAt.toISOString() }))}
+                  nombreEvaluador={asignacion.evaluador.name}
+                  nombreSupervisor={asignacion.postulacion.supervision?.supervisor.name}
+                  canEdit={canEdit}
+                  rolEditor={canEdit ? "evaluador" : null}
+                  respuestaModificada={idsModificadas.has(pregunta.id)}
+                />
+              </EvalDetalleCelda>
+            );
+          })
+        )
+      }
+    />
+  );
+}

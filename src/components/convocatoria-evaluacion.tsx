@@ -95,6 +95,7 @@ type PoolItem = {
 };
 
 type Asignacion = {
+  id?: string;
   evaluadorId: string;
   evaluadorNombre: string;
   orden: number;
@@ -424,6 +425,7 @@ function AccionesCasoModal({
   mostrarRevision,
   onVerCaso,
   onEditarCaso,
+  onEditarEvaluacion,
   onRecordatorioParticipante,
   onRecordatorioEvaluador,
   onRecordatorioSupervisor,
@@ -438,6 +440,7 @@ function AccionesCasoModal({
   mostrarRevision: boolean;
   onVerCaso: () => void;
   onEditarCaso: () => void;
+  onEditarEvaluacion: (asignacionId: string) => void;
   onRecordatorioParticipante: () => void;
   onRecordatorioEvaluador: () => void;
   onRecordatorioSupervisor: () => void;
@@ -445,6 +448,7 @@ function AccionesCasoModal({
 }) {
   const [generandoPdf, setGenerandoPdf] = useState(false);
   const [errorPdf, setErrorPdf] = useState<string | null>(null);
+  const [eligiendoEvaluacion, setEligiendoEvaluacion] = useState(false);
   const participante = recordatorioParticipante(postulacion, preguntas);
   const evaluador = recordatorioEvaluadorCaso(postulacion.asignaciones);
   const supervisor = recordatorioSupervisorCaso(postulacion.asignaciones, postulacion.supervision);
@@ -473,6 +477,37 @@ function AccionesCasoModal({
     }
   }
 
+  if (eligiendoEvaluacion) {
+    return (
+      <div className="eval-acciones-caso">
+        <button
+          className="btn btn-sm btn-secondary"
+          type="button"
+          disabled={ocupado}
+          onClick={() => setEligiendoEvaluacion(false)}
+        >
+          Volver
+        </button>
+        {postulacion.asignaciones.length === 0 ? (
+          <p className="eval-acciones-hint">Este caso no tiene evaluaciones asignadas.</p>
+        ) : (
+          postulacion.asignaciones.map((asignacion) => (
+            <button
+              key={asignacion.id ?? asignacion.evaluadorId}
+              className="btn btn-sm btn-secondary"
+              type="button"
+              disabled={ocupado || !asignacion.id}
+              onClick={() => asignacion.id && onEditarEvaluacion(asignacion.id)}
+            >
+              Editar · {asignacion.evaluadorNombre}
+              {` (${etiquetaEstadoAsignacionFicha(estadoAsignacionFicha(asignacion.estado))})`}
+            </button>
+          ))
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="eval-acciones-caso">
       <button className="btn btn-sm btn-secondary" type="button" disabled={ocupado} onClick={onVerCaso}>
@@ -486,6 +521,23 @@ function AccionesCasoModal({
           onClick={onEditarCaso}
         >
           Editar caso
+        </button>
+      ) : null}
+      {mostrarRevision ? (
+        <button
+          className="btn btn-sm btn-secondary"
+          type="button"
+          disabled={ocupado || postulacion.asignaciones.length === 0}
+          onClick={() => {
+            const conId = postulacion.asignaciones.filter((item) => item.id);
+            if (conId.length === 1 && conId[0].id) {
+              onEditarEvaluacion(conId[0].id);
+              return;
+            }
+            setEligiendoEvaluacion(true);
+          }}
+        >
+          Editar evaluaciones
         </button>
       ) : null}
       <button
@@ -2488,6 +2540,13 @@ export function ConvocatoriaEvaluacion({
                     const caso = accionesCaso;
                     cerrarAccionesCaso();
                     router.push(`/admin/mentorias/${convocatoriaId}/casos/${caso.id}`);
+                  }}
+                  onEditarEvaluacion={(asignacionId) => {
+                    const caso = accionesCaso;
+                    cerrarAccionesCaso();
+                    router.push(
+                      `/admin/mentorias/${convocatoriaId}/casos/${caso.id}/evaluaciones/${asignacionId}`,
+                    );
                   }}
                   onRecordatorioParticipante={() =>
                     void ejecutarRecordatorio(

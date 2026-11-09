@@ -329,6 +329,7 @@ export async function getPanelEvaluacion(id: string) {
               )
             : null;
         return {
+          id: asignacion.id,
           evaluadorId: asignacion.evaluadorId,
           evaluadorNombre: asignacion.evaluador.name,
           orden: asignacion.orden,

@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       omitirArchivosNuevos,
     });
   } else if (kindRaw === "evaluacion") {
-    if (user.role !== "EVALUADOR" && user.role !== "SUPERVISOR") {
+    if (user.role !== "EVALUADOR" && user.role !== "SUPERVISOR" && user.role !== "ADMIN") {
       return Response.json({ error: "No autorizado." }, { status: 403 });
     }
     resultado = await persistirBorradorEvaluacion({
@@ -55,6 +55,7 @@ export async function POST(request: Request) {
       expectedUpdatedAt,
       cambiarEstado: false,
       permitirSinVeredicto: true,
+      comoAdmin: user.role === "ADMIN",
     });
   } else {
     if (user.role !== "SUPERVISOR") {

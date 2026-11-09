@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { enviarObservaciones, finalizarEvaluacion, guardarRevision } from "@/actions/evaluaciones";
+import {
+  enviarObservaciones,
+  finalizarEvaluacion,
+  guardarRevision,
+  guardarRevisionAdmin,
+} from "@/actions/evaluaciones";
 import {
   enviarObservacionesSupervision,
   guardarSupervision,
@@ -30,6 +35,7 @@ import {
   debeRestaurarCopiaLocal,
   escribirCopiaLocal,
   esResultadoBorradorOk,
+  formDataDesdeFormulario,
   leerCopiaLocal,
   mensajeErrorEnvio,
   mensajeErrorGuardado,
@@ -155,7 +161,7 @@ export function FormularioEvaluacion({
   asignacionId: string;
   canEdit: boolean;
   modoEvaluacion?: ModoEvaluacion;
-  rolAccion?: "evaluador" | "supervisor" | "lectura";
+  rolAccion?: "evaluador" | "supervisor" | "lectura" | "admin";
   intencionPendiente?: IntencionSupervision | string | null;
   /** Si true, Pedir cambios / Finalizar llegan al participante sin pasar por supervisor. */
   publicaDirecto?: boolean;
@@ -182,6 +188,7 @@ export function FormularioEvaluacion({
   const esGeneral = modoEvaluacion === "GENERAL";
   const esRubrica = modoEvaluacion === "RUBRICA";
   const esSupervisor = rolAccion === "supervisor";
+  const esAdmin = rolAccion === "admin";
   const reportarVeredicto = useCallback((_clave: string, _veredicto: string) => {}, []);
   const mostrarAcciones = canEdit && rolAccion !== "lectura" && !bloqueado;
   const autoguardado = useAutoguardado({
@@ -229,7 +236,7 @@ export function FormularioEvaluacion({
   }, [asignacionId, autoguardado, kindAutoguardado, mostrarAcciones, versionInicial]);
 
   function datosDelFormulario() {
-    return formRef.current ? new FormData(formRef.current) : null;
+    return formRef.current ? formDataDesdeFormulario(formRef.current) : null;
   }
 
   function abrirConfirmacion(tipo: AccionEnvio) {
@@ -532,9 +539,15 @@ export function FormularioEvaluacion({
                 data-tour="guardar-revision"
                 type="button"
                 disabled={Boolean(guardadoModal) || Boolean(envioModal) || accion.guardando}
-                onClick={guardarRevisionActual(esSupervisor ? guardarSupervision : guardarRevision)}
+                onClick={guardarRevisionActual(
+                  esAdmin
+                    ? guardarRevisionAdmin
+                    : esSupervisor
+                      ? guardarSupervision
+                      : guardarRevision,
+                )}
               >
-                Guardar borrador
+                {esAdmin ? "Guardar evaluación" : "Guardar borrador"}
               </button>
             </div>
           ) : null}
@@ -556,6 +569,7 @@ export function FormularioEvaluacion({
             esSupervisor,
             esGeneral,
             esRubrica,
+            soloGuardar: esAdmin,
             intencionPendiente: intencionPendiente ?? null,
             veredictoPanel,
             setVeredictoPanel,

@@ -92,6 +92,7 @@ export function supervisorActuaComoEvaluador(modo: ModoRevision): boolean {
 
 /** Borrador del formulario de evaluación. El supervisor entra cuando no hay evaluadores. */
 export function puedeGuardarBorradorEvaluacion(rol: string, modo: ModoRevision): boolean {
+  if (rol === "ADMIN") return true;
   if (rol === "EVALUADOR") return usaEvaluadores(modo);
   if (rol === "SUPERVISOR") return supervisorActuaComoEvaluador(modo);
   return false;

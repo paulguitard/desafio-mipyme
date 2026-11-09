@@ -275,9 +275,9 @@ async function persistirSupervisionGeneral(
   });
 }
 
-async function cargaAsignacionEvaluador(id: string, evaluadorId: string) {
+async function cargaAsignacionEvaluador(id: string, evaluadorId: string | null) {
   return prisma.asignacionEvaluador.findFirst({
-    where: { id, evaluadorId },
+    where: evaluadorId ? { id, evaluadorId } : { id },
     include: {
       postulacion: {
         include: {
@@ -322,9 +322,14 @@ export async function persistirBorradorEvaluacion(args: {
   expectedUpdatedAt?: string | null;
   cambiarEstado?: boolean;
   permitirSinVeredicto?: boolean;
+  comoAdmin?: boolean;
 }): Promise<ResultadoBorrador> {
   const asignacionId = String(args.formData.get("asignacionId") ?? "");
-  const asignacion = await cargaAsignacionEvaluador(asignacionId, args.userId);
+  const comoAdmin = Boolean(args.comoAdmin && args.rol === "ADMIN");
+  const asignacion = await cargaAsignacionEvaluador(
+    asignacionId,
+    comoAdmin ? null : args.userId,
+  );
   if (!asignacion) return { error: "Evaluación no encontrada." };
   if (
     !puedeGuardarBorradorEvaluacion(
@@ -334,17 +339,19 @@ export async function persistirBorradorEvaluacion(args: {
   ) {
     return { error: "No tienes permiso para editar esta evaluación." };
   }
-  if (asignacion.estado === "FINALIZADA") {
-    return { error: "Esta evaluación ya está finalizada." };
-  }
-  if (asignacion.estado === "CON_OBSERVACIONES") {
-    return { error: "Espera la corrección del participante." };
-  }
-  if (asignacion.estado === "EN_SUPERVISION") {
-    return { error: "Espera la revisión del supervisor." };
-  }
-  if (!evaluadorPuedeEditar(asignacion.estado)) {
-    return { error: "No puedes editar en este estado." };
+  if (!comoAdmin) {
+    if (asignacion.estado === "FINALIZADA") {
+      return { error: "Esta evaluación ya está finalizada." };
+    }
+    if (asignacion.estado === "CON_OBSERVACIONES") {
+      return { error: "Espera la corrección del participante." };
+    }
+    if (asignacion.estado === "EN_SUPERVISION") {
+      return { error: "Espera la revisión del supervisor." };
+    }
+    if (!evaluadorPuedeEditar(asignacion.estado)) {
+      return { error: "No puedes editar en este estado." };
+    }
   }
 
   if (
