@@ -1,5 +1,5 @@
 import { sanitizeComentarioRichText } from "@/lib/html";
-import { esHtmlVacio, pareceHtml } from "@/lib/preguntas";
+import { esHtmlVacio, pareceHtml, textoPlanoDesdeHtml } from "@/lib/preguntas";
 
 function escapeHtml(valor: string) {
   return valor
@@ -29,5 +29,10 @@ export function htmlParaVistaComentario(valor: string): string {
 /** Sanitiza el HTML del comentario (N/C/S y viñetas). Vacío queda en string vacío. */
 export function sanitizarComentarioObservacion(html: string): string {
   const limpio = sanitizeComentarioRichText(html);
+  const planoOrig = textoPlanoDesdeHtml(html);
+  const planoLimpio = textoPlanoDesdeHtml(limpio);
+  if (planoOrig && planoOrig.startsWith(planoLimpio) && planoOrig.length > planoLimpio.length) {
+    return htmlDesdeTextoPlano(planoOrig);
+  }
   return esHtmlVacio(limpio) ? "" : limpio;
 }

@@ -58,4 +58,12 @@ describe("sanitizarComentarioObservacion", () => {
     expect(clean).toContain("implementación de un canal digital");
     expect(clean).toContain("buenas intenciones");
   });
+
+  it("recupera el texto si un tag queda abierto sin cierre", () => {
+    const clean = sanitizarComentarioObservacion(
+      '<p>Problema bien cuantificado a pesar de la complejidad. El uso de recursos completamente claro, al igual que la planificaci<span style="font-size: 1.25rem',
+    );
+    expect(clean).toContain("planificaci");
+    expect(clean).toContain("completamente claro");
+  });
 });
