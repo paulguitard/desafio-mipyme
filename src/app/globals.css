@@ -1397,6 +1397,69 @@ h1.formulario-caso-titulo {
   border: 0;
 }
 
+.dashboard-pitch-video .pregunta-video-embed-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+
+.dashboard-pitch-video .pregunta-video-embed-frame iframe {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+.dashboard-pitch-video .pregunta-video-embed {
+  padding-bottom: 0.75rem;
+}
+
+.dashboard-pitch-video .pregunta-video-embed > a {
+  display: block;
+  padding: 0 0.75rem;
+}
+
+.dashboard-pitch-tabla tbody tr.dashboard-pitch-fila-seleccionada {
+  position: relative;
+  z-index: 1;
+  background: #fff7f8;
+  box-shadow:
+    0 0 0 1px rgb(255 160 175 / 0.4),
+    0 0 18px 3px rgb(200 16 46 / 0.18),
+    0 0 36px 8px rgb(165 13 38 / 0.1);
+  outline: 2px solid var(--red);
+  outline-offset: -2px;
+}
+
+.dashboard-pitch-tabla tbody tr.dashboard-pitch-fila-seleccionada td {
+  background: #fff7f8;
+  border-color: transparent;
+}
+
+.dashboard-pitch-barra-btn,
+.dashboard-pitch-toolbar-control {
+  box-sizing: border-box;
+  height: 1.75rem;
+  min-height: 1.75rem;
+  max-height: 1.75rem;
+  border-width: 1px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.dashboard-pitch-barra-btn {
+  padding: 0 0.55rem;
+  font-weight: 600;
+}
+
+.dashboard-pitch-toolbar {
+  min-height: 1.75rem;
+}
+
+.dashboard-pitch-toolbar-control {
+  padding: 0 0.5rem;
+}
+
 .pregunta-adjuntos .pregunta-adjuntos-lista > li {
   min-width: 0;
 }
@@ -2337,6 +2400,14 @@ a.pregunta-adjuntos-video {
   flex-direction: column;
   overflow: hidden;
   background: var(--background);
+}
+
+.dashboard-participantes-page .dashboard-vista-btn {
+  font-family: var(--font-montserrat), "Segoe UI", sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
 }
 
 html:has(.ficha-publica-page),

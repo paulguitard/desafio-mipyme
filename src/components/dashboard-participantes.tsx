@@ -1,5 +1,11 @@
+"use client";
+
+import { FormEvent, useState } from "react";
+import { desbloquearEvaluacionesPitch } from "@/actions/dashboard-participantes";
 import { BrandMark } from "@/components/brand-mark";
+import { DashboardEvaluacionesPitch } from "@/components/dashboard-evaluaciones-pitch";
 import { DashboardTablaParticipantes } from "@/components/dashboard-tabla-participantes";
+import type { EvaluacionesPitchPayload } from "@/lib/dashboard-evaluaciones-pitch";
 import type { FilaDashboardParticipante, ResumenDashboardParticipantes } from "@/lib/perfiles-asesorias";
 import { barrasTdPorSeccion, resumenDashboardPublico } from "@/lib/perfiles-asesorias";
 
@@ -108,21 +114,87 @@ function AnilloTorta({
   );
 }
 
-export function DashboardParticipantes({ filas }: { filas: FilaDashboardParticipante[] }) {
+function botonVista(activa: boolean) {
+  return activa
+    ? "dashboard-vista-btn rounded-md bg-white px-3 py-1.5 text-navy"
+    : "dashboard-vista-btn rounded-md px-3 py-1.5 text-white/80 hover:bg-white/10";
+}
+
+export function DashboardParticipantes({
+  filas,
+  token,
+}: {
+  filas: FilaDashboardParticipante[];
+  token: string;
+}) {
   const resumen: ResumenDashboardParticipantes = resumenDashboardPublico(filas);
+  const [vista, setVista] = useState<"inicio" | "pitch">("inicio");
+  const [payload, setPayload] = useState<EvaluacionesPitchPayload | null>(null);
+  const [clave, setClave] = useState("");
+  const [error, setError] = useState("");
+  const [enviando, setEnviando] = useState(false);
+
+  async function enviarClave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setEnviando(true);
+    setError("");
+    const resultado = await desbloquearEvaluacionesPitch({ token, clave });
+    setEnviando(false);
+    if (!resultado.ok) {
+      setError(resultado.error);
+      return;
+    }
+    setPayload(resultado.data);
+    setClave("");
+  }
 
   return (
     <div className="dashboard-participantes-page">
       <header className="shrink-0 border-b border-white/10 bg-navy px-4 py-3 text-white sm:px-6">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <BrandMark inverted compact href="/" />
           <h1 className="border-l border-white/20 pl-4 font-sans text-base font-normal leading-tight sm:text-lg">
             Desafío MiPyme
           </h1>
+          <nav className="ml-auto flex gap-1" aria-label="Vistas del dashboard">
+            <button className={botonVista(vista === "inicio")} type="button" onClick={() => setVista("inicio")}>
+              Inicio
+            </button>
+            <button className={botonVista(vista === "pitch")} type="button" onClick={() => setVista("pitch")}>
+              Evaluaciones Pitch
+            </button>
+          </nav>
         </div>
       </header>
 
-      <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 md:grid-cols-2 md:p-4">
+      {vista === "pitch" && payload ? <DashboardEvaluacionesPitch data={payload} /> : null}
+
+      {vista === "pitch" && !payload ? (
+        <main className="grid min-h-0 flex-1 place-items-center overflow-auto p-4">
+          <form className="card w-full max-w-md space-y-4 p-6" onSubmit={enviarClave}>
+            <h2 className="text-base font-extrabold text-navy">Evaluaciones Pitch</h2>
+            <p className="text-sm text-muted">Ingresa la contraseña para ver las evaluaciones.</p>
+            <label className="field" htmlFor="clave-evaluaciones-pitch">
+              <span>Contraseña</span>
+              <input
+                className="input"
+                id="clave-evaluaciones-pitch"
+                type="password"
+                value={clave}
+                onChange={(event) => setClave(event.target.value)}
+                autoComplete="current-password"
+              />
+            </label>
+            {error ? <p className="text-sm font-semibold text-red">{error}</p> : null}
+            <button className="btn btn-navy" type="submit" disabled={enviando}>
+              {enviando ? "Entrando…" : "Entrar"}
+            </button>
+          </form>
+        </main>
+      ) : null}
+
+      {vista === "inicio" ? (
+        <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 md:grid-cols-2 md:p-4">
         <aside className="flex min-h-0 flex-col gap-6 overflow-auto pt-1">
           <h2 className="flex items-baseline gap-2 px-4 font-extrabold text-navy">
             <span className="text-3xl tabular-nums leading-none">{resumen.total}</span>
@@ -169,8 +241,9 @@ export function DashboardParticipantes({ filas }: { filas: FilaDashboardParticip
           </div>
         </aside>
 
-        <DashboardTablaParticipantes filas={filas} />
-      </main>
+          <DashboardTablaParticipantes filas={filas} />
+        </main>
+      ) : null}
     </div>
   );
 }

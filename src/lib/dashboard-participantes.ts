@@ -1,11 +1,19 @@
 import { prisma } from "@/lib/db";
 import { CONFIG_APP_ID } from "@/lib/config-app";
 import { normalizarCorreo } from "@/lib/correo";
+import {
+  evaluadorDesdeAsignacionPitch,
+  mapearCasoEvaluacionPitch,
+  nombreCasoPitch,
+  urlVideoSegundaPregunta,
+  type EvaluacionesPitchPayload,
+} from "@/lib/dashboard-evaluaciones-pitch";
 import { esTokenPublicoValido, generarTokenPublico } from "@/lib/ficha-publica";
 import { parseArchivosSoloFiles } from "@/lib/preguntas";
 import {
   anexarAsesoriasAPerfiles,
   elegirConvocatoriaActiva,
+  esParticipanteOcultoEnAnalisis,
   filasDashboardPublico,
   filtrarPerfilesAnalisis,
   TITULO_ASESORIA_PITCH,
@@ -88,4 +96,74 @@ export async function cargarFilasDashboardParticipantes(): Promise<FilaDashboard
       ),
     ),
   );
+}
+
+export async function cargarCasosEvaluacionesPitch(): Promise<EvaluacionesPitchPayload> {
+  const convocatorias = await prisma.convocatoria.findMany({
+    select: { id: true, titulo: true, estado: true, createdAt: true },
+  });
+  const pitch = elegirConvocatoriaActiva(convocatorias, TITULO_ASESORIA_PITCH);
+  if (!pitch) return { criterios: [], casos: [] };
+
+  const convocatoria = await prisma.convocatoria.findUnique({
+    where: { id: pitch.id },
+    include: {
+      formulario: {
+        include: {
+          preguntas: { orderBy: { orden: "asc" } },
+          rubrica: { include: { criterios: { orderBy: { orden: "asc" } } } },
+        },
+      },
+      postulaciones: {
+        where: { enviadaAt: { not: null } },
+        include: {
+          postulante: { select: { name: true, email: true } },
+          respuestas: true,
+          asignaciones: {
+            include: {
+              evaluador: { select: { name: true } },
+              revisionesCriterio: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
+              revisionesGenerales: { orderBy: [{ ronda: "asc" }, { ciclo: "asc" }, { createdAt: "asc" }] },
+            },
+            orderBy: { orden: "asc" },
+          },
+        },
+        orderBy: { enviadaAt: "desc" },
+      },
+    },
+  });
+  if (!convocatoria) return { criterios: [], casos: [] };
+
+  const criterios = (convocatoria.formulario.rubrica?.criterios ?? []).map((criterio) => ({
+    id: criterio.id,
+    nombre: criterio.nombre,
+    peso: criterio.peso,
+  }));
+  const preguntas = convocatoria.formulario.preguntas;
+  const casos = convocatoria.postulaciones
+    .filter((postulacion) => !esParticipanteOcultoEnAnalisis(postulacion.postulante.email))
+    .map((postulacion) => {
+      const evaluadores = postulacion.asignaciones.map((asignacion) =>
+        evaluadorDesdeAsignacionPitch({
+          id: asignacion.id,
+          nombre: asignacion.evaluador.name,
+          estado: asignacion.estado,
+          rondaActual: asignacion.rondaActual,
+          cicloSupervision: asignacion.cicloSupervision,
+          criterios,
+          revisionesCriterio: asignacion.revisionesCriterio,
+          revisionesGenerales: asignacion.revisionesGenerales,
+        }),
+      );
+      return mapearCasoEvaluacionPitch({
+        postulacionId: postulacion.id,
+        participanteNombre: postulacion.postulante.name,
+        nombreCaso: nombreCasoPitch(postulacion.nombreCaso, preguntas, postulacion.respuestas),
+        videoUrl: urlVideoSegundaPregunta(preguntas, postulacion.respuestas),
+        criterios,
+        evaluadores,
+      });
+    });
+
+  return { criterios, casos };
 }

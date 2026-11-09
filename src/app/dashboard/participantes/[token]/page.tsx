@@ -17,5 +17,5 @@ export default async function DashboardParticipantesPage({
   if (!esperado || token !== esperado) notFound();
 
   const filas = await cargarFilasDashboardParticipantes();
-  return <DashboardParticipantes filas={filas} />;
+  return <DashboardParticipantes filas={filas} token={token} />;
 }

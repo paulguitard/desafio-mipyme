@@ -162,6 +162,59 @@ export function promedioNotasRubrica(args: {
   return suma / args.notas.length;
 }
 
+export type EvaluadorRubricaParcial = {
+  nombre: string;
+  estado: string;
+  notas: { criterioId: string; nota: number | null | undefined }[];
+};
+
+export type PromedioParcialRubrica = {
+  promedioPorCriterio: Record<string, number | null>;
+  ponderacionPromedio: number | null;
+  finalizados: number;
+  asignados: number;
+  hayPendientes: boolean;
+  pendientesNombres: string[];
+};
+
+/** Promedio de quienes ya finalizaron, aunque queden evaluadores asignados pendientes. */
+export function promedioParcialRubricaFinalizados(args: {
+  criterios: { id: string; peso: number }[];
+  evaluadores: EvaluadorRubricaParcial[];
+}): PromedioParcialRubrica {
+  const finalizados = args.evaluadores.filter((item) => item.estado === "FINALIZADA");
+  const pendientes = args.evaluadores.filter((item) => item.estado !== "FINALIZADA");
+  const promedioPorCriterio: Record<string, number | null> = {};
+  for (const criterio of args.criterios) {
+    const notas = finalizados
+      .map((item) => item.notas.find((nota) => nota.criterioId === criterio.id)?.nota)
+      .filter((nota): nota is number => nota != null && Number.isFinite(nota));
+    promedioPorCriterio[criterio.id] =
+      notas.length === 0 ? null : notas.reduce((acc, nota) => acc + nota, 0) / notas.length;
+  }
+  const ponderaciones = finalizados
+    .map((item) =>
+      notaPonderadaRubrica(
+        args.criterios.map((criterio) => ({
+          peso: criterio.peso,
+          nota: item.notas.find((nota) => nota.criterioId === criterio.id)?.nota ?? null,
+        })),
+      ),
+    )
+    .filter((nota): nota is number => nota != null && Number.isFinite(nota));
+  return {
+    promedioPorCriterio,
+    ponderacionPromedio:
+      ponderaciones.length === 0
+        ? null
+        : ponderaciones.reduce((acc, nota) => acc + nota, 0) / ponderaciones.length,
+    finalizados: finalizados.length,
+    asignados: args.evaluadores.length,
+    hayPendientes: pendientes.length > 0,
+    pendientesNombres: pendientes.map((item) => item.nombre),
+  };
+}
+
 export function notaEnEscala(nota: number, escala: number[]): boolean {
   return escala.includes(nota);
 }

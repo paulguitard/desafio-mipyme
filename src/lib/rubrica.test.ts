@@ -6,6 +6,7 @@ import {
   parseEscalaRubrica,
   parseExplicacionesRubrica,
   promedioNotasRubrica,
+  promedioParcialRubricaFinalizados,
   sumaPesosRubrica,
   validarRubrica,
 } from "@/lib/rubrica";
@@ -128,6 +129,62 @@ describe("promedioNotasRubrica", () => {
     expect(promedioNotasRubrica({ notas: [3.6, 4.2], todosFinalizaron: false })).toBeNull();
     expect(promedioNotasRubrica({ notas: [3.6, 4.2], todosFinalizaron: true })).toBeCloseTo(3.9);
     expect(promedioNotasRubrica({ notas: [4], todosFinalizaron: true })).toBe(4);
+  });
+});
+
+describe("promedioParcialRubricaFinalizados", () => {
+  const criterios = [
+    { id: "c1", peso: 70 },
+    { id: "c2", peso: 30 },
+  ];
+
+  it("promedia solo a quienes finalizaron y marca pendientes", () => {
+    const resultado = promedioParcialRubricaFinalizados({
+      criterios,
+      evaluadores: [
+        {
+          nombre: "Ana",
+          estado: "FINALIZADA",
+          notas: [
+            { criterioId: "c1", nota: 4 },
+            { criterioId: "c2", nota: 2 },
+          ],
+        },
+        {
+          nombre: "Luis",
+          estado: "FINALIZADA",
+          notas: [
+            { criterioId: "c1", nota: 2 },
+            { criterioId: "c2", nota: 4 },
+          ],
+        },
+        {
+          nombre: "Mia",
+          estado: "PENDIENTE",
+          notas: [{ criterioId: "c1", nota: 5 }],
+        },
+      ],
+    });
+    expect(resultado.promedioPorCriterio.c1).toBe(3);
+    expect(resultado.promedioPorCriterio.c2).toBe(3);
+    expect(resultado.ponderacionPromedio).toBe(3);
+    expect(resultado.finalizados).toBe(2);
+    expect(resultado.asignados).toBe(3);
+    expect(resultado.hayPendientes).toBe(true);
+    expect(resultado.pendientesNombres).toEqual(["Mia"]);
+  });
+
+  it("deja pendiente si nadie finalizó", () => {
+    const resultado = promedioParcialRubricaFinalizados({
+      criterios,
+      evaluadores: [
+        { nombre: "Mia", estado: "PENDIENTE", notas: [{ criterioId: "c1", nota: 5 }] },
+      ],
+    });
+    expect(resultado.promedioPorCriterio.c1).toBeNull();
+    expect(resultado.promedioPorCriterio.c2).toBeNull();
+    expect(resultado.ponderacionPromedio).toBeNull();
+    expect(resultado.hayPendientes).toBe(true);
   });
 });
 
