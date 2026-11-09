@@ -18,6 +18,7 @@ import {
   debeRestaurarCopiaLocal,
   escribirCopiaLocal,
   esResultadoBorradorOk,
+  formDataDesdeFormulario,
   leerCopiaLocal,
   mensajeErrorEnvio,
   mensajeErrorGuardado,
@@ -128,7 +129,7 @@ export function FormularioPostulante({
   }, [autoguardado, canEdit, postulacionId, versionInicial]);
 
   function datosDelFormulario() {
-    return formRef.current ? new FormData(formRef.current) : null;
+    return formRef.current ? formDataDesdeFormulario(formRef.current) : null;
   }
 
   function conGuardado(

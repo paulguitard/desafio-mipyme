@@ -7,6 +7,8 @@ import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
 import { TextStyle, FontSize } from "@tiptap/extension-text-style";
 import { avisarCambioFormulario } from "@/lib/autoguardado";
+import { quitarAtributosHtml } from "@/lib/html";
+import { EVENTO_SYNC_EDITORES } from "@/lib/integridad-borrador";
 import { esHtmlVacio } from "@/lib/preguntas";
 
 function htmlParaFormulario(html: string) {
@@ -152,7 +154,7 @@ export function EditorTextoLargo({
   onChange?: (html: string) => void;
 }) {
   const fieldId = useId();
-  const hiddenRef = useRef<HTMLInputElement>(null);
+  const hiddenRef = useRef<HTMLTextAreaElement>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const aceptaSenalEdicion = useRef(false);
@@ -204,8 +206,12 @@ export function EditorTextoLargo({
     editorProps: {
       attributes: {
         class: "rte-content",
+        id: name || fieldId,
         role: "textbox",
         "aria-multiline": "true",
+      },
+      transformPastedHTML(html) {
+        return !destacados && !tamano && !alinear ? quitarAtributosHtml(html) : html;
       },
     },
   });
@@ -231,8 +237,16 @@ export function EditorTextoLargo({
     if (!editor) return;
     const form = hiddenRef.current?.form;
     if (!form) return;
+    const copiarAlCampo = () => {
+      const next = htmlParaFormulario(editor.getHTML());
+      if (hiddenRef.current) hiddenRef.current.value = next;
+      return next;
+    };
     const onFormData = (event: FormDataEvent) => {
-      event.formData.set(name, htmlParaFormulario(editor.getHTML()));
+      event.formData.set(name, copiarAlCampo());
+    };
+    const onSync = () => {
+      copiarAlCampo();
     };
     const onRestaurar = (event: Event) => {
       const detail = (event as CustomEvent<{ name?: string; value?: string }>).detail;
@@ -242,9 +256,11 @@ export function EditorTextoLargo({
       syncHtml(editor.getHTML(), { senal: true });
     };
     form.addEventListener("formdata", onFormData);
+    form.addEventListener(EVENTO_SYNC_EDITORES, onSync);
     form.addEventListener("borrador:restaurar", onRestaurar);
     return () => {
       form.removeEventListener("formdata", onFormData);
+      form.removeEventListener(EVENTO_SYNC_EDITORES, onSync);
       form.removeEventListener("borrador:restaurar", onRestaurar);
     };
   }, [editor, name]);
@@ -336,13 +352,14 @@ export function EditorTextoLargo({
 
   return (
     <div className={`rte${disabled ? " is-disabled" : ""}`}>
-      <input
+      <textarea
         ref={hiddenRef}
-        type="hidden"
-        id={name || fieldId}
         name={name}
-        value={html}
+        defaultValue={html}
+        hidden
         readOnly
+        tabIndex={-1}
+        aria-hidden
       />
       {!disabled ? (
         <div className="rte-toolbar" role="toolbar" aria-label="Formato de texto">

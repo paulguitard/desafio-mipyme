@@ -1,5 +1,12 @@
 import type { KindAutoguardado } from "@/lib/autoguardado";
 
+export const EVENTO_SYNC_EDITORES = "borrador:sync";
+
+export function formDataDesdeFormulario(form: HTMLFormElement): FormData {
+  form.dispatchEvent(new Event(EVENTO_SYNC_EDITORES));
+  return new FormData(form);
+}
+
 export type CopiaLocalBorrador = {
   savedAt: string;
   versionBase: string;

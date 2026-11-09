@@ -13,6 +13,7 @@ import {
 import {
   borrarCopiaLocal,
   escribirCopiaLocal,
+  formDataDesdeFormulario,
   formDataSoloTexto,
 } from "@/lib/integridad-borrador";
 
@@ -140,7 +141,7 @@ export function useAutoguardado(args: {
       sucioRef.current = false;
 
       const soloTexto = Boolean(opciones?.soloTexto || opciones?.keepalive);
-      const formDataCrudo = new FormData(form);
+      const formDataCrudo = formDataDesdeFormulario(form);
       const formData = soloTexto ? formDataSoloTexto(formDataCrudo) : formDataCrudo;
       const id = idDesdeFormData(formDataCrudo, kindRef.current);
       const storage = typeof sessionStorage !== "undefined" ? sessionStorage : null;
