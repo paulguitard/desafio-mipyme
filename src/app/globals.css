@@ -1419,6 +1419,16 @@ h1.formulario-caso-titulo {
   padding: 0 0.75rem;
 }
 
+.dashboard-pitch-main {
+  min-height: 0;
+}
+
+.dashboard-pitch-main > * {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
 .dashboard-pitch-tabla tbody tr.dashboard-pitch-fila-seleccionada {
   position: relative;
   z-index: 1;

@@ -13,7 +13,7 @@ export function DashboardEvaluacionesPitch({ data }: { data: EvaluacionesPitchPa
   );
 
   return (
-    <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 md:grid-cols-[minmax(0,32%)_minmax(0,68%)] md:p-4">
+    <main className="dashboard-pitch-main grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 md:grid-cols-[minmax(0,32%)_minmax(0,68%)] md:p-4">
       <DashboardDetalleEvaluacionesPitch caso={caso} criterios={data.criterios} />
       <DashboardTablaEvaluacionesPitch
         criterios={data.criterios}

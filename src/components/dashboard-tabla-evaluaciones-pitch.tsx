@@ -195,7 +195,7 @@ export function DashboardTablaEvaluacionesPitch({
   const colSpan = 4 + criterios.length;
 
   return (
-    <div className="flex min-h-0 flex-col gap-2">
+    <div className="flex h-full min-h-0 flex-col gap-2 overflow-hidden">
       <div className="dashboard-pitch-toolbar flex shrink-0 flex-nowrap items-end gap-2 overflow-x-auto px-0.5">
         <div className="flex min-w-0 shrink-0 items-center gap-1.5">
           <BotonBarra activo={panel === "filtrar"} onClick={() => togglePanel("filtrar")}>

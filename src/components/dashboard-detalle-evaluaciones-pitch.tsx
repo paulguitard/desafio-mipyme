@@ -14,7 +14,7 @@ export function DashboardDetalleEvaluacionesPitch({
   criterios: CriterioPitchColumna[];
 }) {
   return (
-    <aside className="flex min-h-0 flex-col gap-4 overflow-hidden pt-1">
+    <aside className="flex h-full min-h-0 flex-col gap-4 overflow-hidden pt-1">
       <div className="shrink-0 space-y-3 bg-[var(--background)]">
         {caso ? (
           <div className="px-1">
@@ -50,7 +50,8 @@ export function DashboardDetalleEvaluacionesPitch({
       </div>
 
       {caso ? (
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+          <div className="space-y-4 pb-8">
           {criterios.map((criterio) => (
             <section key={criterio.id} className="card space-y-3 p-5">
               <h3 className="flex items-baseline justify-between gap-3 text-base font-extrabold text-navy">
@@ -107,6 +108,7 @@ export function DashboardDetalleEvaluacionesPitch({
               ))
             )}
           </section>
+          </div>
         </div>
       ) : null}
     </aside>
