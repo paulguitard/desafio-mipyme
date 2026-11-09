@@ -36,9 +36,21 @@ export function sanitizeRichText(html: string): string {
   );
 }
 
+/**
+ * Quita atributos de tags HTML. Evita que un atributo con comillas rotas
+ * (p. ej. style="font-size: 1.25rem>resto) se trague el texto siguiente.
+ */
+function quitarAtributosHtml(html: string): string {
+  return html.replace(/<([a-z][a-z0-9]*)\b[^>]*>/gi, (_, tag: string) => {
+    const nombre = tag.toLowerCase();
+    if (nombre === "br") return "<br>";
+    return `<${nombre}>`;
+  });
+}
+
 /** Comentarios de evaluación: negrita, cursiva, subrayado y viñetas; sin tamaño, alineación ni destacados. */
 export function sanitizeComentarioRichText(html: string): string {
-  return sanitizeHtml(html, {
+  return sanitizeHtml(quitarAtributosHtml(html), {
     allowedTags: ["p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li"],
     allowedAttributes: {},
     allowedSchemes: [],

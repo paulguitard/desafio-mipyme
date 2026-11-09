@@ -50,4 +50,12 @@ describe("sanitizarComentarioObservacion", () => {
     expect(clean).not.toMatch(/font-size|text-align|span/i);
     expect(clean).toContain("<strong>Hola</strong>");
   });
+
+  it("no recorta el texto si un atributo HTML viene mal cerrado", () => {
+    const clean = sanitizarComentarioObservacion(
+      '<p>El proyecto tiene buenas intenciones, pero es más una simple im<span style="font-size: 1.25rem>plementación de un canal digital.</span></p>',
+    );
+    expect(clean).toContain("implementación de un canal digital");
+    expect(clean).toContain("buenas intenciones");
+  });
 });
